@@ -109,8 +109,33 @@ npm run build             # 构建产物在 dist/
 node_modules\.bin\vue-tsc.cmd --noEmit   # 类型检查（Windows）
 ```
 
-## 八、约定
+## 八、开发规范
 
-- `.env.local` 不入库；`dist/`、`node_modules/` 不入库
-- 样式改动涉及颜色时，浅/深两套变量必须同时提供
-- 表格/树/空态改动遵循第五节规范，保持跨应用一致
+### 代码
+
+- **组合式 API**：统一 `<script setup lang="ts">`，不写 Options API；公共逻辑抽 composable / store，不在页面里堆
+- **接口**：一律走 `src/api/*.ts` 封装，组件不直接 `axios`；类型与后端 DTO 对齐
+- **权限**：按钮/入口显隐用 `store.can('资源:动作')`，不自己解析角色
+- **校验**：提交前必须过 `node_modules\.bin\vue-tsc.cmd --noEmit`，类型错误不过夜
+
+### 样式
+
+- **颜色只走 CSS 变量**（`--card-bg`、`--text-base`、`--border-subtle` 等），禁止写死 `#fff` / `#fafafa`；新增颜色必须浅/深两套同时给
+- **表格布局**统一 `ft-page / ft-head / ft-scroll / ft-bottom`，分页条 sticky 右下；空态表格用 `.tbl-empty`、面板用 `.org-empty` 居中撑满
+- **树样式**统一：选中透明底、悬浮中性灰、数量右对齐 11px 浅灰；不要在页面里覆盖成别的颜色
+- 覆盖 antd 默认样式时用 `:root` 提权选择器，不用 `!important` 打补丁（深色 hover 兜底等既有规则除外）
+
+### 主题
+
+- 主题读写只允许经 `src/stores/theme.ts`（cookie `polaris_theme` 优先），页面不直接操作 localStorage / `data-theme`
+- ehr-web 的 `?theme=` 参数是 iframe 嵌入专用，优先级最高且**不写回**偏好，别复用到其它场景
+
+### Git
+
+- 提交信息格式：`<type>: <说明>`，type ∈ `feat / fix / docs / style / refactor / chore`
+- `.env.local`、`dist/`、`node_modules/` 永不提交；`.env` 里只放网关地址等非敏感项
+
+## 九、约定
+
+- 表格/树/空态改动遵循第五、八节规范，保持跨应用一致
+- 改动涉及跨应用共享部分（主题、布局 class、request 封装）时，六个应用同步评估
