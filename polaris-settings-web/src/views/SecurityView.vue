@@ -39,7 +39,7 @@
                     v-model:value="form.defaultPassword"
                     :disabled="form.initialPasswordMode === 'RANDOM'"
                     :maxlength="64"
-                    placeholder="G#191975"
+                    placeholder="固定密码模式下必填"
                   />
                 </a-form-item>
 
@@ -180,8 +180,8 @@ const ruleOptions = [
 
 /** 默认值只用于加载失败时兜底展示，真实值以后端为准 */
 const form = reactive<SecurityConfigBody>({
-  initialPasswordMode: 'FIXED',
-  defaultPassword: 'G#191975',
+  initialPasswordMode: 'RANDOM',
+  defaultPassword: '',
   passwordRules: ['DIGIT', 'UPPER', 'LOWER', 'SPECIAL'],
   passwordMinLength: 6,
   passwordMaxLength: 15,
