@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>配置中心</title>
+    <script>
+      (function () {
+        try {
+          // 跨应用共享主题：优先读 cookie，再回退本应用 localStorage（此前误用了 ehr_theme）
+          var ck = document.cookie.match(/(?:^|; )polaris_theme=(light|dark)/);
+          var t = ck ? ck[1] : localStorage.getItem('settings_theme');
+          if (t !== 'light' && t !== 'dark') {
+            t =
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 本地环境文件（.env.example 保留入库）
+.env.local
+.env.*.local
+
+# 日志
+*.log
+
+# IDE
+.idea/
+.vscode/

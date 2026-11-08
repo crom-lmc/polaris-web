@@ -1,0 +1,139 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+/* ===== 主题变量：白天 / 黑夜 ===== */
+:root,
+:root[data-theme='light'] {
+  --bg-page: #f5f6f8;
+  --text-base: #1f2329;
+  --header-bg: #ffffff;
+  --sider-bg: #ffffff;
+  --header-text: #1f2329;
+  --header-border: #e8e8e8;
+  --header-hover: rgba(0, 0, 0, 0.04);
+  --login-shell-bg: linear-gradient(135deg, #eef2ff 0%, #f7f9fc 100%);
+  --login-card-bg: #ffffff;
+  --login-card-shadow: 0 8px 32px rgba(20, 25, 40, 0.08);
+  --muted: #8a9099;
+  --code-bg: #f2f3f5;
+  --border-subtle: #eef0f4;
+  /* 表格表头 / 行 hover 底色：深色模式下不能用固定的浅色，否则悬停会出现白块 */
+  --table-head-bg: #fafafa;
+  --table-row-hover: #fafafa;
+}
+
+:root[data-theme='dark'] {
+  --bg-page: #0f1115;
+  --text-base: rgba(255, 255, 255, 0.85);
+  --header-bg: #0f1115;
+  --sider-bg: #0f1115;
+  --header-text: rgba(255, 255, 255, 0.85);
+  --header-border: rgba(255, 255, 255, 0.08);
+  --header-hover: rgba(255, 255, 255, 0.12);
+  --login-shell-bg: linear-gradient(135deg, #0d1018 0%, #14181f 100%);
+  --login-card-bg: #1b1e26;
+  --login-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --muted: #9aa6b2;
+  --code-bg: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --table-head-bg: #1b1e26;
+  --table-row-hover: rgba(255, 255, 255, 0.08);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-page);
+  color: var(--text-base);
+}
+
+.page-container {
+  padding: 16px;
+}
+
+/* ===== 列表页统一：受控高度 + 操作列固定 + 分页条贴底 =====
+   顶栏 64 + 内容区上下 padding 16×2 = 96，剩余高度给页面。
+   ft-page 管整页高度，ft-scroll 是唯一滚动容器（sticky 必须有滚动祖先）。
+   有分页的页面额外加 ft-bottom：把 antd 的 wrapper → spin → table 链撑满滚动容器，
+   分页用 margin-top:auto 贴到容器底部（仅 sticky:bottom 在内容不足一屏时不会贴底），
+   再用 sticky:bottom 保证长列表滚动时分页依然可见。
+   表格最小宽度由各页 --ft-min-width 覆盖，默认 0 表示不强制横向宽度。 */
+.ft-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 96px);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ft-head {
+  flex: 0 0 auto;
+}
+
+.ft-scroll {
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ft-scroll.ft-bottom {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 不写 min-height:0：flex item 保留默认 auto（最小内容高度），
+   长列表时才会撑开滚动容器而不是被压缩裁掉；内容不足时 flex-grow 又会把链撑满。 */
+.ft-scroll.ft-bottom > .ant-table-wrapper,
+.ft-scroll.ft-bottom > .ant-table-wrapper > .ant-spin-nested-loading,
+.ft-scroll.ft-bottom > .ant-table-wrapper .ant-spin-container,
+.ft-scroll.ft-bottom > .ant-table-wrapper .ant-table {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.ft-scroll.ft-bottom .ant-table-wrapper .ant-table-pagination {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: auto 0 0;
+  padding: 10px 14px;
+  background: var(--header-bg);
+  border-top: 1px solid var(--header-border);
+}
+
+/* 操作列固定：不用 antd 的 fixed:'right'，那会在表格内部再开一层横向滚动，
+   把滚动条压到长表格内容最底部。z-index 必须低于分页条的 5。 */
+.ft-table .ant-table table {
+  min-width: var(--ft-min-width, 0px);
+}
+
+.ft-table .ant-table-thead > tr > th:last-child,
+.ft-table .ant-table-tbody > tr > td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--header-bg) !important;
+  border-left: 1px solid var(--header-border);
+}
+
+/* 深色模式：全局兜底表格行 hover 底色。
+   各页面若有写死的浅色 hover（如 #fafafa），深色下会整行变白；这里统一走主题变量。 */
+:root[data-theme='dark'] .ant-table-tbody > tr:hover > td,
+:root[data-theme='dark'] .ant-table-tbody > tr.ant-table-row-hover > td {
+  background: var(--table-row-hover) !important;
+}
+
+/* 深色模式：空态占位行 hover 不要变白 */
+:root[data-theme='dark'] .ant-table-tbody > tr.ant-table-placeholder:hover > td {
+  background: transparent !important;
+}

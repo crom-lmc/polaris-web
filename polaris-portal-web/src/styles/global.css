@@ -1,0 +1,124 @@
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f7f8fa;
+  --bg-mute: #eef1f6;
+  --bg-card: #ffffff;
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --text: #1f2329;
+  --text-2: #5c6470;
+  --text-3: #8f959e;
+  --text-body: #2b3038;
+  --line: #eef0f3;
+  --line-hover: #d9dee8;
+  --code-bg: #f6f8fa;
+  --accent: #4e6ef2;
+  --accent-soft: #eef2ff;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --max: 1120px;
+  /* 无封面时的柔和占位底色（按分类取色，深浅色各一套） */
+  --cover-grad-1: linear-gradient(135deg, #e8f0ff, #d8e6ff);
+  --cover-grad-2: linear-gradient(135deg, #e4fbf4, #d2f5ea);
+  --cover-grad-3: linear-gradient(135deg, #fff4e6, #ffe6c9);
+  --cover-grad-4: linear-gradient(135deg, #f3e8ff, #e8d9ff);
+  --cover-grad-5: linear-gradient(135deg, #ffe9ef, #ffd8e2);
+  color-scheme: light;
+}
+
+/* 深色主题：与账号中心 / 人力中心 / 内容中心同一套配色，cookie 同步后各应用一致 */
+:root[data-theme='dark'] {
+  --bg: #0f1115;
+  --bg-soft: #161a22;
+  --bg-mute: #1b1e26;
+  --bg-card: #161a22;
+  --header-bg: rgba(15, 17, 21, 0.92);
+  --text: rgba(255, 255, 255, 0.88);
+  --text-2: rgba(255, 255, 255, 0.65);
+  --text-3: rgba(255, 255, 255, 0.45);
+  --text-body: rgba(255, 255, 255, 0.85);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-hover: rgba(255, 255, 255, 0.22);
+  --code-bg: rgba(255, 255, 255, 0.08);
+  --accent: #6d86ff;
+  --accent-soft: rgba(78, 110, 242, 0.18);
+  --cover-grad-1: linear-gradient(135deg, #1b2540, #22304f);
+  --cover-grad-2: linear-gradient(135deg, #122b26, #173b33);
+  --cover-grad-3: linear-gradient(135deg, #3a2c1c, #4a3722);
+  --cover-grad-4: linear-gradient(135deg, #2b1e3d, #36264c);
+  --cover-grad-5: linear-gradient(135deg, #3d1f28, #4d2833);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.container {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.portal-main {
+  min-height: calc(100vh - 200px);
+  padding: 24px 0 48px;
+}
+
+.section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 14px;
+}
+
+.section-title h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.section-title .more {
+  font-size: 13px;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.section-title .more:hover {
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.clamp-1 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

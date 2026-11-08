@@ -1,0 +1,121 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+/* ===== 主题变量：白天 / 黑夜 ===== */
+:root,
+:root[data-theme='light'] {
+  --bg-page: #f5f6f8;
+  --text-base: #1f2329;
+  --header-bg: #ffffff;
+  --sider-bg: #ffffff;
+  --header-text: #1f2329;
+  --header-border: #e8e8e8;
+  --header-hover: rgba(0, 0, 0, 0.04);
+  --login-shell-bg: linear-gradient(135deg, #eef2ff 0%, #f7f9fc 100%);
+  --login-card-bg: #ffffff;
+  --login-card-shadow: 0 8px 32px rgba(20, 25, 40, 0.08);
+  --muted: #8a9099;
+  --code-bg: #f2f3f5;
+  --border-subtle: #eef0f4;
+}
+
+:root[data-theme='dark'] {
+  --bg-page: #0f1115;
+  --text-base: rgba(255, 255, 255, 0.85);
+  --header-bg: #0f1115;
+  --sider-bg: #0f1115;
+  --header-text: rgba(255, 255, 255, 0.85);
+  --header-border: rgba(255, 255, 255, 0.08);
+  --header-hover: rgba(255, 255, 255, 0.12);
+  --login-shell-bg: linear-gradient(135deg, #0d1018 0%, #14181f 100%);
+  --login-card-bg: #1b1e26;
+  --login-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --muted: #9aa6b2;
+  --code-bg: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-page);
+  color: var(--text-base);
+}
+
+.page-container {
+  padding: 16px;
+}
+
+
+/* ===== 列表页统一固定方案（与统一账号中心 ft-* 保持一致） =====
+   ft-page   整页受控高度（顶栏 64 + 内容区上下 padding 32 = 96），禁止整页滚动；
+   ft-grow   在已有受控高度的 .page-root 里，让列表面板撑满剩余空间；
+   ft-head   顶部工具栏不参与滚动；
+   ft-scroll 唯一滚动容器（sticky 必须有明确的滚动祖先）；
+   ft-bottom 有分页时叠加：把 antd 的 wrapper → spin → table 链撑满滚动容器，
+             分页用 margin:auto 0 0 贴到容器底（内容不足一屏也贴底），
+             再用 sticky:bottom 保证长列表滚动时分页依然可见；
+   ft-table  操作列 sticky right，min-width 由各页 --ft-min-width 覆盖。 */
+.ft-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 96px);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.ft-grow {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+.ft-head {
+  flex: 0 0 auto;
+}
+.ft-scroll {
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.ft-scroll.ft-bottom {
+  display: flex;
+  flex-direction: column;
+}
+/* 不写 min-height:0：flex item 保留默认 auto（最小内容高度），长列表才能撑开滚动容器。 */
+.ft-scroll.ft-bottom > .ant-table-wrapper,
+.ft-scroll.ft-bottom > .ant-table-wrapper > .ant-spin-nested-loading,
+.ft-scroll.ft-bottom > .ant-table-wrapper .ant-spin-container,
+.ft-scroll.ft-bottom > .ant-table-wrapper .ant-table {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.ft-scroll.ft-bottom .ant-table-wrapper .ant-table-pagination {
+  position: sticky;
+  bottom: 0;
+  /* 必须高于 sticky 操作列的 3，否则纵向滚动时操作列单元格会盖住分页条 */
+  z-index: 5;
+  margin: auto 0 0;
+  padding: 10px 14px;
+  background: var(--panel-bg, var(--header-bg));
+  border-top: 1px solid var(--panel-border, var(--header-border));
+}
+.ft-table .ant-table table {
+  min-width: var(--ft-min-width, 0px);
+}
+/* 不用 antd 的 fixed:'right'，那会在表格内部再开一层横向滚动。 */
+.ft-table .ant-table-thead > tr > th:last-child,
+.ft-table .ant-table-tbody > tr > td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--panel-bg, var(--header-bg)) !important;
+  border-left: 1px solid var(--panel-border, var(--header-border));
+}

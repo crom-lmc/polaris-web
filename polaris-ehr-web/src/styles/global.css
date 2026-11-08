@@ -1,0 +1,320 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+/* ===== 主题变量：白天 / 黑夜 ===== */
+:root,
+:root[data-theme='light'] {
+  --bg-page: #f5f6f8;
+  --text-base: #1f2329;
+  --header-bg: #ffffff;
+  --sider-bg: #ffffff;
+  --header-text: #1f2329;
+  --header-border: #e8e8e8;
+  --header-hover: rgba(0, 0, 0, 0.04);
+  --login-shell-bg: linear-gradient(135deg, #eef2ff 0%, #f7f9fc 100%);
+  --login-card-bg: #ffffff;
+  --login-card-shadow: 0 8px 32px rgba(20, 25, 40, 0.08);
+  --muted: #8a9099;
+  --code-bg: #f2f3f5;
+  --border-subtle: #eef0f4;
+  /* 卡片 / 表单控件底色（富文本编辑器等自定义组件复用） */
+  --card-bg: #ffffff;
+  --card-border: #d9d9d9;
+  --toolbar-bg: #fafafa;
+  /* 组织树选中行与普通节点同色（不铺蓝底），悬浮用中性灰 */
+  --brand: #2f54eb;
+  --tree-hover-bg: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme='dark'] {
+  --bg-page: #0f1115;
+  --text-base: rgba(255, 255, 255, 0.85);
+  --header-bg: #0f1115;
+  --sider-bg: #0f1115;
+  --header-text: rgba(255, 255, 255, 0.85);
+  --header-border: rgba(255, 255, 255, 0.08);
+  --header-hover: rgba(255, 255, 255, 0.12);
+  --login-shell-bg: linear-gradient(135deg, #0d1018 0%, #14181f 100%);
+  --login-card-bg: #1b1e26;
+  --login-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --muted: #9aa6b2;
+  --code-bg: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  /* 卡片 / 表单控件底色（富文本编辑器等自定义组件复用） */
+  --card-bg: #161a22;
+  --card-border: rgba(255, 255, 255, 0.12);
+  --toolbar-bg: #1b1e26;
+  /* 组织树选中行与普通节点同色（不铺蓝底），悬浮用中性灰 */
+  --brand: #2f54eb;
+  --tree-hover-bg: rgba(255, 255, 255, 0.06);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-page);
+  color: var(--text-base);
+}
+
+/* 组织树：选中行不再单独铺蓝底，与其它节点行同色（选中态不靠底色区分）
+   悬浮仍保留中性灰反馈；:root 抬高优先级压过 antd 运行时注入的默认选中底色 */
+:root .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: transparent;
+}
+
+:root .ant-tree .ant-tree-node-content-wrapper:hover {
+  background: var(--tree-hover-bg);
+}
+
+.page-container {
+  padding: 16px;
+}
+
+/* ===== EHR 页面通用面板（固定外壳布局：只有面板内部滚动） ===== */
+:root,
+:root[data-theme='light'] {
+  --panel-bg: #ffffff;
+  --panel-border: #eef0f4;
+}
+
+:root[data-theme='dark'] {
+  --panel-bg: #161a22;
+  --panel-border: rgba(255, 255, 255, 0.08);
+}
+
+.page-root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--panel-border);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* 面板头部右侧的快捷操作（如组织架构树的展开/收起全部） */
+.panel-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+/* ===== 表格面板：横向滚动交给外层 .panel-body（它是视口尺寸的滚动容器，
+   横向滚动条自然贴在可视区底部，不用滑到页面最底才出现）。表格不再用 scroll.x 在内部
+   另开一层横向滚动（那会把横向滚动条压到长表格内容最底部，难够到）。
+   为了让「操作」列在横向滚动时始终贴住右边，改用 CSS sticky 实现（见各视图 .org-table /
+   .emp-table 等最后列 sticky 规则），不再依赖 antd 的 fixed 列。 */
+.panel-body.table-body {
+  overflow-x: auto;
+}
+
+/* 分页条固定：位于 .panel-body 滚动容器内的分页表格，其分页控件钉在可视区底部，
+   滚动时始终可见、不必把整页滑到底才够得着；滚到内容最底时自然归位。
+   不依赖 JS，纯 CSS sticky（滚动祖先即 .panel-body）。作用于所有面板内分页表格。 */
+.panel-body .ant-table-pagination {
+  position: sticky;
+  bottom: 0;
+  /* 必须高于 sticky 操作列的 z-index(3)，否则纵向滚动时操作列单元格会盖在分页条上造成重叠 */
+  z-index: 5;
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--panel-border);
+}
+/* 让 sticky 分页条与上面表格之间留出间距，而不是紧贴最后一行 */
+.panel-body .ant-table-pagination.ant-table-pagination-right {
+  margin-top: 12px;
+}
+
+/* 表头/单元格默认左右内边距 8px，而 .panel-head / .list-toolbar / .toolbar / 抽屉内容 都是 14px，
+   表格文字会比周围左出 6px，看着就是「没对齐」。首尾列补到 14px 对齐——全局对所有表格生效，
+   这样连「人员档案抽屉」里没套 .table-body 的 4 张子表也能对齐。
+   注意：antd v4 对 size=middle/default 有一套特异性更高的内边距规则会覆盖普通 th 选择器，
+   所以这里必须 !important 才能真正压过它（之前没加 !important，规则被覆盖、从未生效）。 */
+.ant-table-thead > tr > th:first-child,
+.ant-table-tbody > tr > td:first-child {
+  padding-left: 14px !important;
+}
+
+.ant-table-thead > tr > th:last-child,
+.ant-table-tbody > tr > td:last-child {
+  padding-right: 14px !important;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 两行单元格的次要信息行（姓名下方的工号/性别、申请人下方的部门/时间、日期下方的提交时间等）：
+   超长截断而不是换行，避免行高被撑乱、相邻列基线错乱。全局对所有表格生效，
+   配合去掉 a-table 的 scroll.x —— 表格按面板宽度自适应后，这一行只在真的放不下时才出省略号。 */
+.cell-sub {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  line-height: 1.45;
+}
+
+/* 表格内标签（状态/类型/交接等）强制不折行：防止「事假」之类被窄列挤成竖排两字 */
+.ant-table-tbody .ant-tag {
+  white-space: nowrap;
+}
+
+/* 表格单元格内的次要说明行（.muted）：超长一律截断，不换行，避免行高被撑乱、
+   相邻列基线错乱。全局对所有表格生效，覆盖弹窗/抽屉里的子表。 */
+.ant-table-tbody td > .muted {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== 固定列（操作列 fixed: 'right'）必须自己叠在上面 =====
+   antd v4 的固定列只给了 position: sticky 和背景色，没有 z-index。
+   后面的普通单元格在 DOM 里排在固定列之后，会直接画在它上面——
+   表现就是操作列里「禁用」上叠着隔壁列的「2」「—」「1 人」，看着像乱码。
+   另外背景必须显式设成不透明：antd 的默认背景是浅色主题的白，
+   在暗色皮肤下被覆盖成透明，左边列的文字照样会透出来（「删除张晨」）。
+   选择器带上 tbody > tr > td 是为了压过 antd 自己的 `.ant-table-tbody > tr > td`。 */
+.ant-table-tbody > tr > td.ant-table-cell-fix-left,
+.ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  z-index: 2;
+  background: var(--panel-bg, #fff);
+}
+
+.ant-table-thead > tr > th.ant-table-cell-fix-left,
+.ant-table-thead > tr > th.ant-table-cell-fix-right {
+  z-index: 3;
+  background: var(--panel-bg, #fff);
+}
+
+
+/* ===== 列表页统一固定方案（与统一账号中心 ft-* 保持一致） =====
+   ft-page   整页受控高度（顶栏 64 + 内容区上下 padding 32 = 96），禁止整页滚动；
+   ft-grow   在已有受控高度的 .page-root 里，让列表面板撑满剩余空间；
+   ft-head   顶部工具栏不参与滚动；
+   ft-scroll 唯一滚动容器（sticky 必须有明确的滚动祖先）；
+   ft-bottom 有分页时叠加：把 antd 的 wrapper → spin → table 链撑满滚动容器，
+             分页用 margin:auto 0 0 贴到容器底（内容不足一屏也贴底），
+             再用 sticky:bottom 保证长列表滚动时分页依然可见；
+   ft-table  操作列 sticky right，min-width 由各页 --ft-min-width 覆盖。 */
+.ft-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 96px);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.ft-grow {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+.ft-head {
+  flex: 0 0 auto;
+}
+.ft-scroll {
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.ft-scroll.ft-bottom {
+  display: flex;
+  flex-direction: column;
+}
+/* 不写 min-height:0：flex item 保留默认 auto（最小内容高度），长列表才能撑开滚动容器。 */
+.ft-scroll.ft-bottom > .ant-table-wrapper,
+.ft-scroll.ft-bottom > .ant-table-wrapper > .ant-spin-nested-loading,
+.ft-scroll.ft-bottom > .ant-table-wrapper .ant-spin-container,
+.ft-scroll.ft-bottom > .ant-table-wrapper .ant-table {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+/* 空态：撑满表头之下、分页条之上的剩余高度并居中（与统一账号中心「待我审批」一致）。
+   只在无数据时加 .tbl-empty-mode，有数据时不改动表格布局，避免拉伸行高。 */
+.tbl-empty-mode .ant-table-container {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.tbl-empty-mode .ant-table-content {
+  flex: 1 0 auto;
+}
+.tbl-empty-mode .ant-table-content > table {
+  height: 100%;
+}
+.tbl-empty-mode .ant-table-placeholder > td {
+  height: 100%;
+  padding: 0;
+  border-bottom: none;
+}
+.tbl-empty {
+  height: 100%;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ft-scroll.ft-bottom .ant-table-wrapper .ant-table-pagination {
+  position: sticky;
+  bottom: 0;
+  /* 必须高于 sticky 操作列的 3，否则纵向滚动时操作列单元格会盖住分页条 */
+  z-index: 5;
+  margin: auto 0 0;
+  padding: 10px 14px;
+  background: var(--panel-bg, var(--header-bg));
+  border-top: 1px solid var(--panel-border, var(--header-border));
+}
+.ft-table .ant-table table {
+  min-width: var(--ft-min-width, 0px);
+}
+/* 不用 antd 的 fixed:'right'，那会在表格内部再开一层横向滚动。 */
+.ft-table .ant-table-thead > tr > th:last-child,
+.ft-table .ant-table-tbody > tr > td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--panel-bg, var(--header-bg)) !important;
+  border-left: 1px solid var(--panel-border, var(--header-border));
+}

@@ -1,0 +1,306 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+/* ===== 主题变量：白天 / 黑夜 ===== */
+:root,
+:root[data-theme='light'] {
+  --bg-page: #f5f6f8;
+  --text-base: #1f2329;
+  --header-bg: #ffffff;
+  --sider-bg: #ffffff;
+  --header-text: #1f2329;
+  --header-border: #e8e8e8;
+  --header-hover: rgba(0, 0, 0, 0.04);
+  --login-shell-bg: linear-gradient(135deg, #eef2ff 0%, #f7f9fc 100%);
+  --login-card-bg: #ffffff;
+  --login-card-shadow: 0 8px 32px rgba(20, 25, 40, 0.08);
+  --muted: #8a9099;
+  --code-bg: #f2f3f5;
+  --border-subtle: #eef0f4;
+  /* 审批配置等页面直接引用的 antd 语义变量（此前未定义，深色下回退成白底/浅边框） */
+  --color-background-primary: #ffffff;
+  --color-border-tertiary: #eef0f4;
+  --color-text-primary: #1f2329;
+  --color-text-secondary: #8a9099;
+  /* 左侧导航树：与人员管理组织树一致，选中不铺底、悬浮中性灰 */
+  --brand: #2f54eb;
+  --tree-hover-bg: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme='dark'] {
+  --bg-page: #0f1115;
+  --text-base: rgba(255, 255, 255, 0.85);
+  --header-bg: #0f1115;
+  --sider-bg: #0f1115;
+  --header-text: rgba(255, 255, 255, 0.85);
+  --header-border: rgba(255, 255, 255, 0.08);
+  --header-hover: rgba(255, 255, 255, 0.12);
+  --login-shell-bg: linear-gradient(135deg, #0d1018 0%, #14181f 100%);
+  --login-card-bg: #1b1e26;
+  --login-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --muted: #9aa6b2;
+  --code-bg: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  /* 审批配置等页面直接引用的 antd 语义变量：与浅色一一对应，深色下不再回退成白底 */
+  --color-background-primary: #161a22;
+  --color-border-tertiary: rgba(255, 255, 255, 0.08);
+  --color-text-primary: rgba(255, 255, 255, 0.85);
+  --color-text-secondary: #9aa6b2;
+  /* 左侧导航树：与人员管理组织树一致，选中不铺底、悬浮中性灰 */
+  --brand: #2f54eb;
+  --tree-hover-bg: rgba(255, 255, 255, 0.06);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-page);
+  color: var(--text-base);
+}
+
+.page-container {
+  padding: 16px;
+}
+
+/* ===== EHR 页面通用面板（固定外壳布局：只有面板内部滚动） ===== */
+:root,
+:root[data-theme='light'] {
+  --panel-bg: #ffffff;
+  --panel-border: #eef0f4;
+}
+
+:root[data-theme='dark'] {
+  --panel-bg: #161a22;
+  --panel-border: rgba(255, 255, 255, 0.08);
+}
+
+.page-root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--panel-border);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+}
+
+/* ===== 表格面板：横向只允许表格自己滚，外层不许滚 =====
+   .panel-body 是 overflow:auto 的滚动容器，一旦表格比面板宽，它自己就成了横向滚动条；
+   触摸板/横向滚轮随便蹭一下，整张表（连表头）就被推走十几像素，文字贴着卡片左边界被切成半个字。
+   现在外层锁死横向，表格按面板宽度自适应（列宽只做建议，不设 scroll.x 硬下限），
+   连接「表格宽不宽」这个前提都不再出现。 */
+.panel-body.table-body {
+  overflow-x: hidden;
+}
+
+/* 表头/单元格默认左右内边距 8px，而 .panel-head / .list-toolbar / .toolbar 是 14px，
+   表格文字会比卡片标题左出 6px，看着就是「没对齐」。首尾列补到 14px 对齐标题。 */
+.table-body .ant-table-thead > tr > th:first-child,
+.table-body .ant-table-tbody > tr > td:first-child {
+  padding-left: 14px;
+}
+
+.table-body .ant-table-thead > tr > th:last-child,
+.table-body .ant-table-tbody > tr > td:last-child {
+  padding-right: 14px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 单元格次要信息行（姓名下方的组织/工号、申请人下方的部门等）：超长截断，
+   不把整行高度撑乱、也不溢出到相邻列。配合去掉 a-table 的 scroll.x 一起用——
+   表格按面板宽度自适应后，这一行只在真的放不下时才出省略号。 */
+.table-body .cell-sub {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* ===== 审批配置左侧导航树：审批模板 / 业务场景 / 业务点配置 / 消息配置 =====
+   四页树的层级和数据各不相同（结构由各页自己决定，这里一律不动），只统一视觉，
+   并与人力中心「人员管理 / 组织架构」的组织树保持一致：13px 字号、32px 行高、
+   树底与右侧列表同底、选中不铺底、悬浮中性灰、名称左对齐 + 数量右对齐（浅灰小字）。 */
+.approval-nav-sider {
+  border-right: 1px solid var(--color-border-tertiary, #eef0f4);
+  padding: 12px 8px;
+  background: var(--color-background-primary, #fff);
+  overflow-y: auto;
+  /* 名称超长走省略号，不允许横向滚动条 */
+  overflow-x: hidden;
+}
+
+/* a-layout-sider 的 theme=dark 会注入 #001529 藏青底，和右侧列表底色不一致；
+   强制与页面/列表同底（cssinjs 注入在全局样式之后，需 :root 提权覆盖） */
+:root .approval-nav-sider.ant-layout-sider,
+:root[data-theme='dark'] .approval-nav-sider.ant-layout-sider {
+  background: var(--color-background-primary, #fff);
+}
+
+.approval-nav-tree.ant-tree {
+  background: transparent;
+  font-size: 13px;
+}
+
+:root .approval-nav-tree.ant-tree .ant-tree-treenode {
+  width: 100%;
+  padding-bottom: 2px;
+}
+
+:root .approval-nav-tree.ant-tree .ant-tree-node-content-wrapper {
+  min-height: 32px;
+  line-height: 32px;
+  color: var(--color-text-primary, #1f2329);
+}
+
+/* 选中行不铺底色，与人员管理组织树一致（选中态不靠底色区分）；悬浮保留中性灰 */
+:root .approval-nav-tree.ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: transparent;
+}
+
+:root .approval-nav-tree.ant-tree .ant-tree-node-content-wrapper:hover {
+  background: var(--tree-hover-bg);
+}
+
+/* 节点标题：名称占满剩余宽度并截断，数量贴右显示（与组织树的「xxx人」一致） */
+.approval-nav-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.approval-nav-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-nav-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted, #8a9099);
+}
+
+.approval-nav-title-root {
+  font-weight: 600;
+  color: var(--color-text-primary, #1f2329);
+}
+
+.approval-nav-title-app {
+  font-weight: 500;
+  color: var(--color-text-primary, #1f2329);
+}
+
+.approval-nav-title-leaf {
+  font-size: 13px;
+}
+
+
+/* ===== 列表页统一固定方案（与统一账号中心 ft-* 保持一致） =====
+   ft-page   整页受控高度（顶栏 64 + 内容区上下 padding 32 = 96），禁止整页滚动；
+   ft-grow   在已有受控高度的 .page-root 里，让列表面板撑满剩余空间；
+   ft-head   顶部工具栏不参与滚动；
+   ft-scroll 唯一滚动容器（sticky 必须有明确的滚动祖先）；
+   ft-bottom 有分页时叠加：把 antd 的 wrapper → spin → table 链撑满滚动容器，
+             分页用 margin:auto 0 0 贴到容器底（内容不足一屏也贴底），
+             再用 sticky:bottom 保证长列表滚动时分页依然可见；
+   ft-table  操作列 sticky right，min-width 由各页 --ft-min-width 覆盖。 */
+.ft-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 96px);
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.ft-grow {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+.ft-head {
+  flex: 0 0 auto;
+}
+.ft-scroll {
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.ft-scroll.ft-bottom {
+  display: flex;
+  flex-direction: column;
+}
+/* 不写 min-height:0：flex item 保留默认 auto（最小内容高度），长列表才能撑开滚动容器。 */
+.ft-scroll.ft-bottom > .ant-table-wrapper,
+.ft-scroll.ft-bottom > .ant-table-wrapper > .ant-spin-nested-loading,
+.ft-scroll.ft-bottom > .ant-table-wrapper .ant-spin-container,
+.ft-scroll.ft-bottom > .ant-table-wrapper .ant-table {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.ft-scroll.ft-bottom .ant-table-wrapper .ant-table-pagination {
+  position: sticky;
+  bottom: 0;
+  /* 必须高于 sticky 操作列的 3，否则纵向滚动时操作列单元格会盖住分页条 */
+  z-index: 5;
+  margin: auto 0 0;
+  padding: 10px 14px;
+  background: var(--panel-bg, var(--header-bg));
+  border-top: 1px solid var(--panel-border, var(--header-border));
+}
+.ft-table .ant-table table {
+  min-width: var(--ft-min-width, 0px);
+}
+/* 不用 antd 的 fixed:'right'，那会在表格内部再开一层横向滚动。 */
+.ft-table .ant-table-thead > tr > th:last-child,
+.ft-table .ant-table-tbody > tr > td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--panel-bg, var(--header-bg)) !important;
+  border-left: 1px solid var(--panel-border, var(--header-border));
+}
