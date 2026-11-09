@@ -15,6 +15,7 @@ const router = createRouter({
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '工作台' } },
         { path: 'orgs', component: () => import('@/views/OrgView.vue'), meta: { title: '组织架构', perm: 'org:view' } },
         { path: 'employees', component: () => import('@/views/EmployeeView.vue'), meta: { title: '人员管理', perm: 'employee:view' } },
+        { path: 'recruits', component: () => import('@/views/RecruitView.vue'), meta: { title: '招聘管理', perm: 'recruit:view' } },
         { path: 'leaves', component: () => import('@/views/LeaveView.vue'), meta: { title: '请假管理', perm: 'leave:view' } },
         { path: 'attendance', component: () => import('@/views/AttendanceView.vue'), meta: { title: '考勤管理', perm: 'overtime:view' } },
         { path: 'my-resign', component: () => import('@/views/MyResignView.vue'), meta: { title: '离职申请', perm: 'resign:apply' } },

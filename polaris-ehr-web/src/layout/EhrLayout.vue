@@ -52,6 +52,10 @@
             <template #icon><team-outlined /></template>
             人员管理
           </a-menu-item>
+          <a-menu-item v-if="store.can('recruit:view')" key="/recruits">
+            <template #icon><solution-outlined /></template>
+            招聘管理
+          </a-menu-item>
           <a-menu-item v-if="store.can('leave:view')" key="/leaves">
             <template #icon><calendar-outlined /></template>
             请假管理
@@ -105,6 +109,7 @@ import {
   MenuOutlined,
   NotificationOutlined,
   RiseOutlined,
+  SolutionOutlined,
   TeamOutlined
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'

@@ -7,21 +7,30 @@ import ArticleCard from '@/components/ArticleCard.vue'
 import {
   IS_PREVIEW,
   PREVIEW_MSG_TYPE,
+  SSO_AUTHORIZE_URL,
   fetchBanners,
   fetchCategories,
   fetchLayout,
   fetchLinks,
   fetchTags,
+  fetchTodos,
   moduleLimit,
   pageArticles,
   type ArticleItem,
   type BannerItem,
   type FriendLinkItem,
   type LayoutModule,
-  type TaxonomyItem
+  type TaxonomyItem,
+  type TodoSummary
 } from '@/api/portal'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const user = useUserStore()
+
+/* 登录后展示审批中心待办；未登录或审批中心不可用时整块隐藏 */
+const todos = ref<TodoSummary | null>(null)
+const approvalUrl = `${SSO_AUTHORIZE_URL}/approvals`
 
 const modules = ref<LayoutModule[]>([])
 const banners = ref<BannerItem[]>([])
@@ -118,6 +127,12 @@ onMounted(async () => {
   const saved = await fetchLayout().catch(() => [] as LayoutModule[])
   if (!layoutLocked) modules.value = saved
   await ensureData(enabledKeys())
+  if (!IS_PREVIEW) {
+    await user.bootstrap().catch(() => false)
+    if (user.isLoggedIn) {
+      await fetchTodos().then((d) => { todos.value = d }).catch(() => { todos.value = null })
+    }
+  }
   loading.value = false
 })
 
@@ -167,6 +182,38 @@ const visibleModules = computed(() => modules.value.filter((m) => m.enabled === 
     <PortalHeader />
     <main class="portal-main">
       <div class="container">
+        <!-- 登录后的统一待办：审批中心待我处理，按业务类型汇总 -->
+        <section v-if="todos && todos.total" class="todo-block">
+          <div class="todo-head">
+            <div class="todo-title-row">
+              <h2>我的待办</h2>
+              <span class="muted">共 {{ todos.total }} 项</span>
+            </div>
+            <div class="todo-cats">
+              <a-tag v-for="c in todos.categories" :key="c.name" color="blue">
+                {{ c.name }} {{ c.count }}
+              </a-tag>
+            </div>
+          </div>
+          <div class="todo-list">
+            <a
+              v-for="item in todos.items.slice(0, 8)"
+              :key="item.id"
+              class="todo-item"
+              :href="approvalUrl"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="todo-cat">{{ item.category }}</span>
+              <span class="todo-name">{{ item.title || item.bizName || '待审批单据' }}</span>
+              <span class="todo-meta">{{ item.applicantName || '' }}{{ item.applicantName ? ' · ' : '' }}{{ item.createdAt || '' }}</span>
+            </a>
+          </div>
+          <div v-if="todos.total > 8" class="todo-more">
+            <a :href="approvalUrl" target="_blank" rel="noopener">查看全部 {{ todos.total }} 项</a>
+          </div>
+        </section>
+
         <a-spin :spinning="loading">
           <template v-for="mod in visibleModules" :key="mod.moduleKey">
             <!-- Banner 轮播 -->
@@ -294,6 +341,93 @@ const visibleModules = computed(() => modules.value.filter((m) => m.enabled === 
 </template>
 
 <style scoped>
+/* 登录后的统一待办 */
+.todo-block {
+  margin-bottom: 28px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+
+.todo-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.todo-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.todo-title-row h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.todo-cats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px dashed var(--line);
+  color: inherit;
+}
+
+.todo-item:first-child {
+  border-top: none;
+}
+
+.todo-item:hover .todo-name {
+  color: var(--accent);
+}
+
+.todo-cat {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.todo-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.todo-meta {
+  flex: none;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.todo-more {
+  margin-top: 10px;
+  text-align: right;
+  font-size: 13px;
+}
+
 .block {
   margin-bottom: 34px;
 }

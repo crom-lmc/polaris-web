@@ -177,6 +177,15 @@
             >
               重置密码
             </a-button>
+            <a-button
+              v-if="store.can('system:session:manage')"
+              type="link"
+              size="small"
+              danger
+              @click="askForceLogout(record)"
+            >
+              强制下线
+            </a-button>
           </a-space>
         </template>
       </template>
@@ -329,6 +338,7 @@ import {
   disableAccount,
   enableAccount,
   fetchAccountAppIds,
+  forceLogoutAccount,
   fetchAccounts,
   grantAccountApps,
   resetAccountPassword,
@@ -745,6 +755,26 @@ async function unlock(record: AccountVO) {
     await load()
   } catch (e: any) {
     message.error(e?.message || '解锁失败')
+  }
+}
+
+function askForceLogout(record: AccountVO) {
+  confirmAction({
+    title: '强制下线',
+    content: `将作废「${record.nickname || record.username}」全部在线会话，该账号需重新登录，确认吗？`,
+    okText: '强制下线',
+    okType: 'danger',
+    onOk: () => doForceLogout(record)
+  })
+}
+
+async function doForceLogout(record: AccountVO) {
+  try {
+    const res = await forceLogoutAccount(record.id)
+    const count = res.data || 0
+    message.success(count ? `已下线 ${count} 个会话` : '该账号当前没有在线会话')
+  } catch (e: any) {
+    message.error(e?.message || '强制下线失败')
   }
 }
 

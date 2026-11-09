@@ -502,6 +502,86 @@ export function exportEmployees(params: Record<string, unknown>) {
   })
 }
 
+/* ---------- 批量导入导出（P2-2） ---------- */
+
+export interface ImportRowError {
+  /** 工作表名，如「员工基础信息」 */
+  sheet: string
+  /** Excel 行号（含表头，从 1 开始） */
+  row: number
+  name?: string
+  message: string
+}
+
+export interface ImportPreview {
+  taskId: string
+  fileName: string
+  total: number
+  validCount: number
+  invalidCount: number
+  errors: ImportRowError[]
+}
+
+export interface ImportResult {
+  taskId: string
+  /** DONE */
+  status: string
+  total: number
+  success: number
+  failed: number
+  errorFileId?: string | null
+  errors: ImportRowError[]
+}
+
+/** 下载四 sheet 员工导入模板 */
+export function downloadImportTemplate() {
+  return request.get<never, { data: Blob }>('/api/ehr/import-export/import/template', {
+    responseType: 'blob'
+  })
+}
+
+/** 上传并解析预览：只校验不落库 */
+export function previewEmployeeImport(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return request.post<never, ImportPreview>('/api/ehr/import-export/import', form)
+}
+
+/** 确认导入：失败行不写库，返回统计与错误文件ID */
+export function confirmEmployeeImport(taskId: string) {
+  return request.post<never, ImportResult>(`/api/ehr/import-export/import/${taskId}/confirm`)
+}
+
+/** 下载导入错误明细（服务端生成的 xlsx 附件） */
+export function downloadImportError(errorFileId: string) {
+  return request.get<never, { data: Blob }>(`/api/ehr/attachments/${errorFileId}/download`, {
+    responseType: 'blob'
+  })
+}
+
+/** 导出员工 xlsx（数据范围 + 敏感掩码 + 审计） */
+export function exportEmployeesXlsx(params: Record<string, unknown>) {
+  return request.get<never, { data: Blob }>('/api/ehr/import-export/export/employees', {
+    params,
+    responseType: 'blob'
+  })
+}
+
+/** 导出合同 xlsx（仅数据范围内员工） */
+export function exportContractsXlsx() {
+  return request.get<never, { data: Blob }>('/api/ehr/import-export/export/contracts', {
+    responseType: 'blob'
+  })
+}
+
+/** 导出月度考勤 xlsx */
+export function exportAttendanceXlsx(month?: string) {
+  return request.get<never, { data: Blob }>('/api/ehr/import-export/export/attendance', {
+    params: { month },
+    responseType: 'blob'
+  })
+}
+
 /** 查看手机号 / 身份证 / 紧急联系电话明文（需 employee:sensitive:view，留 PLAIN 审计） */
 export function sensitiveEmployeeDetail(id: string) {
   return request.get<never, EmployeeItem>(`/api/ehr/employees/${id}/sensitive`)
@@ -1322,3 +1402,98 @@ export function offlineAnnouncement(id: string) {
 export function deleteAnnouncement(id: string) {
   return request.delete<never, void>(`/api/ehr/announcements/manage/${id}`)
 }
+
+/* ---------------- 招聘管道（P2-1） ---------------- */
+
+export interface RecruitCandidate {
+  id: string
+  name: string
+  mobile?: string
+  email?: string
+  source?: string
+  position: string
+  orgId?: string
+  orgPath?: string
+  stage: string
+  ownerId?: string
+  ownerName?: string
+  remark?: string
+  hasActiveOffer?: boolean
+  offerId?: string
+  offerStatus?: string
+  createdAt?: string
+}
+
+export interface RecruitCandidateBody {
+  name: string
+  mobile?: string
+  email?: string
+  source?: string
+  position: string
+  orgId?: string
+  stage?: string
+  remark?: string
+}
+
+export interface RecruitOffer {
+  id: string
+  candidateId: string
+  candidateName?: string
+  candidateMobile?: string
+  position: string
+  salary: string
+  expectedOnboardDate?: string
+  orgId?: string
+  orgPath?: string
+  status: string
+  remark?: string
+  employeeId?: string
+  employeeName?: string
+  employeeStatus?: string
+  createdAt?: string
+}
+
+export interface RecruitOfferBody {
+  candidateId: string
+  position: string
+  salary: number
+  expectedOnboardDate: string
+  orgId: string
+  remark?: string
+}
+
+export const listRecruitCandidates = (params: {
+  stage?: string
+  keyword?: string
+  page?: number
+  size?: number
+}) => request.get<never, PageData<RecruitCandidate>>('/api/ehr/recruits/candidates', { params })
+
+export const createRecruitCandidate = (body: RecruitCandidateBody) =>
+  request.post<never, RecruitCandidate>('/api/ehr/recruits/candidates', body)
+
+export const updateRecruitCandidate = (id: string, body: RecruitCandidateBody) =>
+  request.put<never, RecruitCandidate>(`/api/ehr/recruits/candidates/${id}`, body)
+
+export const eliminateRecruitCandidate = (id: string, remark?: string) =>
+  request.post<never, void>(`/api/ehr/recruits/candidates/${id}/eliminate`, { remark })
+
+export const restoreRecruitCandidate = (id: string) =>
+  request.post<never, void>(`/api/ehr/recruits/candidates/${id}/restore`)
+
+export const listRecruitOffers = (params: {
+  status?: string
+  keyword?: string
+  page?: number
+  size?: number
+}) => request.get<never, PageData<RecruitOffer>>('/api/ehr/recruits/offers', { params })
+
+export const createRecruitOffer = (body: RecruitOfferBody) =>
+  request.post<never, RecruitOffer>('/api/ehr/recruits/offers', body)
+
+export const cancelRecruitOffer = (id: string) =>
+  request.post<never, void>(`/api/ehr/recruits/offers/${id}/cancel`)
+
+export const convertRecruitOffer = (id: string) =>
+  request.post<never, RecruitOffer>(`/api/ehr/recruits/offers/${id}/convert`)
+

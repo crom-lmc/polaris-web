@@ -70,6 +70,35 @@ export function fetchMe() {
   return request.get<never, MeInfo>('/api/portal/me')
 }
 
+/* ---------------- 登录后的统一待办（审批中心聚合） ---------------- */
+
+export interface TodoCategory {
+  name: string
+  count: number
+}
+
+export interface TodoItem {
+  id: string
+  taskId?: string
+  category: string
+  bizType?: string
+  bizName?: string
+  title?: string
+  applicantName?: string
+  orgPath?: string
+  createdAt?: string
+}
+
+export interface TodoSummary {
+  total: number
+  categories: TodoCategory[]
+  items: TodoItem[]
+}
+
+export function fetchTodos() {
+  return request.get<never, TodoSummary>('/api/portal/todos')
+}
+
 // ---------------- 门户内容（公开接口，经网关读 CMS） ----------------
 
 export interface LayoutModule {

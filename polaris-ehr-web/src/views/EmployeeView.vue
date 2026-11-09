@@ -83,6 +83,14 @@
             <template #icon><download-outlined /></template>
             导出
           </a-button>
+          <a-button v-if="canContractExport" :loading="contractExporting" @click="doExportContracts">
+            <template #icon><download-outlined /></template>
+            导出合同
+          </a-button>
+          <a-button v-if="canImport" @click="openImport">
+            <template #icon><upload-outlined /></template>
+            导入
+          </a-button>
           <a-button v-if="canCreate" type="primary" @click="openCreate">
             <template #icon><user-add-outlined /></template>
             新增人员
@@ -993,6 +1001,105 @@
       :instance-id="approvalInstanceId"
       @done="refreshAll"
     />
+
+    <!-- 批量导入员工：上传预览 → 确认入库（失败行不写库） -->
+    <a-modal
+      v-model:open="importOpen"
+      title="批量导入员工"
+      :footer="null"
+      width="780px"
+      centered
+      destroy-on-close
+    >
+      <template v-if="importStep === 'upload'">
+        <a-alert
+          type="info"
+          show-icon
+          message="先下载模板填写，再上传预览；预览阶段不会写入任何员工数据"
+          description="员工基础信息为必填表，教育/工作/家庭成员为选填表；按「姓名+身份证号」自动匹配。身份证号、手机号不可与现有员工重复。"
+        />
+        <div class="import-actions">
+          <a-button @click="doDownloadTemplate">
+            <template #icon><download-outlined /></template>
+            下载模板
+          </a-button>
+          <a-upload
+            accept=".xlsx,.xls"
+            :show-upload-list="false"
+            :before-upload="handleImportFile"
+            :disabled="importUploading"
+          >
+            <a-button type="primary" :loading="importUploading">
+              <template #icon><upload-outlined /></template>
+              选择文件并预览
+            </a-button>
+          </a-upload>
+        </div>
+      </template>
+
+      <template v-else-if="importStep === 'preview' && importPreview">
+        <a-descriptions :column="4" size="small" bordered class="mb12">
+          <a-descriptions-item label="文件">{{ importPreview.fileName }}</a-descriptions-item>
+          <a-descriptions-item label="数据行">{{ importPreview.total }}</a-descriptions-item>
+          <a-descriptions-item label="可导入">
+            <span class="ok-text">{{ importPreview.validCount }}</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="校验失败">
+            <span :class="importPreview.invalidCount ? 'err-text' : ''">{{ importPreview.invalidCount }}</span>
+          </a-descriptions-item>
+        </a-descriptions>
+        <a-alert
+          v-if="importPreview.invalidCount"
+          type="warning"
+          show-icon
+          class="mb12"
+          message="存在校验失败行"
+          description="确认导入时只会写入校验通过的行，失败行会单独生成错误明细文件；可在确认后下载修正。"
+        />
+        <div v-if="importPreview.errors.length" class="import-error-wrap">
+          <a-table
+            size="small"
+            :columns="importErrorColumns"
+            :data-source="importPreview.errors"
+            :pagination="{ pageSize: 6, size: 'small' }"
+            :scroll="{ y: 220 }"
+            :row-key="(r: any) => `${r.sheet}-${r.row}-${r.message}`"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'row'">{{ record.sheet }} 第 {{ record.row }} 行</template>
+            </template>
+          </a-table>
+        </div>
+        <div class="import-footer">
+          <a-button @click="resetImport">重新选择</a-button>
+          <a-button @click="importOpen = false">取消</a-button>
+          <a-button
+            type="primary"
+            :loading="importing"
+            :disabled="importPreview.validCount === 0"
+            @click="doConfirmImport"
+          >
+            确认导入（{{ importPreview.validCount }} 行）
+          </a-button>
+        </div>
+      </template>
+
+      <template v-else-if="importStep === 'result' && importResult">
+        <a-result
+          :status="importResult.failed ? 'warning' : 'success'"
+          :title="importResult.failed ? '导入完成，部分行失败' : '导入完成'"
+          :sub-title="`共 ${importResult.total} 行，成功 ${importResult.success} 行，失败 ${importResult.failed} 行`"
+        >
+          <template #extra>
+            <a-button v-if="importResult.errorFileId" @click="doDownloadImportError">
+              <template #icon><download-outlined /></template>
+              下载错误明细
+            </a-button>
+            <a-button type="primary" class="ml8" @click="importOpen = false">知道了</a-button>
+          </template>
+        </a-result>
+      </template>
+    </a-modal>
   </div>
 </template>
 
@@ -1000,7 +1107,7 @@
 import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { ApartmentOutlined, CloseCircleFilled, DownloadOutlined, ReloadOutlined, UserAddOutlined } from '@ant-design/icons-vue'
+import { ApartmentOutlined, CloseCircleFilled, DownloadOutlined, ReloadOutlined, UploadOutlined, UserAddOutlined } from '@ant-design/icons-vue'
 import HandoverEditor from '@/components/HandoverEditor.vue'
 import EmployeeProfileDrawer from '@/components/EmployeeProfileDrawer.vue'
 import {
@@ -1016,9 +1123,14 @@ import {
   deleteWork,
   bizOptions,
   closeAccountEmployee,
+  confirmEmployeeImport,
   dictOptions,
+  downloadImportError,
+  downloadImportTemplate,
   employeeProfile,
+  exportContractsXlsx,
   exportEmployees,
+  previewEmployeeImport,
   onboardEmployee,
   orgTree,
   pageEmployees,
@@ -1040,6 +1152,8 @@ import {
   type EmpChangeBody,
   type EmployeeItem,
   type FamilyBody,
+  type ImportPreview,
+  type ImportResult,
   type OrgNode,
   type WorkBody
 } from '@/api/ehr'
@@ -1071,6 +1185,8 @@ const canResign = computed(() => store.can('employee:resign'))
 /** 敏感字段明文 / 导出按独立权限控制 */
 const canSensitive = computed(() => store.can('employee:sensitive:view'))
 const canExport = computed(() => store.can('employee:export'))
+const canContractExport = computed(() => store.can('contract:view'))
+const canImport = computed(() => store.can('employee:import'))
 /** 组织树要 org:view；普通员工没有，左侧只能空着 */
 const canSeeOrgTree = computed(() => store.can('org:view'))
 
@@ -2421,6 +2537,108 @@ function doExport() {
   })
 }
 
+/* ---------- 导出合同（xlsx，仅数据范围内员工） ---------- */
+const contractExporting = ref(false)
+
+function saveBlob(data: Blob, fileName: string) {
+  const blob = data instanceof Blob ? data : new Blob([data])
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function doExportContracts() {
+  contractExporting.value = true
+  try {
+    const res: any = await exportContractsXlsx()
+    saveBlob(res.data, `劳动合同-${dayjs().format('YYYYMMDD')}.xlsx`)
+    message.success('合同导出已开始')
+  } catch (e: any) {
+    message.error(e?.message || '导出失败')
+  } finally {
+    contractExporting.value = false
+  }
+}
+
+/* ---------- 批量导入（上传预览 → 确认入库） ---------- */
+const importOpen = ref(false)
+const importStep = ref<'upload' | 'preview' | 'result'>('upload')
+const importUploading = ref(false)
+const importing = ref(false)
+const importPreview = ref<ImportPreview | null>(null)
+const importResult = ref<ImportResult | null>(null)
+const importErrorColumns = [
+  { title: '位置', key: 'row', width: 170 },
+  { title: '姓名', dataIndex: 'name', width: 110 },
+  { title: '错误原因', dataIndex: 'message' }
+]
+
+function openImport() {
+  resetImport()
+  importOpen.value = true
+}
+
+function resetImport() {
+  importStep.value = 'upload'
+  importPreview.value = null
+  importResult.value = null
+}
+
+async function doDownloadTemplate() {
+  try {
+    const res: any = await downloadImportTemplate()
+    saveBlob(res.data, '员工导入模板.xlsx')
+  } catch (e: any) {
+    message.error(e?.message || '模板下载失败')
+  }
+}
+
+async function handleImportFile(file: File) {
+  const name = file.name.toLowerCase()
+  if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+    message.warning('只支持 .xlsx / .xls 文件')
+    return false
+  }
+  importUploading.value = true
+  try {
+    importPreview.value = await previewEmployeeImport(file)
+    importStep.value = 'preview'
+  } catch (e: any) {
+    message.error(e?.message || '文件解析失败')
+  } finally {
+    importUploading.value = false
+  }
+  return false
+}
+
+async function doConfirmImport() {
+  if (!importPreview.value) return
+  importing.value = true
+  try {
+    importResult.value = await confirmEmployeeImport(importPreview.value.taskId)
+    importStep.value = 'result'
+    await refreshAll()
+  } catch (e: any) {
+    message.error(e?.message || '导入失败')
+  } finally {
+    importing.value = false
+  }
+}
+
+async function doDownloadImportError() {
+  const fileId = importResult.value?.errorFileId
+  if (!fileId) return
+  try {
+    const res: any = await downloadImportError(fileId)
+    saveBlob(res.data, `员工导入错误明细-${dayjs().format('YYYYMMDD')}.xlsx`)
+  } catch (e: any) {
+    message.error(e?.message || '错误明细下载失败')
+  }
+}
+
 /* ---------- 开户结果 ---------- */
 const resultOpen = ref(false)
 const accountResult = ref<AccountBrief | null>(null)
@@ -2725,6 +2943,43 @@ onMounted(async () => {
 
 .mt12 {
   margin-top: 12px;
+}
+
+/* 批量导入弹窗 */
+.mb12 {
+  margin-bottom: 12px;
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.import-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.import-error-wrap {
+  max-height: 280px;
+}
+
+.import-error-wrap .ant-table {
+  font-size: 13px;
+}
+
+.ok-text {
+  color: var(--color-success, #16a34a);
+  font-weight: 600;
+}
+
+.err-text {
+  color: var(--color-error, #dc2626);
+  font-weight: 600;
 }
 
 /* 弹窗顶部的「办理对象」条：不再用表单标签，姓名加重 + 次要信息跟在后面 */

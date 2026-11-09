@@ -67,6 +67,11 @@ export function changeMyPassword(oldPassword: string, newPassword: string) {
     { oldPassword, newPassword })
 }
 
+/** 强制下线：作废该账号所有中心会话（超管 / system:session:manage） */
+export function forceLogoutAccount(id: string) {
+  return request.post<never, { data: number }>(`/api/auth/admin/sessions/${id}/logout`)
+}
+
 /** 登录审计日志 */
 export function fetchLoginLogs(params: {
   page: number

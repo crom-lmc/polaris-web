@@ -22,6 +22,10 @@
         </a-button>
       </div>
       <div class="toolbar-right">
+        <a-button v-if="canExportAttendance" :loading="attendanceExporting" @click="doExportAttendance">
+          <template #icon><download-outlined /></template>
+          导出月度考勤
+        </a-button>
         <a-button type="primary" @click="openApply">
           <template #icon><plus-outlined /></template>
           提交加班
@@ -179,6 +183,7 @@ import { message } from 'ant-design-vue'
 import {
   cancelOvertime,
   confirmAttendanceMonthly,
+  exportAttendanceXlsx,
   listAttendanceMonthly,
   listOvertimes,
   submitOvertime,
@@ -370,6 +375,29 @@ async function doConfirm(record: AttendanceMonthItem) {
     await loadMonthly()
   } catch (e: any) {
     message.error(e?.message || '确认失败')
+  }
+}
+
+/* ---------- 导出月度考勤（xlsx） ---------- */
+const canExportAttendance = computed(() => store.can('overtime:view'))
+const attendanceExporting = ref(false)
+
+async function doExportAttendance() {
+  attendanceExporting.value = true
+  try {
+    const res: any = await exportAttendanceXlsx(summaryMonth.value)
+    const blob = new Blob([res.data])
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `月度考勤-${summaryMonth.value}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success('考勤导出已开始')
+  } catch (e: any) {
+    message.error(e?.message || '导出失败')
+  } finally {
+    attendanceExporting.value = false
   }
 }
 

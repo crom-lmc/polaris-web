@@ -19,6 +19,16 @@ export function loginByEmail(data: { email: string; code: string }) {
   return request.post<never, { data: TokenResponse }>('/api/auth/email/login', data)
 }
 
+/** 忘记密码：发送重置验证码（scene=reset，与登录验证码隔离） */
+export function sendResetPasswordCode(data: { email: string }) {
+  return request.post<never, { data: void }>('/api/auth/password/forgot/code', data)
+}
+
+/** 忘记密码：验证码校验通过后设置新密码 */
+export function resetPasswordByCode(data: { email: string; code: string; newPassword: string }) {
+  return request.post<never, { data: void }>('/api/auth/password/forgot/reset', data)
+}
+
 /** 当前令牌对应的身份（含 permissions / apps） */
 export function me() {
   return request.get<never, { data: AuthUser }>('/api/auth/me')
