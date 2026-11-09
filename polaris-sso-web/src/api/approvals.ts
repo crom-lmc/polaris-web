@@ -101,3 +101,105 @@ export function terminateApproval(id: string, note?: string) {
     { note }
   )
 }
+
+/* ---------------- 审批运营 ---------------- */
+
+/** 时效统计口径：只统计「已结束」单据的时长；backlog 为在途数 */
+export interface ApprovalStats {
+  total: number
+  approved: number
+  rejected: number
+  withdrawn: number
+  terminated: number
+  backlog: number
+  avgHours: number
+  p90Hours: number
+  /** 驳回率，百分比 0-100 */
+  rejectRate: number
+}
+
+/** 审批人维度：handled=通过的+驳回的任务数 */
+export interface ApprovalApproverStats {
+  approverId: string
+  approverName: string
+  handled: number
+  approved: number
+  rejected: number
+  avgHours: number
+  p90Hours: number
+}
+
+/** 积压单：在途且当前步骤有待办 */
+export interface ApprovalBacklogItem {
+  id: string
+  apprNo: string
+  title: string
+  bizName: string
+  bizType: string
+  applicantName: string
+  orgPath: string
+  currentStep: number
+  totalStep: number
+  stepName: string
+  submittedAt: string
+  waitingSince: string
+  waitingHours: number
+  slaHours: number | null
+  overdue: boolean
+  approverNames: string
+  urgeCount: number
+  lastUrgeAt: string | null
+}
+
+/** 批量审批结果：成功已生效，失败带原因，不整体回滚 */
+export interface BatchApprovalResult {
+  success: Array<string | number>
+  failed: Array<{ taskId: string; reason: string }>
+}
+
+export interface ApprovalOpsQuery {
+  appCode?: string
+  bizType?: string
+  orgId?: string
+  from?: string
+  to?: string
+  limit?: number
+}
+
+export function fetchApprovalStats(params: ApprovalOpsQuery = {}) {
+  return request.get<never, { data: ApprovalStats }>('/api/accounts/approvals/stats', { params })
+}
+
+export function fetchApproverStats(params: ApprovalOpsQuery = {}) {
+  return request.get<never, { data: ApprovalApproverStats[] }>(
+    '/api/accounts/approvals/stats/approver',
+    { params }
+  )
+}
+
+export function fetchApprovalBacklog(params: ApprovalOpsQuery = {}) {
+  return request.get<never, { data: ApprovalBacklogItem[] }>(
+    '/api/accounts/approvals/backlog',
+    { params }
+  )
+}
+
+/** 催办：给当前待办人发提醒，instance.urge_count +1 */
+export function urgeApproval(id: string, note?: string) {
+  return request.post<never, { data: void }>(`/api/accounts/approvals/${id}/urge`, { note })
+}
+
+/** 批量通过/驳回：逐条校验，部分失败不回滚 */
+export function batchApproveTasks(taskIds: string[], pass: boolean, note?: string) {
+  return request.post<never, { data: BatchApprovalResult }>(
+    '/api/accounts/approvals/tasks/batch',
+    { taskIds, pass, note }
+  )
+}
+
+/** 导出 CSV：返回 R 壳里的字符串，前端转 Blob 下载 */
+export function exportApprovals(type: 'pending' | 'instances', params: ApprovalOpsQuery = {}) {
+  return request.get<never, { data: string }>('/api/accounts/approvals/export', {
+    params: { ...params, type }
+  })
+}
