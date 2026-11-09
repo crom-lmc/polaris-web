@@ -5,6 +5,7 @@
         <a-radio-group v-model:value="scope" button-style="solid" @change="onScopeChange">
           <a-radio-button value="mine">我的请假</a-radio-button>
           <a-radio-button v-if="canApprove" value="all">审批列表</a-radio-button>
+          <a-radio-button v-if="canViewTeam" value="team">团队请假</a-radio-button>
         </a-radio-group>
         <a-select
           v-model:value="statusFilter"
@@ -29,9 +30,9 @@
 
     <section class="panel ft-grow">
       <div class="panel-head">
-        <span>{{ scope === 'mine' ? '我的请假记录' : '全部请假记录' }}</span>
+        <span>{{ scope === 'mine' ? '我的请假记录' : scope === 'team' ? '团队请假记录' : '全部请假记录' }}</span>
         <span class="muted">
-          {{ scope === 'mine' ? '共 ' + total + ' 条' : '审批动作在「审批中心」处理，这里可查看全部单据与流程' }}
+          {{ scope === 'team' ? '按组织范围展示待审批 / 已通过记录' : scope === 'mine' ? '共 ' + total + ' 条' : '审批动作在「审批中心」处理，这里可查看全部单据与流程' }}
         </span>
       </div>
       <div class="panel-body table-body ft-scroll ft-bottom">
@@ -54,8 +55,12 @@
               <a-tag color="blue">{{ record.leaveTypeName }}</a-tag>
             </template>
             <template v-else-if="column.key === 'range'">
-              <div>{{ record.startDate }} ~ {{ record.endDate }}</div>
-              <div class="muted cell-sub">{{ record.days }} 天</div>
+              <div>{{ record.startDate }} {{ periodText(record.startPeriod) }} ~ {{ record.endDate }} {{ periodText(record.endPeriod) }}</div>
+              <div class="muted cell-sub">
+                {{ record.days }} 天
+                <span v-if="record.dayMode === 'WORKDAY'">· 工作日</span>
+                <span v-if="record.returnDate">· {{ record.returnDate }} 返岗</span>
+              </div>
             </template>
             <template v-else-if="column.key === 'applicant'">
               <div class="cell-sub">{{ record.applicantName }}</div>
@@ -89,8 +94,13 @@
                 >
                   <a class="act danger">撤销</a>
                 </a-popconfirm>
+                <a
+                  v-if="record.status === 1 && record.mine && canApply"
+                  class="act"
+                  @click="openEarlyReturn(record)"
+                >销假</a>
                 <span
-                  v-if="!runningBriefForRow(record) && !rejectedBriefForRow(record) && !(record.status === 0 && record.mine)"
+                  v-if="!runningBriefForRow(record) && !rejectedBriefForRow(record) && !((record.status === 0 || record.status === 1) && record.mine)"
                   class="muted"
                 >—</span>
               </div>
@@ -121,9 +131,52 @@
             value-format="YYYY-MM-DD"
             style="width: 100%"
             :placeholder="['开始日期', '结束日期']"
+            @change="onRangeChange"
           />
         </a-form-item>
-        <a-alert v-if="days" type="info" show-icon :message="`共 ${days} 天（按自然日计算）`" class="mb12" />
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="开始半天">
+              <a-select v-model:value="applyForm.startPeriod" :options="periodOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="结束半天">
+              <a-select v-model:value="applyForm.endPeriod" :options="periodOptions" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="天数计算方式">
+          <a-select v-model:value="applyForm.dayMode" :options="dayModeOptions" />
+        </a-form-item>
+        <a-alert v-if="currentRule" type="info" show-icon class="mb12" :message="ruleHint" />
+        <a-alert
+          v-if="conflicts.length"
+          type="warning"
+          show-icon
+          class="mb12"
+          :message="`所选时段与 ${conflicts.length} 条已有请假单重叠`"
+          :description="conflictText"
+        />
+        <a-form-item
+          v-if="currentRule && currentRule.attachmentRequired === 1"
+          label="证明材料"
+          required
+          extra="病假 / 婚假 / 产假等类型需上传证明，支持 pdf、图片、Word、压缩包"
+        >
+          <a-upload
+            :max-count="1"
+            :custom-request="customUpload"
+            :file-list="attachmentFiles"
+            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.zip"
+            @remove="onAttachmentRemove"
+          >
+            <a-button>
+              <template #icon><upload-outlined /></template>
+              上传证明
+            </a-button>
+          </a-upload>
+        </a-form-item>
         <a-form-item
           v-if="delegateCtx.required"
           label="审批转办给谁"
@@ -149,6 +202,36 @@
       </a-form>
     </a-modal>
 
+    <a-modal
+      v-model:open="earlyOpen"
+      title="提前返岗销假"
+      :confirm-loading="earlySaving"
+      ok-text="确认销假"
+      cancel-text="取消"
+      width="440px"
+      centered
+      destroy-on-close
+      @ok="submitEarlyReturn"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="实际返岗日期" required>
+          <a-date-picker
+            v-model:value="earlyForm.returnDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-input v-model:value="earlyForm.note" :maxlength="100" placeholder="选填" />
+        </a-form-item>
+        <a-alert
+          type="info"
+          show-icon
+          message="销假后按实际返岗日期重算天数，多请的假期额度会自动退回"
+        />
+      </a-form>
+    </a-modal>
+
     <!-- 审批动作、流程进度、意见都在审批中心抽屉里完成，本页不再本地审批 -->
     <approval-detail-drawer
       v-model:open="approvalDrawerOpen"
@@ -161,16 +244,24 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import {
   applyLeave,
   cancelLeave,
+  earlyReturnLeave,
+  leaveConflicts,
   leaveDelegateOptions as fetchLeaveDelegateOptions,
+  leaveRules,
   leaveTypeOptions as fetchLeaveTypeOptions,
+  myLeaveQuotas,
   pageLeaves,
+  teamLeaves,
+  uploadEhrAttachment,
   type LeaveDelegateOptions,
   type LeaveItem,
+  type LeaveQuotaItem,
+  type LeaveTypeRule,
   type TypeOption
 } from '@/api/ehr'
 import { useUserStore } from '@/stores/user'
@@ -187,8 +278,9 @@ import {
 const store = useUserStore()
 const canApply = computed(() => store.can('leave:apply'))
 const canApprove = computed(() => store.can('leave:approve') || store.can('approval:approve'))
+const canViewTeam = computed(() => store.can('leave:view:team'))
 
-const scope = ref<'mine' | 'all'>('mine')
+const scope = ref<'mine' | 'all' | 'team'>('mine')
 const statusFilter = ref<number | undefined>(undefined)
 const rows = ref<LeaveItem[]>([])
 
@@ -221,7 +313,9 @@ const size = ref(10)
 const statusFilterOptions = [
   { value: 0, label: '待审批' },
   { value: 1, label: '已通过' },
-  { value: 2, label: '已驳回' }
+  { value: 2, label: '已驳回' },
+  { value: 3, label: '已撤销' },
+  { value: 4, label: '已销假' }
 ]
 
 const pagination = computed(() => ({
@@ -245,6 +339,13 @@ const columns = [
 async function load() {
   loading.value = true
   try {
+    if (scope.value === 'team') {
+      const list = await teamLeaves({})
+      rows.value = list || []
+      total.value = rows.value.length
+      approvalBriefs.value = []
+      return
+    }
     const data = await pageLeaves({
       scope: scope.value,
       status: statusFilter.value,
@@ -267,7 +368,7 @@ function reload() {
 }
 
 function onScopeChange() {
-  // 审批列表默认只看待审批，避免历史单据淹没待办
+  // 审批列表默认只看待审批，避免历史单据淹没待办；团队视图展示待审批 + 已通过
   statusFilter.value = scope.value === 'all' ? 0 : undefined
   reload()
 }
@@ -279,7 +380,13 @@ function onTableChange(p: any) {
 }
 
 function statusColor(status: number) {
-  return status === 0 ? 'orange' : status === 1 ? 'green' : status === 2 ? 'red' : 'default'
+  return status === 0 ? 'orange' : status === 1 ? 'green' : status === 2 ? 'red' : status === 4 ? 'purple' : 'default'
+}
+
+function periodText(p?: string | null) {
+  if (p === 'AM') return '上午'
+  if (p === 'PM') return '下午'
+  return ''
 }
 
 /* ---------- 申请 ---------- */
@@ -288,13 +395,53 @@ const saving = ref(false)
 const applyForm = reactive<{
   leaveType: string
   range: string[] | undefined
+  startPeriod: string
+  endPeriod: string
+  dayMode: string
   reason: string
   delegateAccountId?: string
+  attachmentId?: string
 }>({
   leaveType: 'ANNUAL',
   range: undefined,
-  reason: ''
+  startPeriod: 'AM',
+  endPeriod: 'PM',
+  dayMode: 'NATURAL',
+  reason: '',
+  attachmentId: undefined
 })
+
+const periodOptions = [
+  { value: 'AM', label: '上午' },
+  { value: 'PM', label: '下午' }
+]
+const dayModeOptions = [
+  { value: 'NATURAL', label: '自然日（含周末）' },
+  { value: 'WORKDAY', label: '工作日（跳过周末 / 节假日）' }
+]
+
+/** 请假类型规则与本人剩余额度：打开弹窗时加载，用于前端提示与必填校验 */
+const rules = ref<Record<string, LeaveTypeRule>>({})
+const quotas = ref<Record<string, LeaveQuotaItem>>({})
+const conflicts = ref<LeaveItem[]>([])
+const attachmentFiles = ref<any[]>([])
+
+const currentRule = computed(() => rules.value[applyForm.leaveType])
+const quotaItem = computed(() => quotas.value[applyForm.leaveType])
+const ruleHint = computed(() => {
+  const r = currentRule.value
+  if (!r) return ''
+  const parts = [`单次 ${r.minDays}~${r.maxDaysPerRequest} 天`]
+  if (r.minNoticeDays > 0) parts.push(`需提前 ${r.minNoticeDays} 天申请`)
+  if (r.allowPastDays > 0) parts.push(`最多补请 ${r.allowPastDays} 天`)
+  if (r.quotaRequired === 1) parts.push(`当前剩余 ${quotaItem.value?.availableDays ?? 0} 天`)
+  return parts.join('；')
+})
+const conflictText = computed(() =>
+  conflicts.value
+    .map((c) => `${c.startDate}~${c.endDate}（${c.statusName}）`)
+    .join('；')
+)
 
 /** 部门负责人请假必须指定审批转办人；普通人打开弹窗时 required=false，隐藏该字段 */
 const delegateCtx = ref<LeaveDelegateOptions>({ required: false, options: [] })
@@ -311,24 +458,103 @@ const leaveTypeOptions = ref<TypeOption[]>([])
 const days = computed(() => {
   const r = applyForm.range
   if (!r || r.length !== 2) return 0
-  return dayjs(r[1]).diff(dayjs(r[0]), 'day') + 1
+  const start = dayjs(r[0])
+  const end = dayjs(r[1])
+  if (end.isBefore(start, 'day')) return 0
+  let total = 0
+  let cur = start
+  while (!cur.isAfter(end, 'day')) {
+    const fraction = cur.isSame(start, 'day')
+      ? (applyForm.startPeriod === 'AM' ? 1 : 0.5)
+      : cur.isSame(end, 'day')
+        ? (applyForm.endPeriod === 'PM' ? 1 : 0.5)
+        : 1
+    if (applyForm.dayMode === 'WORKDAY' && (cur.day() === 0 || cur.day() === 6)) {
+      cur = cur.add(1, 'day')
+      continue
+    }
+    total += fraction
+    cur = cur.add(1, 'day')
+  }
+  return total
 })
+
+function onRangeChange() {
+  conflicts.value = []
+  const r = applyForm.range
+  if (!r || r.length !== 2) return
+  leaveConflicts(r[0], r[1])
+    .then((d) => (conflicts.value = d || []))
+    .catch(() => {})
+}
 
 function openApply() {
   applyForm.leaveType = 'ANNUAL'
   applyForm.range = undefined
+  applyForm.startPeriod = 'AM'
+  applyForm.endPeriod = 'PM'
+  applyForm.dayMode = 'NATURAL'
   applyForm.reason = ''
   applyForm.delegateAccountId = undefined
+  applyForm.attachmentId = undefined
+  attachmentFiles.value = []
+  conflicts.value = []
   delegateCtx.value = { required: false, options: [] }
   applyOpen.value = true
   fetchLeaveDelegateOptions()
     .then((d) => (delegateCtx.value = d))
     .catch(() => {})
+  leaveRules()
+    .then((list) => {
+      const m: Record<string, LeaveTypeRule> = {}
+      ;(list || []).forEach((r) => (m[r.leaveType] = r))
+      rules.value = m
+    })
+    .catch(() => {})
+  myLeaveQuotas()
+    .then((list) => {
+      const m: Record<string, LeaveQuotaItem> = {}
+      ;(list || []).forEach((q) => (m[q.leaveType] = q))
+      quotas.value = m
+    })
+    .catch(() => {})
+}
+
+/** 证明附件上传：自定义请求直传后端，成功后拿附件ID */
+function customUpload(options: any) {
+  const file = options.file as File
+  uploadEhrAttachment(file)
+    .then((res) => {
+      applyForm.attachmentId = res.id
+      attachmentFiles.value = [{ uid: res.id, name: res.fileName, status: 'done' }]
+      options.onSuccess?.(res)
+    })
+    .catch((e: any) => {
+      message.error(e?.message || '附件上传失败')
+      options.onError?.(e)
+    })
+}
+
+function onAttachmentRemove() {
+  applyForm.attachmentId = undefined
+  attachmentFiles.value = []
 }
 
 async function submitApply() {
   if (!applyForm.range || applyForm.range.length !== 2) {
     message.warning('请选择请假日期')
+    return
+  }
+  if (days.value <= 0) {
+    message.warning('所选时段请假天数为 0，请调整半天或日期')
+    return
+  }
+  if (currentRule.value && days.value < currentRule.value.minDays) {
+    message.warning(`该类型最少请 ${currentRule.value.minDays} 天`)
+    return
+  }
+  if (currentRule.value && currentRule.value.attachmentRequired === 1 && !applyForm.attachmentId) {
+    message.warning('该请假类型必须上传证明材料')
     return
   }
   if (delegateCtx.value.required && !applyForm.delegateAccountId) {
@@ -345,7 +571,11 @@ async function submitApply() {
       leaveType: applyForm.leaveType,
       startDate: applyForm.range[0],
       endDate: applyForm.range[1],
+      startPeriod: applyForm.startPeriod,
+      endPeriod: applyForm.endPeriod,
+      dayMode: applyForm.dayMode,
       reason: applyForm.reason.trim(),
+      attachmentId: applyForm.attachmentId,
       delegateAccountId: applyForm.delegateAccountId
     })
     message.success('已提交，等待审批')
@@ -355,6 +585,41 @@ async function submitApply() {
     message.error(e?.message || '提交失败')
   } finally {
     saving.value = false
+  }
+}
+
+/* ---------- 销假 ---------- */
+const earlyOpen = ref(false)
+const earlySaving = ref(false)
+const earlyTarget = ref<LeaveItem | null>(null)
+const earlyForm = reactive({ returnDate: '', note: '' })
+
+function openEarlyReturn(record: LeaveItem) {
+  earlyTarget.value = record
+  earlyForm.returnDate = dayjs().format('YYYY-MM-DD')
+  earlyForm.note = ''
+  earlyOpen.value = true
+}
+
+async function submitEarlyReturn() {
+  if (!earlyTarget.value) return
+  if (!earlyForm.returnDate) {
+    message.warning('请选择实际返岗日期')
+    return
+  }
+  earlySaving.value = true
+  try {
+    await earlyReturnLeave(earlyTarget.value.id, {
+      returnDate: earlyForm.returnDate,
+      note: earlyForm.note.trim()
+    })
+    message.success('销假成功，多请的额度已退回')
+    earlyOpen.value = false
+    reload()
+  } catch (e: any) {
+    message.error(e?.message || '销假失败')
+  } finally {
+    earlySaving.value = false
   }
 }
 

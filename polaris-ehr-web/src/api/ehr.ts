@@ -821,8 +821,14 @@ export interface LeaveItem {
   leaveTypeName: string
   startDate: string
   endDate: string
+  startPeriod?: string
+  endPeriod?: string
+  dayMode?: string
   days: number
   reason: string
+  returnDate?: string | null
+  attachmentId?: string | null
+  attachmentName?: string
   status: number
   statusName: string
   /** 提交时按部门负责人快照的审批人账户ID；为空表示由有审批权的人兜底 */
@@ -850,11 +856,111 @@ export function applyLeave(body: {
   leaveType: string
   startDate: string
   endDate: string
+  startPeriod?: string
+  endPeriod?: string
+  dayMode?: string
   reason: string
+  attachmentId?: string
   /** 审批转办人账户ID：部门负责人请假必填 */
   delegateAccountId?: string
 }) {
   return request.post<never, LeaveItem>('/api/ehr/leaves', body)
+}
+
+/** 提前返岗销假：按实际返岗日期重算天数并退回额度 */
+export function earlyReturnLeave(id: string, body: { returnDate: string; note?: string }) {
+  return request.post<never, LeaveItem>(`/api/ehr/leaves/${id}/early-return`, body)
+}
+
+/** 提交前时段冲突（只查本人） */
+export function leaveConflicts(startDate: string, endDate: string) {
+  return request.get<never, LeaveItem[]>('/api/ehr/leaves/conflicts', { params: { startDate, endDate } })
+}
+
+/** 团队请假视图：需 leave:view:team */
+export function teamLeaves(params: { orgId?: string; from?: string; to?: string }) {
+  return request.get<never, LeaveItem[]>('/api/ehr/leaves/team', { params })
+}
+
+// ---------------- 假期额度 / 类型规则 / 附件 ----------------
+
+export interface LeaveQuotaItem {
+  id: string
+  employeeId: string
+  leaveType: string
+  leaveTypeName: string
+  year: number
+  totalDays: number
+  usedDays: number
+  frozenDays: number
+  availableDays: number
+}
+
+export interface LeaveTypeRule {
+  leaveType: string
+  enabled: number
+  quotaRequired: number
+  defaultQuotaDays: number
+  attachmentRequired: number
+  minDays: number
+  maxDaysPerRequest: number
+  minNoticeDays: number
+  allowPastDays: number
+  needDelegate: number
+  sortNo: number
+}
+
+export interface QuotaLogItem {
+  id: string
+  leaveId?: string | null
+  action: string
+  actionName: string
+  days: number
+  beforeAvailable: number
+  afterAvailable: number
+  remark?: string
+  createdAt?: string
+}
+
+export function myLeaveQuotas(year?: number) {
+  return request.get<never, LeaveQuotaItem[]>('/api/ehr/leave-quotas/me', { params: { year } })
+}
+
+export function employeeLeaveQuotas(employeeId: string, year?: number) {
+  return request.get<never, LeaveQuotaItem[]>('/api/ehr/leave-quotas', { params: { employeeId, year } })
+}
+
+export function initEmployeeLeaveQuota(employeeId: string, year?: number) {
+  return request.post<never, LeaveQuotaItem[]>('/api/ehr/leave-quotas/init', null, {
+    params: { employeeId, year }
+  })
+}
+
+export function leaveQuotaLogs(quotaId: string) {
+  return request.get<never, QuotaLogItem[]>(`/api/ehr/leave-quotas/${quotaId}/logs`)
+}
+
+/** 发起额度调整审批：审批通过后才生效 */
+export function adjustLeaveQuota(quotaId: string, body: { delta: number; reason: string }) {
+  return request.post<never, unknown>(`/api/ehr/leave-quotas/${quotaId}/adjust`, body)
+}
+
+export function leaveRules() {
+  return request.get<never, LeaveTypeRule[]>('/api/ehr/leave-rules')
+}
+
+export function saveLeaveRule(leaveType: string, body: Partial<LeaveTypeRule>) {
+  return request.put<never, LeaveTypeRule>(`/api/ehr/leave-rules/${leaveType}`, body)
+}
+
+/** 附件上传（请假证明材料），返回附件ID */
+export function uploadEhrAttachment(file: File, bizType = 'LEAVE') {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('bizType', bizType)
+  return request.post<never, { id: string; fileName: string; size: number }>('/api/ehr/attachments', form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
 export function cancelLeave(id: string) {
