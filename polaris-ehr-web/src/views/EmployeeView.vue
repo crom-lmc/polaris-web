@@ -1200,13 +1200,9 @@ async function loadApprovalBriefs(list: EmployeeItem[]) {
   approvalBriefs.value = refs.length ? await fetchLatestApprovals(refs).catch(() => []) : []
 }
 
-/** 只有审批中心里确实在途的单才算「审批中」；业务行残留的已完成实例号不算 */
+/** 只有审批中心里确实在途的单才算「审批中」 */
 function runningBriefForRow(r: EmployeeItem) {
-  return runningBriefOf(
-    briefsForRow(approvalBriefs.value, r.id),
-    r.approvalInstanceId,
-    r.approvalBizType
-  )
+  return runningBriefOf(briefsForRow(approvalBriefs.value, r.id))
 }
 
 /** 审批完成后不再给详情入口，只有被驳回时需要查看驳回意见 */
@@ -2045,8 +2041,8 @@ async function submit() {
 /* ---------- 入职 / 转正 生命周期 ---------- */
 /** 转正申请是否可提交：试用期、且该员工当前没有任何在途审批单 */
 function hasPendingRegularize(row: EmployeeItem) {
-  // 通用在途指针优先（入职/信息变更/离职在途时同样不能发起转正），兼容老字段
-  return !!row.approvalInstanceId || row.regularizeStatus === 1 || row.regularizeStatus === 2
+  // 入职/信息变更/离职在途时同样不能发起转正
+  return !!runningBriefForRow(row) || row.regularizeStatus === 1 || row.regularizeStatus === 2
 }
 
 /** 当前登录账号对应的员工档案ID（用于「本人」判定） */

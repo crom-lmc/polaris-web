@@ -293,10 +293,6 @@ export interface EmployeeItem {
   accountDisabled?: boolean
   /** true=本次保存走了审批（信息变更已提交、尚未生效） */
   pendingApproval?: boolean
-  /** 当前在途审批单 ID（settings 库实例）；有值即在列表显示「XX审批中」并可点开详情 */
-  approvalInstanceId?: string | null
-  /** ehr.onboard / ehr.regularize / ehr.emp_update / ehr.resign */
-  approvalBizType?: string | null
 }
 
 export interface PageData<T> {
