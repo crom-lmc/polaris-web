@@ -346,8 +346,6 @@
           <a-form-item label="渲染模式">
             <a-select v-model:value="pageForm.renderMode">
               <a-select-option value="SECTIONS">分组卡片（推荐）</a-select-option>
-              <a-select-option value="TEMPLATE">受限 HTML 模板</a-select-option>
-              <a-select-option value="COMPONENT">前端注册组件</a-select-option>
               <a-select-option value="ROUTE">自定义页面路由（iframe 嵌入）</a-select-option>
             </a-select>
           </a-form-item>
@@ -363,12 +361,6 @@
       />
 
       <a-form v-if="pageForm.renderMode !== 'SECTIONS'" layout="vertical" class="compact">
-        <a-form-item v-if="pageForm.renderMode === 'TEMPLATE'" label="HTML 模板（受限白名单编译，非原生 innerHTML）">
-          <a-textarea v-model:value="pageForm.htmlTpl" :rows="6" class="mono" />
-        </a-form-item>
-        <a-form-item v-if="pageForm.renderMode === 'COMPONENT'" label="前端注册的组件 key">
-          <a-input v-model:value="pageForm.componentKey" placeholder="如 ehr-onboard-panel" />
-        </a-form-item>
         <a-form-item
           v-if="pageForm.renderMode === 'ROUTE'"
           label="自定义页面地址（审批抽屉信息区 iframe 嵌入，自动拼 instanceId 参数；流程与操作区保持平台渲染）"
@@ -1090,7 +1082,7 @@ async function saveTemplate() {
 const pageOpen = ref(false)
 const pageTarget = ref<ApprovalTemplate | null>(null)
 const savingPage = ref(false)
-const pageForm = reactive({ view: 'APPROVAL', renderMode: 'SECTIONS', config: '', htmlTpl: '', componentKey: '', routePath: '' })
+const pageForm = reactive({ view: 'APPROVAL', renderMode: 'SECTIONS', config: '', routePath: '' })
 
 /**
  * 页面配置器字段池条目。
@@ -1216,8 +1208,6 @@ async function openPage(record: ApprovalTemplate) {
   pageForm.view = 'APPROVAL'
   pageForm.renderMode = 'SECTIONS'
   pageForm.config = ''
-  pageForm.htmlTpl = ''
-  pageForm.componentKey = ''
   pageForm.routePath = ''
   try {
     const p = await requestPage(record.id)
@@ -1225,8 +1215,6 @@ async function openPage(record: ApprovalTemplate) {
       pageForm.view = p.view || 'APPROVAL'
       pageForm.renderMode = p.renderMode || 'SECTIONS'
       pageForm.config = pretty(p.config)
-      pageForm.htmlTpl = p.htmlTpl || ''
-      pageForm.componentKey = p.componentKey || ''
       pageForm.routePath = p.routePath || ''
     }
   } catch (e) {
@@ -1277,8 +1265,6 @@ async function savePageCfg() {
       view: pageForm.view,
       renderMode: pageForm.renderMode,
       config: pageForm.config,
-      htmlTpl: pageForm.htmlTpl,
-      componentKey: pageForm.componentKey,
       routePath: pageForm.routePath.trim()
     })
     message.success('页面配置已保存')

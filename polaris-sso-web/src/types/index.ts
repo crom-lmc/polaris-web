@@ -253,8 +253,6 @@ export interface ApprovalPageConfig {
   titleTpl?: string
   sections?: ApprovalPageSection[]
   actions?: string[]
-  htmlTpl?: string
-  componentKey?: string
   /** renderMode=ROUTE 的自定义页面地址：信息区整段换成 iframe 嵌入 */
   routePath?: string
 }

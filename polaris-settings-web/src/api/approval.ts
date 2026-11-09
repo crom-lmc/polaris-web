@@ -318,8 +318,6 @@ export interface PageEdit {
   view: string
   renderMode: string
   config: string
-  htmlTpl: string
-  componentKey: string
   /** renderMode=ROUTE 的自定义页面地址（应用内路由或完整 URL） */
   routePath: string
 }
@@ -347,8 +345,6 @@ export interface ApprovalTemplateDetail extends ApprovalTemplate {
     view: string
     renderMode: string
     config: string
-    htmlTpl: string
-    componentKey: string
     routePath: string
     version?: number
   } | null
