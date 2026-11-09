@@ -79,6 +79,8 @@ export interface FlowStep {
   name: string
   /** 步骤级生效条件，空 = 总执行 */
   conditionExpr: string
+  /** 节点时效小时数：该步骤停留超过此值触发超时提醒，空=不提醒（仅保存时透传） */
+  slaHours?: number | null
   /** approver 为 1 个，parallel 为 N 个；gateway 用 branches */
   nodes: NodeEdit[]
   branches?: FlowBranch[]
@@ -117,6 +119,7 @@ export interface StepWire {
   branchPath?: string
   depth?: number
   uiKind?: string
+  slaHours?: number | null
   isGateway?: boolean
   nodes?: NodeWire[]
 }
@@ -146,6 +149,8 @@ export interface StepSave {
   branchPath: string
   depth: number
   uiKind: string
+  /** 节点时效小时数，设计器未编辑时原样透传，避免保存把已配置的 SLA 清空 */
+  slaHours?: number | null
   name: string
   conditionExpr: string
   conditionDesc: string
@@ -189,6 +194,7 @@ export function fromWireSteps(wires: StepWire[]): FlowStep[] {
       kind: gateway ? 'gateway' : ws.length > 1 ? 'parallel' : 'approver',
       name: w.name || '',
       conditionExpr: w.conditionExpr || '',
+      slaHours: w.slaHours ?? null,
       nodes: gateway ? [] : ws.map(toNode),
       parentNodeId: w.parentNodeId || null,
       branchPath: w.branchPath || '',
@@ -271,6 +277,7 @@ export function toSaveSteps(steps: FlowStep[]): StepSave[] {
         branchPath,
         depth,
         uiKind: s.kind.toUpperCase(),
+        slaHours: s.slaHours ?? null,
         name: s.name || '',
         conditionExpr: s.conditionExpr || '',
         conditionDesc: '',
