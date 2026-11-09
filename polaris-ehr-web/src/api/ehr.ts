@@ -289,6 +289,8 @@ export interface EmployeeItem {
   remark?: string
   createdAt?: string
   account?: AccountBrief | null
+  /** 本次返回的手机号/身份证/紧急联系电话是否为掩码值 */
+  sensitiveMasked?: boolean
   /** 离职/复职时账号状态是否已同步 */
   accountDisabled?: boolean
   /** true=本次保存走了审批（信息变更已提交、尚未生效） */
@@ -370,6 +372,8 @@ export interface BankItem {
   bank: string
   bankName?: string
   accountNo: string
+  /** 卡号是否已按权限掩码 */
+  sensitiveMasked?: boolean
   holderName?: string
   branch?: string
   isPrimary?: number
@@ -457,6 +461,106 @@ export const deleteFamily = (employeeId: string, id: string) =>
 
 export function pageEmployees(params: Record<string, unknown>) {
   return request.get<never, PageData<EmployeeItem>>('/api/ehr/employees', { params })
+}
+
+/* ---------------- 人力看板 ---------------- */
+
+/** 看板汇总：后端已按当前账号的数据范围过滤，前端不再二次裁剪 */
+export interface DashboardSummary {
+  overview: {
+    active: number
+    probation: number
+    onboarding: number
+    terminating: number
+    onboardThisMonth: number
+    resignThisMonth: number
+    regularizedThisMonth: number
+  }
+  orgDistribution: Array<{ orgId: string; orgName: string; type: string; employees: number }>
+  headcount: Array<{
+    orgId: string
+    orgName: string
+    type: string
+    headcount: number
+    actual: number
+    /** 编制为 0 时为 null，页面显示「—」 */
+    utilization: number | null
+  }>
+  headcountTotal: { headcount: number; actual: number; utilization: number | null }
+  leaveTrend: Array<{ month: string; leaveType: string; leaveTypeName: string; days: number }>
+}
+
+export function dashboardSummary(params: { orgId?: string; from?: string; to?: string } = {}) {
+  return request.get<never, DashboardSummary>('/api/ehr/dashboard/summary', { params })
+}
+
+/** 导出人员数据（CSV，后端按数据范围+敏感权限处理并记审计） */
+export function exportEmployees(params: Record<string, unknown>) {
+  return request.get<never, { data: Blob }>('/api/ehr/employees/export', {
+    params,
+    responseType: 'blob'
+  })
+}
+
+/** 查看手机号 / 身份证 / 紧急联系电话明文（需 employee:sensitive:view，留 PLAIN 审计） */
+export function sensitiveEmployeeDetail(id: string) {
+  return request.get<never, EmployeeItem>(`/api/ehr/employees/${id}/sensitive`)
+}
+
+/* ---------- 敏感操作审计 ---------- */
+
+export interface AuditLogItem {
+  id: string
+  operatorId: string
+  operatorName?: string
+  /** VIEW / PLAIN / EXPORT */
+  action: string
+  /** EMPLOYEE 等 */
+  targetType: string
+  targetId?: string | null
+  /** 员工类目标补的姓名 */
+  targetName?: string
+  /** 涉及的敏感字段 */
+  fields?: string
+  ip?: string
+  ua?: string
+  createdAt?: string
+}
+
+export function pageAuditLogs(params: Record<string, unknown>) {
+  return request.get<never, PageData<AuditLogItem>>('/api/ehr/audit-logs', { params })
+}
+
+/* ---------- 我的到期提醒 ---------- */
+
+export interface ReminderItem {
+  id: string
+  employeeId: string
+  receiverId: string
+  type: string
+  bizId?: string | null
+  triggerDate?: string
+  title: string
+  content?: string
+  readFlag?: number
+  createdAt?: string
+  employeeName?: string
+}
+
+export function pageMyReminders(params: Record<string, unknown>) {
+  return request.get<never, PageData<ReminderItem>>('/api/ehr/reminders/my', { params })
+}
+
+export function myReminderUnreadCount() {
+  return request.get<never, number>('/api/ehr/reminders/unread-count')
+}
+
+export function readReminder(id: string) {
+  return request.post<never, void>(`/api/ehr/reminders/${id}/read`)
+}
+
+export function readAllReminders() {
+  return request.post<never, void>('/api/ehr/reminders/read-all')
 }
 
 export function myEmployee() {
@@ -954,11 +1058,12 @@ export function saveLeaveRule(leaveType: string, body: Partial<LeaveTypeRule>) {
 }
 
 /** 附件上传（请假证明材料），返回附件ID */
-export function uploadEhrAttachment(file: File, bizType = 'LEAVE') {
+export function uploadEhrAttachment(file: File, bizType = 'LEAVE', bizId?: string) {
   const form = new FormData()
   form.append('file', file)
   form.append('bizType', bizType)
-  return request.post<never, { id: string; fileName: string; size: number }>('/api/ehr/attachments', form, {
+  if (bizId) form.append('bizId', bizId)
+  return request.post<never, EhrAttachment>('/api/ehr/attachments', form, {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
@@ -1049,6 +1154,154 @@ export function announcementOrgTree() {
 export function getAnnouncement(id: string) {
   return request.get<never, AnnouncementItem>(`/api/ehr/announcements/manage/${id}`)
 }
+
+/* ---------------- 合同与档案附件（P1-1） ---------------- */
+
+export interface ContractItem {
+  id: string
+  employeeId: string
+  employeeName?: string
+  contractNo?: string
+  /** FIXED / UNFIXED / INTERN / LABOR */
+  contractType: string
+  contractTypeName?: string
+  startDate?: string
+  endDate?: string
+  signDate?: string
+  /** ACTIVE / PENDING / TERMINATING / EXPIRED / RENEWED / TERMINATED */
+  status: string
+  statusName?: string
+  renewFromId?: string
+  fileId?: string
+  fileName?: string
+  remark?: string
+  /** 距到期天数；负数=已过期 */
+  expireDays?: number
+  /** RED 7 天内 / YELLOW 30 天内 */
+  expireFlag?: string
+  createdAt?: string
+}
+
+export interface ContractBody {
+  contractNo?: string
+  contractType: string
+  startDate: string
+  endDate?: string
+  signDate?: string
+  fileId?: string
+  remark?: string
+}
+
+export interface ContractRenewBody extends ContractBody {
+  reason?: string
+}
+
+export const listContracts = (employeeId: string) =>
+  request.get<never, ContractItem[]>('/api/ehr/contracts', { params: { employeeId } })
+
+export const addContract = (employeeId: string, body: ContractBody) =>
+  request.post<never, ContractItem>('/api/ehr/contracts', body, { params: { employeeId } })
+
+export const updateContract = (id: string, body: ContractBody) =>
+  request.put<never, ContractItem>(`/api/ehr/contracts/${id}`, body)
+
+export const renewContract = (id: string, body: ContractRenewBody) =>
+  request.post<never, ContractItem>(`/api/ehr/contracts/${id}/renew`, body)
+
+export const terminateContract = (id: string, reason: string) =>
+  request.post<never, ContractItem>(`/api/ehr/contracts/${id}/terminate`, { reason })
+
+export interface EhrAttachment {
+  id: string
+  fileName: string
+  size: number
+  mime?: string
+  bizType?: string
+  bizId?: string
+  uploadedBy?: string
+  createdAt?: string
+}
+
+export const listEhrAttachments = (bizType: string, bizId: string) =>
+  request.get<never, EhrAttachment[]>('/api/ehr/attachments', { params: { bizType, bizId } })
+
+export const deleteEhrAttachment = (id: string) => request.delete(`/api/ehr/attachments/${id}`)
+
+export function downloadEhrAttachment(id: string) {
+  return request.get<never, { data: Blob }>(`/api/ehr/attachments/${id}/download`, {
+    responseType: 'blob'
+  })
+}
+
+/* ---------------- 轻量考勤（P1-2） ---------------- */
+
+export interface OvertimeItem {
+  id: string
+  employeeId: string
+  employeeName?: string
+  workDate: string
+  hours: number
+  /** NORMAL / HOLIDAY / RESTDAY */
+  type: string
+  typeName?: string
+  reason?: string
+  /** 0 待审批 / 1 已通过 / 2 已驳回 / 3 已撤销 */
+  status: number
+  statusName?: string
+  approveNote?: string
+  createdAt?: string
+  mine?: boolean
+}
+
+export interface OvertimePage {
+  list: OvertimeItem[]
+  total: number
+}
+
+export interface OvertimeBody {
+  workDate: string
+  hours: number
+  type: string
+  reason?: string
+}
+
+export const listOvertimes = (params: {
+  scope?: string
+  employeeId?: string
+  month?: string
+  page?: number
+  size?: number
+}) => request.get<never, OvertimePage>('/api/ehr/attendance/overtimes', { params })
+
+export const submitOvertime = (body: OvertimeBody) =>
+  request.post<never, OvertimeItem>('/api/ehr/attendance/overtimes', body)
+
+export const cancelOvertime = (id: string) =>
+  request.post<never, void>(`/api/ehr/attendance/overtimes/${id}/cancel`)
+
+export interface AttendanceMonthItem {
+  id: string
+  employeeId: string
+  employeeName?: string
+  month: string
+  shouldDays: number
+  actualDays: number
+  leaveDays: number
+  overtimeHours: number
+  absentDays: number
+  /** 0 未确认 / 1 已确认 */
+  confirmed: number
+}
+
+export const listAttendanceMonthly = (month: string, employeeId?: string) =>
+  request.get<never, AttendanceMonthItem[]>('/api/ehr/attendance/monthly', {
+    params: { month, employeeId }
+  })
+
+export const confirmAttendanceMonthly = (month: string, employeeId: string) =>
+  request.post<never, AttendanceMonthItem>('/api/ehr/attendance/monthly/confirm', null, {
+    params: { month, employeeId }
+  })
 
 export function createAnnouncement(body: AnnouncementSaveBody) {
   return request.post<never, AnnouncementItem>('/api/ehr/announcements/manage', body)

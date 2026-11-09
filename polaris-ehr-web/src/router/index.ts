@@ -16,10 +16,12 @@ const router = createRouter({
         { path: 'orgs', component: () => import('@/views/OrgView.vue'), meta: { title: '组织架构', perm: 'org:view' } },
         { path: 'employees', component: () => import('@/views/EmployeeView.vue'), meta: { title: '人员管理', perm: 'employee:view' } },
         { path: 'leaves', component: () => import('@/views/LeaveView.vue'), meta: { title: '请假管理', perm: 'leave:view' } },
+        { path: 'attendance', component: () => import('@/views/AttendanceView.vue'), meta: { title: '考勤管理', perm: 'overtime:view' } },
         { path: 'my-resign', component: () => import('@/views/MyResignView.vue'), meta: { title: '离职申请', perm: 'resign:apply' } },
         { path: 'my-regularize', component: () => import('@/views/MyRegularizeView.vue'), meta: { title: '转正申请', perm: 'regularize:apply' } },
         { path: 'approvals', component: () => import('@/views/ApprovalView.vue'), meta: { title: '审批中心', perm: 'approval:todo' } },
         { path: 'announcements', component: () => import('@/views/AnnouncementView.vue'), meta: { title: '通知管理', perm: 'announcement:manage' } },
+        { path: 'audit-logs', component: () => import('@/views/AuditLogView.vue'), meta: { title: '审计日志', perm: 'audit:view' } },
         { path: 'no-access', component: () => import('@/views/NoAccessView.vue'), meta: { title: '无权限', public: true } }
       ]
     },

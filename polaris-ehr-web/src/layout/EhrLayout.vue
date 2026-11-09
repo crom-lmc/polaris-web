@@ -56,6 +56,10 @@
             <template #icon><calendar-outlined /></template>
             请假管理
           </a-menu-item>
+          <a-menu-item v-if="store.can('overtime:view')" key="/attendance">
+            <template #icon><clock-circle-outlined /></template>
+            考勤管理
+          </a-menu-item>
           <a-menu-item v-if="store.can('resign:apply')" key="/my-resign">
             <template #icon><export-outlined /></template>
             离职申请
@@ -71,6 +75,10 @@
           <a-menu-item v-if="store.can('announcement')" key="/announcements">
             <template #icon><notification-outlined /></template>
             通知管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
+            <template #icon><file-search-outlined /></template>
+            审计日志
           </a-menu-item>
         </a-menu>
       </a-layout-sider>
@@ -89,8 +97,10 @@ import {
   AppstoreOutlined,
   AuditOutlined,
   CalendarOutlined,
+  ClockCircleOutlined,
   DownOutlined,
   ExportOutlined,
+  FileSearchOutlined,
   LogoutOutlined,
   MenuOutlined,
   NotificationOutlined,

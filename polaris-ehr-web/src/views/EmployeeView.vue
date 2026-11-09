@@ -79,6 +79,10 @@
             刷新
           </a-button>
           <span class="spacer" />
+          <a-button v-if="canExport" :loading="exporting" @click="doExport">
+            <template #icon><download-outlined /></template>
+            导出
+          </a-button>
           <a-button v-if="canCreate" type="primary" @click="openCreate">
             <template #icon><user-add-outlined /></template>
             新增人员
@@ -103,7 +107,12 @@
                     <span class="emp-name-text">{{ record.name }}</span>
                   </a-tooltip>
                 </div>
-                <div class="muted cell-sub">{{ record.empNo }}</div>
+                <div class="muted cell-sub">
+                  {{ record.empNo }}
+                  <a-tag v-if="dueTag(record)" :color="dueTag(record)?.color" class="due-tag">
+                    {{ dueTag(record)?.text }}
+                  </a-tag>
+                </div>
               </template>
               <template v-else-if="column.key === 'gender'">
                 {{ genderText(record.gender) }}
@@ -136,6 +145,7 @@
               <template v-else-if="column.key === 'action'">
                 <a-space size="small" wrap>
                   <a @click="openProfile(record)">查看</a>
+                  <a v-if="canSensitive && record.sensitiveMasked" @click="openPlain(record)">查看明文</a>
                   <!-- 只有「待入职」是编辑档案；试用期/在职走「变更」，只能改个人信息 -->
                   <a v-if="canEdit && canEditRecord(record)" @click="openEdit(record)">
                     {{ record.status === 10 ? '编辑' : '变更' }}
@@ -956,6 +966,27 @@
       :can-edit="false"
     />
 
+    <!-- 敏感信息明文（需 employee:sensitive:view，后端会记录 PLAIN 审计） -->
+    <a-modal
+      v-model:open="plainOpen"
+      :title="`敏感信息 · ${plainName}`"
+      :footer="null"
+      width="420px"
+      centered
+    >
+      <a-alert
+        type="warning"
+        show-icon
+        message="本次查看已记录审计日志（操作人 / 时间 / IP）"
+        style="margin-bottom: 12px"
+      />
+      <a-descriptions :column="1" bordered size="small">
+        <a-descriptions-item v-for="item in plainRows" :key="item.label" :label="item.label">
+          {{ item.value || '—' }}
+        </a-descriptions-item>
+      </a-descriptions>
+    </a-modal>
+
     <!-- 在途审批详情：流程进度 / 审批人 / 意见 / 我的处理，全部来自审批中心 -->
     <approval-detail-drawer
       v-model:open="approvalDrawerOpen"
@@ -969,7 +1000,7 @@
 import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { ApartmentOutlined, CloseCircleFilled, ReloadOutlined, UserAddOutlined } from '@ant-design/icons-vue'
+import { ApartmentOutlined, CloseCircleFilled, DownloadOutlined, ReloadOutlined, UserAddOutlined } from '@ant-design/icons-vue'
 import HandoverEditor from '@/components/HandoverEditor.vue'
 import EmployeeProfileDrawer from '@/components/EmployeeProfileDrawer.vue'
 import {
@@ -987,11 +1018,13 @@ import {
   closeAccountEmployee,
   dictOptions,
   employeeProfile,
+  exportEmployees,
   onboardEmployee,
   orgTree,
   pageEmployees,
   reduceEmployee,
   regularizeApply,
+  sensitiveEmployeeDetail,
   submitDraft,
   submitEmpChange,
   submitRehireApply,
@@ -1035,6 +1068,9 @@ const canCreate = computed(() => store.can('employee:create'))
 const canEdit = computed(() => store.can('employee:edit'))
 const canDelete = computed(() => store.can('employee:delete'))
 const canResign = computed(() => store.can('employee:resign'))
+/** 敏感字段明文 / 导出按独立权限控制 */
+const canSensitive = computed(() => store.can('employee:sensitive:view'))
+const canExport = computed(() => store.can('employee:export'))
 /** 组织树要 org:view；普通员工没有，左侧只能空着 */
 const canSeeOrgTree = computed(() => store.can('org:view'))
 
@@ -1916,7 +1952,18 @@ function openCreate() {
   modalOpen.value = true
 }
 
-function openEdit(row: EmployeeItem) {
+async function openEdit(row: EmployeeItem) {
+  // 列表里的手机号/身份证/紧急电话是掩码值，编辑需要明文回填；
+  // 无敏感权限时后端会拒绝，此时不允许打开表单，避免把掩码值提交回去
+  let source = row
+  if (row.sensitiveMasked) {
+    try {
+      source = await sensitiveEmployeeDetail(row.id)
+    } catch (e: any) {
+      message.error(e?.message || '无查看敏感字段权限，无法编辑该员工信息')
+      return
+    }
+  }
   editing.value = row
   resetForm()
   clearSubRows()
@@ -1926,21 +1973,21 @@ function openEdit(row: EmployeeItem) {
   form.name = row.name
   form.orgId = row.orgId
   form.position = row.position || ''
-  form.mobile = row.mobile || ''
+  form.mobile = source.mobile || ''
   form.email = row.email || ''
   form.gender = row.gender === 1 || row.gender === 2 ? row.gender : undefined
   form.nativeProvince = row.nativeProvince || undefined
   form.nativeCity = row.nativeCity || ''
   form.nativeDistrict = row.nativeDistrict || ''
   form.nativeDetail = row.nativeDetail || ''
-  form.idCard = row.idCard || ''
+  form.idCard = source.idCard || ''
   form.birthday = row.birthday || undefined
   form.nation = row.nation || undefined
   form.maritalStatus = row.maritalStatus || undefined
   form.politicalStatus = row.politicalStatus || undefined
   form.education = row.education || undefined
   form.emergencyContact = row.emergencyContact || ''
-  form.emergencyPhone = row.emergencyPhone || ''
+  form.emergencyPhone = source.emergencyPhone || ''
   form.currentAddress = row.currentAddress || ''
   form.hireDate = row.hireDate || undefined
   form.exemptProbation = !!row.exemptProbation
@@ -2320,6 +2367,60 @@ function openProfile(row: EmployeeItem) {
   profileOpen.value = true
 }
 
+/* ---------- 查看敏感明文 ---------- */
+const plainOpen = ref(false)
+const plainName = ref('')
+const plainRows = ref<{ label: string; value?: string }[]>([])
+
+async function openPlain(row: EmployeeItem) {
+  try {
+    const detail = await sensitiveEmployeeDetail(row.id)
+    plainName.value = detail.name
+    plainRows.value = [
+      { label: '手机号', value: detail.mobile },
+      { label: '身份证号', value: detail.idCard },
+      { label: '紧急联系电话', value: detail.emergencyPhone }
+    ]
+    plainOpen.value = true
+  } catch (e: any) {
+    message.error(e?.message || '获取明文失败')
+  }
+}
+
+/* ---------- 导出人员（CSV，后端按数据范围+权限处理并记审计） ---------- */
+const exporting = ref(false)
+
+function doExport() {
+  Modal.confirm({
+    title: '确认导出人员数据？',
+    content: '导出仅包含你当前数据范围内的人员；手机号等敏感字段会按权限掩码，本次操作将记录审计日志。',
+    okText: '导出',
+    cancelText: '取消',
+    onOk: async () => {
+      exporting.value = true
+      try {
+        const res: any = await exportEmployees({
+          keyword: query.keyword || undefined,
+          orgId: query.orgId || undefined,
+          status: query.status ?? undefined
+        })
+        const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `人员数据-${dayjs().format('YYYYMMDD')}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        message.success('导出已开始')
+      } catch (e: any) {
+        message.error(e?.message || '导出失败')
+      } finally {
+        exporting.value = false
+      }
+    }
+  })
+}
+
 /* ---------- 开户结果 ---------- */
 const resultOpen = ref(false)
 const accountResult = ref<AccountBrief | null>(null)
@@ -2363,10 +2464,29 @@ function genderText(g?: number) {
   return g === 1 ? '男' : g === 2 ? '女' : '—'
 }
 
+/** 试用期且 30 天内到期：列表直接给出到期标签，颜色随紧急程度变化 */
+function dueTag(row: EmployeeItem): { text: string; color: string } | null {
+  if (row.status !== 30 || !row.expectedRegularizeDate) return null
+  const days = dayjs(row.expectedRegularizeDate).startOf('day').diff(dayjs().startOf('day'), 'day')
+  if (days < 0 || days > 30) return null
+  const color = days <= 1 ? 'red' : days <= 7 ? 'orange' : 'blue'
+  return { text: days === 0 ? '今日转正到期' : `转正 T-${days}`, color }
+}
+
 onMounted(async () => {
+  const route = useRoute()
+  // 看板卡片跳转：/employees?status=40 或 ?orgId=xxx，进入即带筛选
+  const statusQuery = route.query.status
+  if (typeof statusQuery === 'string' && statusQuery && !Number.isNaN(Number(statusQuery))) {
+    query.status = Number(statusQuery)
+  }
+  const orgQuery = route.query.orgId
+  if (typeof orgQuery === 'string' && orgQuery) {
+    query.orgId = orgQuery
+  }
   await refreshAll()
   // 从消息中心「关闭账号」待办跳过来：/employees?employeeId=xxx，直接打开该员工档案
-  const employeeId = useRoute().query.employeeId
+  const employeeId = route.query.employeeId
   if (typeof employeeId === 'string' && employeeId) {
     profileId.value = employeeId
     profileOpen.value = true
@@ -2565,6 +2685,11 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 试用期到期标签：跟在工号后面，避免挤压姓名 */
+.due-tag {
+  margin-left: 6px;
 }
 
 /* 账号列：标签与用户名之间留出间距，避免「已开户」紧贴用户名挤在一起 */

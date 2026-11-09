@@ -185,6 +185,16 @@
           </a-table>
         </a-tab-pane>
 
+        <!-- 合同（P1-1） -->
+        <a-tab-pane v-if="canContractView" key="contracts" tab="合同">
+          <EmployeeContractPanel :employee-id="employeeId" :can-manage="canContractManage" />
+        </a-tab-pane>
+
+        <!-- 档案附件（P1-1） -->
+        <a-tab-pane v-if="canAttachmentView" key="attachments" tab="档案附件">
+          <EmployeeAttachmentPanel :employee-id="employeeId" :can-manage="canContractManage || !!canEdit" />
+        </a-tab-pane>
+
         <!-- 家庭成员 -->
         <a-tab-pane key="families" :tab="`家庭成员（${profile?.families?.length || 0}）`">
           <div class="sub-toolbar">
@@ -413,12 +423,20 @@ import {
   type WorkItem
 } from '@/api/ehr'
 import { statusColor, statusLabel } from '@/constants/employeeStatus'
+import EmployeeContractPanel from './EmployeeContractPanel.vue'
+import EmployeeAttachmentPanel from './EmployeeAttachmentPanel.vue'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps<{
   open: boolean
   employeeId?: string
   canEdit?: boolean
 }>()
+
+const store = useUserStore()
+const canContractView = computed(() => store.can('contract:view'))
+const canContractManage = computed(() => store.can('contract:manage'))
+const canAttachmentView = computed(() => store.can('contract:view') || store.can('employee:view'))
 
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
