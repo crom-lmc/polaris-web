@@ -69,6 +69,10 @@
             <template #icon><bell-outlined /></template>
             消息配置
           </a-menu-item>
+          <a-menu-item v-if="store.can('embed:view')" key="/embed-points">
+            <template #icon><api-outlined /></template>
+            埋点管理
+          </a-menu-item>
           <a-menu-item v-if="store.can('code:view')" key="/code-rules">
             <template #icon><number-outlined /></template>
             单号规则
@@ -86,6 +90,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
+  ApiOutlined,
   AuditOutlined,
   BellOutlined,
   ControlOutlined,

@@ -19,6 +19,7 @@ const router = createRouter({
         { path: 'biz-points', component: () => import('@/views/BizPointView.vue'), meta: { title: '业务点配置', perm: 'approval:bizpoint' } },
         { path: 'security', component: () => import('@/views/SecurityView.vue'), meta: { title: '安全配置', perm: 'security:view' } },
         { path: 'notices', component: () => import('@/views/NoticeConfigView.vue'), meta: { title: '消息配置', perm: 'notice:view' } },
+        { path: 'embed-points', component: () => import('@/views/EmbedPointView.vue'), meta: { title: '埋点管理', perm: 'embed:view' } },
         { path: 'code-rules', component: () => import('@/views/CodeRuleView.vue'), meta: { title: '单号规则', perm: 'code:view' } },
         { path: 'no-access', component: () => import('@/views/NoAccessView.vue'), meta: { title: '无权限', public: true } }
       ]

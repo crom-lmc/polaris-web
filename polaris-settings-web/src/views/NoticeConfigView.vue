@@ -3,9 +3,6 @@
     <div class="page-root notice-layout">
       <!-- 左侧模块树：全部 → 各业务模块，点击过滤右侧配置列表 -->
       <aside class="panel module-tree">
-        <div class="panel-head">
-          <span>业务模块</span>
-        </div>
         <div class="panel-body tree-body">
           <a-tree
             v-if="rows.length"

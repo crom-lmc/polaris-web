@@ -186,13 +186,15 @@
         </a-tab-pane>
 
         <!-- 合同（P1-1） -->
-        <a-tab-pane v-if="canContractView" key="contracts" tab="合同">
-          <EmployeeContractPanel :employee-id="employeeId" :can-manage="canContractManage" />
+        <a-tab-pane v-if="canContractView" key="contracts" :tab="`合同（${contractTabCount}）`">
+          <!-- 查看档案抽屉一律只读：合同的新增/续签/终止只在「变更员工信息」弹窗里操作 -->
+          <EmployeeContractPanel :employee-id="employeeId" :can-manage="canContractManage && !!canEdit" @count="contractTabCount = $event" />
         </a-tab-pane>
 
         <!-- 档案附件（P1-1） -->
-        <a-tab-pane v-if="canAttachmentView" key="attachments" tab="档案附件">
-          <EmployeeAttachmentPanel :employee-id="employeeId" :can-manage="canContractManage || !!canEdit" />
+        <a-tab-pane v-if="canAttachmentView" key="attachments" :tab="`档案附件（${attachmentTabCount}）`">
+          <!-- 查看档案抽屉一律只读：附件上传/删除只在「变更员工信息」弹窗里操作 -->
+          <EmployeeAttachmentPanel :employee-id="employeeId" :can-manage="canContractManage && !!canEdit" @count="attachmentTabCount = $event" />
         </a-tab-pane>
 
         <!-- 家庭成员 -->
@@ -447,6 +449,9 @@ const emit = defineEmits<{
 const loading = ref(false)
 const profile = ref<EmployeeProfile | null>(null)
 const activeTab = ref('banks')
+/** 合同 / 档案附件页签角标条数（由子面板加载后回传） */
+const contractTabCount = ref(0)
+const attachmentTabCount = ref(0)
 
 async function load() {
   if (!props.employeeId) return
@@ -478,6 +483,8 @@ watch(
   ([o]) => {
     if (o) {
       activeTab.value = 'banks'
+      contractTabCount.value = 0
+      attachmentTabCount.value = 0
       load()
     }
   }

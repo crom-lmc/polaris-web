@@ -764,22 +764,25 @@
         </a-spin>
 
         <div class="form-section-title">沟通记录</div>
-        <div v-if="canManage && detailLocked" class="muted" style="margin-bottom: 8px">
+        <div v-if="canManage && detailCandidate.stage === 'REJECTED'" class="muted" style="margin-bottom: 8px">
+          候选人已淘汰，不可编辑沟通记录
+        </div>
+        <div v-else-if="canManage && detailLocked" class="muted" style="margin-bottom: 8px">
           Offer 审批中/已通过，暂不可新增沟通记录
         </div>
         <div v-if="canManage" class="comm-form">
-          <a-input v-model:value="commForm.content" :disabled="detailLocked" placeholder="沟通内容（期望薪资、到岗时间等）" />
+          <a-input v-model:value="commForm.content" :disabled="commLocked" placeholder="沟通内容（期望薪资、到岗时间等）" />
           <div class="comm-form-actions">
-            <a-select v-model:value="commForm.type" :options="commTypeOptions" :disabled="detailLocked" style="width: 140px" />
+            <a-select v-model:value="commForm.type" :options="commTypeOptions" :disabled="commLocked" style="width: 140px" />
             <a-input-number
               v-model:value="commForm.expectedSalary"
               :min="0"
               :step="500"
-              :disabled="detailLocked"
+              :disabled="commLocked"
               placeholder="期望月薪"
               style="width: 150px"
             />
-            <a-button type="primary" :loading="commSaving" :disabled="detailLocked" @click="saveComm">记录</a-button>
+            <a-button type="primary" :loading="commSaving" :disabled="commLocked" @click="saveComm">记录</a-button>
           </div>
         </div>
         <div v-if="!detailComms.length" class="muted">暂无沟通记录</div>
@@ -1414,6 +1417,8 @@ const detailComms = ref<CandidateComm[]>([])
 const detailLoading = ref(false)
 /** Offer 审批中/已通过：详情抽屉只读（约面试、约下一轮、沟通记录都不可操作） */
 const detailLocked = computed(() => !!detailCandidate.value && detailCandidate.value.hasActiveOffer)
+/** 沟通记录锁定：Offer 审批中/已通过，或候选人已淘汰（淘汰后不允许再补记录） */
+const commLocked = computed(() => detailLocked.value || detailCandidate.value?.stage === 'REJECTED')
 
 const interviewRounds = computed<InterviewRound[]>(() => {
   const map = new Map<number, RecruitInterview[]>()

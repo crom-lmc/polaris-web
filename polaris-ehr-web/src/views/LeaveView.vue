@@ -28,6 +28,18 @@
       </div>
     </div>
 
+    <a-alert
+      v-if="carryoverNotice"
+      type="warning"
+      show-icon
+      class="carryover-banner"
+      :message="`你还有 ${carryoverRemaining} 天上年结转年假未休完，将于 ${annualQuota?.carryoverExpireAt || ''} 到期作废，请及时休假或签署自动放弃`"
+    >
+      <template #action>
+        <a-button size="small" danger @click="openWaive">自动放弃</a-button>
+      </template>
+    </a-alert>
+
     <section class="panel ft-grow">
       <div class="panel-head">
         <span>{{ scope === 'mine' ? '我的请假记录' : scope === 'team' ? '团队请假记录' : '全部请假记录' }}</span>
@@ -297,7 +309,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import {
@@ -314,6 +326,7 @@ import {
   pageLeaves,
   teamLeaves,
   uploadEhrAttachment,
+  waiveAnnualCarryover,
   type LeaveDelegateOptions,
   type LeaveItem,
   type LeaveQuotaItem,
@@ -797,12 +810,47 @@ onMounted(() => {
     statusFilter.value = 0
   }
   load()
+  loadAnnualQuota()
   fetchLeaveTypeOptions().then((opts) => (leaveTypeOptions.value = opts)).catch(() => {})
 })
+
+/** 我的年假额度：12 月结转到期提示条 + 自动放弃入口 */
+const annualQuota = ref<LeaveQuotaItem | null>(null)
+const carryoverNotice = computed(() => !!annualQuota.value?.carryoverNotice)
+const carryoverRemaining = computed(() => annualQuota.value?.carryoverRemaining ?? 0)
+
+function loadAnnualQuota() {
+  myLeaveQuotas()
+    .then((list) => {
+      annualQuota.value = (list || []).find((q) => q.leaveType === 'ANNUAL') || null
+    })
+    .catch(() => {})
+}
+
+function openWaive() {
+  Modal.confirm({
+    title: '自动放弃上年结转年假',
+    content: `放弃后 ${carryoverRemaining.value} 天结转年假将立即作废且不可恢复，确定放弃吗？`,
+    okText: '确定放弃',
+    okButtonProps: { danger: true },
+    cancelText: '再想想',
+    centered: true,
+    onOk: () =>
+      waiveAnnualCarryover()
+        .then((days) => {
+          message.success(`已放弃 ${days} 天结转年假`)
+          loadAnnualQuota()
+        })
+        .catch((e: any) => message.error(e?.message || '操作失败'))
+  })
+}
 </script>
 
 <style scoped>
 /* 横向滚动由 .panel-body/.ft-scroll 承担，操作列由 .ft-table 固定 */
+.carryover-banner {
+  margin-bottom: 12px;
+}
 .page-root {
   --ft-min-width: 1100px;
 }

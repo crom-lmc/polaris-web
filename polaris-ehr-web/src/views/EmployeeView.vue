@@ -79,6 +79,7 @@
             刷新
           </a-button>
           <a-button v-if="canViewSeniority" @click="openSeniorityLedger">司龄台账</a-button>
+          <a-button v-if="canViewLeaveQuota" @click="openAnnualLeaveLedger">年假台账</a-button>
           <span class="spacer" />
           <a-button v-if="canExport" :loading="exporting" @click="doExport">
             <template #icon><download-outlined /></template>
@@ -246,7 +247,7 @@
       <a-form layout="vertical">
         <div v-if="!personalOnly" class="form-hint">
           标 <span class="req-star">*</span> 的项为「提交入职」的前置条件（工号、邮箱由系统生成，备注选填）；提交入职还要求
-          银行卡、教育背景、工作经历、家庭成员各至少 1 条，并先在列表「司龄核定」完成核定。
+          银行卡、教育背景、工作经历、家庭成员、合同各至少 1 条（合同在本行「查看 → 合同」页签录入），并先在列表「司龄核定」完成核定。
         </div>
         <a-row :gutter="12">
           <a-col :span="6">
@@ -601,6 +602,14 @@
               </template>
             </template>
           </a-table>
+        </a-tab-pane>
+
+        <!-- 劳动合同 / 档案附件：仅编辑已建档员工时展示（走独立接口实时保存，不随「提交变更」一起提交） -->
+        <a-tab-pane v-if="editing && canContractView" key="contracts" :tab="`劳动合同（${contractTabCount}）`">
+          <EmployeeContractPanel :employee-id="editing.id" :can-manage="canContractManage" @count="contractTabCount = $event" />
+        </a-tab-pane>
+        <a-tab-pane v-if="editing && canAttachmentView" key="attachments" :tab="`档案附件（${attachmentTabCount}）`">
+          <EmployeeAttachmentPanel :employee-id="editing.id" :can-manage="canContractManage" @count="attachmentTabCount = $event" />
         </a-tab-pane>
       </a-tabs>
     </a-modal>
@@ -1164,6 +1173,67 @@
       </a-table>
     </a-drawer>
 
+    <!-- 年假台账 -->
+    <a-drawer v-model:open="annualLedgerOpen" title="年假台账" width="1080px" destroy-on-close>
+      <div class="list-toolbar">
+        <a-input-search
+          v-model:value="annualLedgerKeyword"
+          placeholder="姓名 / 工号"
+          allow-clear
+          style="width: 200px"
+          @search="loadAnnualLeaveLedger"
+        />
+        <a-select
+          v-model:value="annualLedgerYear"
+          :options="annualLedgerYearOptions"
+          style="width: 110px"
+          @change="onAnnualLedgerYearChange"
+        />
+        <a-button @click="loadAnnualLeaveLedger">
+          <template #icon><reload-outlined /></template>
+          刷新
+        </a-button>
+      </div>
+      <a-table
+        :columns="annualLedgerColumns"
+        :data-source="annualLedgerRows"
+        :loading="annualLedgerLoading"
+        row-key="employeeId"
+        size="middle"
+        :scroll="{ x: 1160 }"
+        :pagination="annualLedgerPagination"
+        @change="onAnnualLedgerTableChange"
+      >
+        <template #emptyText>
+          <a-empty v-if="!annualLedgerLoading" description="暂无年假数据" />
+        </template>
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'generatedDays'">
+            <span>{{ record.generatedDays ?? 0 }}</span>
+            <a-tag v-if="record.missing" color="orange" class="ledger-tag">未生成</a-tag>
+          </template>
+          <template v-else-if="column.key === 'carryoverIn'">
+            <span>{{ record.carryoverIn ?? 0 }}</span>
+            <div v-if="record.carryoverRemaining > 0" class="muted cell-sub">
+              剩余 {{ record.carryoverRemaining }} 天
+            </div>
+          </template>
+          <template v-else-if="column.key === 'availableDays'">
+            <strong>{{ record.availableDays ?? 0 }}</strong>
+          </template>
+          <template v-else-if="column.key === 'carryoverExpireAt'">
+            {{ record.carryoverExpireAt || '—' }}
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="statusColor(record.status)">{{ record.statusName || '—' }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'tier'">
+            <a-tag color="blue">{{ record.tier || '—' }}</a-tag>
+          </template>
+        </template>
+      </a-table>
+    </a-drawer>
+
     <!-- 前司工作记录 -->
     <a-modal v-model:open="segmentsViewOpen" :footer="null" width="880px" centered destroy-on-close>
       <template #title>
@@ -1319,6 +1389,8 @@ import { Modal, message } from 'ant-design-vue'
 import { ApartmentOutlined, CloseCircleFilled, DownloadOutlined, ReloadOutlined, UploadOutlined, UserAddOutlined } from '@ant-design/icons-vue'
 import HandoverEditor from '@/components/HandoverEditor.vue'
 import EmployeeProfileDrawer from '@/components/EmployeeProfileDrawer.vue'
+import EmployeeContractPanel from '@/components/EmployeeContractPanel.vue'
+import EmployeeAttachmentPanel from '@/components/EmployeeAttachmentPanel.vue'
 import {
   addBank,
   addEducation,
@@ -1344,6 +1416,7 @@ import {
   previewEmployeeImport,
   onboardEmployee,
   orgTree,
+  pageAnnualLeaveLedger,
   pageEmployees,
   pageSeniority,
   reduceEmployee,
@@ -1360,6 +1433,7 @@ import {
   updateWork,
   uploadEhrAttachment,
   type AccountBrief,
+  type AnnualLeaveLedgerItem,
   type BankBody,
   type DictOption,
   type EducationBody,
@@ -1397,6 +1471,9 @@ import dayjs from 'dayjs'
 const store = useUserStore()
 const canCreate = computed(() => store.can('employee:create'))
 const canEdit = computed(() => store.can('employee:edit'))
+const canContractView = computed(() => store.can('contract:view'))
+const canContractManage = computed(() => store.can('contract:manage'))
+const canAttachmentView = computed(() => store.can('contract:view') || store.can('employee:view'))
 const canDelete = computed(() => store.can('employee:delete'))
 const canResign = computed(() => store.can('employee:resign'))
 /** 敏感字段明文 / 导出按独立权限控制 */
@@ -1712,6 +1789,9 @@ function onTableChange(p: any) {
 /* ---------- 表单 ---------- */
 const modalOpen = ref(false)
 const editing = ref<EmployeeItem | null>(null)
+/** 变更弹窗「劳动合同 / 档案附件」页签角标条数（由子面板加载后回传） */
+const contractTabCount = ref(0)
+const attachmentTabCount = ref(0)
 /** 待入职 = 编辑档案；试用期/在职 = 变更个人信息 */
 const modalTitle = computed(() => {
   if (!editing.value) return '新增人员'
@@ -2980,6 +3060,79 @@ const seniorityColumns = [
   { title: '操作', key: 'action', width: 80 }
 ]
 
+/* 年假台账 */
+const canViewLeaveQuota = computed(() => store.can('leave:quota:view'))
+const annualLedgerOpen = ref(false)
+const annualLedgerKeyword = ref('')
+const annualLedgerYear = ref(dayjs().year())
+const annualLedgerRows = ref<AnnualLeaveLedgerItem[]>([])
+const annualLedgerLoading = ref(false)
+const annualLedgerTotal = ref(0)
+const annualLedgerPage = ref(1)
+const annualLedgerSize = ref(10)
+const annualLedgerYearOptions = Array.from({ length: 5 }, (_, i) => {
+  const y = dayjs().year() - 2 + i
+  return { value: y, label: `${y} 年` }
+})
+
+const annualLedgerColumns = [
+  { title: '工号', dataIndex: 'empNo', width: 95 },
+  { title: '姓名', dataIndex: 'name', width: 95 },
+  { title: '组织', dataIndex: 'orgName', width: 160, ellipsis: true },
+  { title: '入职日期', dataIndex: 'hireDate', width: 110 },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '年假档位', key: 'tier', width: 100 },
+  { title: '当年产生', key: 'generatedDays', width: 110 },
+  { title: '上年结转', key: 'carryoverIn', width: 110 },
+  { title: '已用', dataIndex: 'usedDays', width: 80 },
+  { title: '剩余', key: 'availableDays', width: 85 },
+  { title: '结转失效日', key: 'carryoverExpireAt', width: 115 }
+]
+
+const annualLedgerPagination = computed(() => ({
+  current: annualLedgerPage.value,
+  pageSize: annualLedgerSize.value,
+  total: annualLedgerTotal.value,
+  showSizeChanger: true,
+  showTotal: (t: number) => `共 ${t} 条`
+}))
+
+async function loadAnnualLeaveLedger() {
+  if (!canViewLeaveQuota.value) return
+  annualLedgerLoading.value = true
+  try {
+    const data = await pageAnnualLeaveLedger({
+      keyword: annualLedgerKeyword.value || undefined,
+      year: annualLedgerYear.value,
+      page: annualLedgerPage.value,
+      size: annualLedgerSize.value
+    })
+    annualLedgerRows.value = data.list || []
+    annualLedgerTotal.value = data.total || 0
+  } catch (e: any) {
+    message.error(e?.message || '加载年假台账失败')
+  } finally {
+    annualLedgerLoading.value = false
+  }
+}
+
+function onAnnualLedgerTableChange(p: any) {
+  annualLedgerPage.value = p.current || 1
+  annualLedgerSize.value = p.pageSize || 10
+  loadAnnualLeaveLedger()
+}
+
+function onAnnualLedgerYearChange() {
+  annualLedgerPage.value = 1
+  loadAnnualLeaveLedger()
+}
+
+function openAnnualLeaveLedger() {
+  annualLedgerOpen.value = true
+  annualLedgerPage.value = 1
+  loadAnnualLeaveLedger()
+}
+
 /* 台账：查看某人的前司工作记录 */
 const segmentsViewOpen = ref(false)
 const segmentsViewTarget = ref<SeniorityItem | null>(null)
@@ -3382,6 +3535,10 @@ onMounted(async () => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ledger-tag {
+  margin-left: 6px;
+}
+
 .seg-summary {
   margin-left: 10px;
   font-size: 12px;

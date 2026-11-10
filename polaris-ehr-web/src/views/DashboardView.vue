@@ -146,22 +146,23 @@
           试用期提醒
           <span v-if="unread" class="badge">{{ unread }}</span>
         </span>
-        <a v-if="reminders.length" @click="markAll">全部标记已读</a>
+        <a v-if="unread" @click="markAll">全部标记已读</a>
       </div>
       <div class="panel-body">
-        <a-empty v-if="!reminders.length" description="暂无未读提醒" />
+        <a-empty v-if="!reminders.length" description="暂无提醒" />
         <a-list v-else :data-source="reminders" size="small">
           <template #renderItem="{ item }">
-            <a-list-item>
+            <a-list-item :class="{ 'reminder-read': item.readFlag === 1 }">
               <a-list-item-meta>
                 <template #title>
                   <span>{{ item.title }}</span>
                   <a-tag v-if="item.employeeName" color="blue" class="ml8">{{ item.employeeName }}</a-tag>
+                  <a-tag v-if="item.readFlag === 1" class="ml8">已读</a-tag>
                 </template>
                 <template #description>{{ item.content }}</template>
               </a-list-item-meta>
               <template #actions>
-                <a @click="markRead(item)">标记已读</a>
+                <a v-if="item.readFlag !== 1" @click="markRead(item)">标记已读</a>
               </template>
             </a-list-item>
           </template>
@@ -349,8 +350,8 @@ function trendHeight(total: number) {
 async function loadReminders() {
   try {
     const [list, count] = await Promise.all([
-      pageMyReminders({ unreadOnly: true, page: 1, size: 5 }),
-      myReminderUnreadCount()
+      pageMyReminders({ unreadOnly: false, type: 'PROBATION_DUE', page: 1, size: 20 }),
+      myReminderUnreadCount('PROBATION_DUE')
     ])
     reminders.value = list.list || []
     unread.value = Number(count) || 0
@@ -703,6 +704,12 @@ onMounted(async () => {
 
 .ml8 {
   margin-left: 8px;
+}
+
+/* 已读提醒保留展示但置灰：消息不是待办，转正/离职后才从列表消失 */
+.reminder-read :deep(.ant-list-item-meta-title),
+.reminder-read :deep(.ant-list-item-meta-description) {
+  color: var(--color-text-tertiary, #8c8c8c);
 }
 
 /* 未读徽标：与列表里的状态色保持一致，用 antd 默认红 */

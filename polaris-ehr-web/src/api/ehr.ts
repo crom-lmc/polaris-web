@@ -643,8 +643,8 @@ export function pageMyReminders(params: Record<string, unknown>) {
   return request.get<never, PageData<ReminderItem>>('/api/ehr/reminders/my', { params })
 }
 
-export function myReminderUnreadCount() {
-  return request.get<never, number>('/api/ehr/reminders/unread-count')
+export function myReminderUnreadCount(type?: string) {
+  return request.get<never, number>('/api/ehr/reminders/unread-count', { params: type ? { type } : {} })
 }
 
 export function readReminder(id: string) {
@@ -1100,7 +1100,22 @@ export interface LeaveQuotaItem {
   usedDays: number
   frozenDays: number
   availableDays: number
+  /** 上期结转进来 / 结转已消耗 / 结转剩余 / 结转失效日 */
+  carryoverIn?: number
+  carryoverUsed?: number
+  carryoverRemaining?: number
+  carryoverExpireAt?: string
+  /** 是否已签署自动放弃结转（年假） */
+  carryoverWaived?: boolean
+  /** 12 月待办提示标记：结转剩余 >0 且未签署放弃（年假） */
+  carryoverNotice?: boolean
+  source?: string
+  calcDetail?: string
 }
+
+/** 自动放弃上年结转剩余年假，返回放弃天数 */
+export const waiveAnnualCarryover = () =>
+  request.post<any, number>('/api/ehr/leave-quotas/me/annual-carryover/waive')
 
 export interface LeaveTypeRule {
   leaveType: string
@@ -2119,6 +2134,38 @@ export const pageSeniority = (params: {
   page?: number
   size?: number
 }) => request.get<never, PageData<SeniorityItem>>('/api/ehr/admin/seniority', { params })
+
+/** 年假台账行：当年产生 / 上年结转 / 已用 / 剩余 */
+export interface AnnualLeaveLedgerItem {
+  employeeId: string
+  empNo?: string
+  name?: string
+  orgName?: string
+  hireDate?: string
+  resignDate?: string
+  status?: number
+  statusName?: string
+  year: number
+  /** 年假档位：5 / 10 / 15（年内跨档显示 5→10） */
+  tier?: string
+  generatedDays: number
+  carryoverIn: number
+  carryoverRemaining: number
+  usedDays: number
+  frozenDays: number
+  availableDays: number
+  totalDays: number
+  carryoverExpireAt?: string
+  missing?: boolean
+  calcDetail?: string
+}
+
+export const pageAnnualLeaveLedger = (params: {
+  keyword?: string
+  year?: number
+  page?: number
+  size?: number
+}) => request.get<never, PageData<AnnualLeaveLedgerItem>>('/api/ehr/admin/annual-leave/ledger', { params })
 
 export const seniorityRecords = (employeeId: string) =>
   request.get<never, SeniorityRecordItem[]>(`/api/ehr/admin/seniority/${employeeId}/records`)

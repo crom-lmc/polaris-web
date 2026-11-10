@@ -51,6 +51,9 @@ const props = defineProps<{
   canManage?: boolean
 }>()
 
+/** 把条数抛给外层，供页签显示角标 */
+const emit = defineEmits<{ (e: 'count', n: number): void }>()
+
 const rows = ref<EhrAttachment[]>([])
 const loading = ref(false)
 
@@ -66,6 +69,7 @@ async function load() {
   loading.value = true
   try {
     rows.value = await listEhrAttachments('EMPLOYEE', props.employeeId)
+    emit('count', rows.value.length)
   } catch (e: any) {
     message.error(e?.message || '加载附件失败')
   } finally {
