@@ -82,13 +82,16 @@
           <a-descriptions-item label="所属应用">{{ current.appCode ? appNameOf(current.appCode) : '通用' }}</a-descriptions-item>
           <a-descriptions-item label="模块">{{ current.module || '-' }}</a-descriptions-item>
           <a-descriptions-item label="描述">
-            <a-input v-if="drawerMode === 'edit'" v-model:value="form.name" placeholder="埋点用途说明" />
-            <span v-else>{{ current.name }}</span>
+            <a-input
+              v-model:value="form.name"
+              :disabled="drawerMode !== 'edit'"
+              placeholder="埋点用途说明"
+            />
           </a-descriptions-item>
         </a-descriptions>
 
         <!-- 试用期提醒收件人：部门多选 + 人员多选 + 直属主管复选 -->
-        <template v-if="drawerMode !== 'view' && isReceiver">
+        <template v-if="isReceiver">
           <a-divider orientation="left">收件人维护</a-divider>
           <a-form layout="vertical">
             <a-form-item label="按部门（含所有下级）">
@@ -100,7 +103,7 @@
                 show-search
                 tree-node-filter-prop="title"
                 :loading="receiverLoading"
-                :disabled="isHistory"
+                :disabled="isReadonly"
                 placeholder="可多选部门，保存后展开为部门内已开户在职员工"
                 max-tag-count="responsive"
                 @change="syncReceiverJson"
@@ -115,13 +118,13 @@
                 option-filter-prop="label"
                 :options="employeeOptions"
                 :loading="receiverLoading"
-                :disabled="isHistory"
+                :disabled="isReadonly"
                 placeholder="可搜姓名 / 工号，可多选"
                 @change="syncReceiverJson"
               />
             </a-form-item>
             <a-form-item>
-              <a-checkbox v-model:checked="directSupervisor" :disabled="isHistory" @change="syncReceiverJson">
+              <a-checkbox v-model:checked="directSupervisor" :disabled="isReadonly" @change="syncReceiverJson">
                 同时发送给员工的直属主管
               </a-checkbox>
             </a-form-item>
@@ -129,7 +132,7 @@
         </template>
 
         <!-- 新开账户默认授权角色：角色编码多选 -->
-        <template v-if="drawerMode !== 'view' && isRoles">
+        <template v-if="isRoles">
           <a-divider orientation="left">默认授权角色</a-divider>
           <a-form layout="vertical">
             <a-form-item label="角色编码（可输入后回车新增）">
@@ -138,7 +141,7 @@
                 mode="tags"
                 allow-clear
                 :options="roleOptions"
-                :disabled="isHistory"
+                :disabled="isReadonly"
                 placeholder="如 EMPLOYEE_SELF"
                 @change="syncRolesJson"
               />
@@ -153,14 +156,13 @@
             <a-button v-if="drawerMode === 'edit'" size="small" @click="formatValue">格式化</a-button>
           </div>
           <a-textarea
-            v-if="drawerMode === 'edit'"
             v-model:value="form.value"
             class="json-input mono"
             :rows="12"
             spellcheck="false"
+            :disabled="isReadonly"
             @blur="onValueBlur"
           />
-          <pre v-else class="json-block">{{ pretty(form.value) }}</pre>
         </template>
       </template>
 
@@ -381,8 +383,8 @@ const form = reactive({ name: '', value: '' })
 const currentCode = computed(() => current.value?.code || '')
 const isReceiver = computed(() => currentCode.value === RECEIVER_KEY)
 const isRoles = computed(() => currentCode.value === ROLE_KEY)
-/** 历史快照：复用编辑抽屉的展示结构，但所有控件只读 */
-const isHistory = computed(() => drawerMode.value === 'history')
+/** 查看/历史快照与编辑页同构，仅禁用全部控件 */
+const isReadonly = computed(() => drawerMode.value !== 'edit')
 /** 结构化维护的埋点不再展示原始 JSON 输入框 */
 const isStructured = computed(() => isReceiver.value || isRoles.value)
 
@@ -699,20 +701,6 @@ async function load() {
 .json-input {
   font-size: 12px;
   line-height: 1.6;
-}
-
-.json-block {
-  margin: 0;
-  padding: 12px;
-  max-height: 55vh;
-  overflow: auto;
-  background: var(--code-bg, #fafafa);
-  border: 1px solid var(--border-color, #f0f0f0);
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 
 .drawer-actions {
