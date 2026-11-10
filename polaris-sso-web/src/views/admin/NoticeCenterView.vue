@@ -104,6 +104,59 @@
       mode="approve"
       @done="onApproved"
     />
+
+    <!-- 面试待办：直接在统一账号中心维护面试结果，不跳转 EHR -->
+    <a-modal
+      v-model:open="ivOpen"
+      :title="ivReadonly ? '面试结果' : '维护面试结果'"
+      :footer="null"
+      width="560px"
+      centered
+    >
+      <a-spin :spinning="ivLoading">
+        <div class="iv-meta">
+          <div>
+            <span class="iv-label">候选人</span>{{ ivForm.candidateName }}
+            <span v-if="ivForm.position" class="muted"> · {{ ivForm.position }}</span>
+          </div>
+          <div><span class="iv-label">轮次</span>第 {{ ivForm.roundNo }} 轮面试</div>
+          <div><span class="iv-label">时间</span>{{ ivForm.scheduledAt || '待定' }}</div>
+          <div><span class="iv-label">方式</span>{{ ivMethodText }}</div>
+          <div v-if="ivForm.location"><span class="iv-label">地点</span>{{ ivForm.location }}</div>
+          <div v-if="ivReadonly"><span class="iv-label">状态</span>面试已结束，以下为已维护的结果</div>
+        </div>
+        <div class="iv-field">
+          <div class="iv-label">本轮结果 <span v-if="!ivReadonly" class="req">*</span></div>
+          <a-radio-group v-model:value="ivForm.result" :disabled="ivReadonly">
+            <a-radio value="PASS">通过</a-radio>
+            <a-radio value="FAIL">不通过</a-radio>
+          </a-radio-group>
+          <template v-if="!ivReadonly">
+            <div v-if="ivForm.result === 'FAIL'" class="iv-warn">
+              不通过将直接淘汰候选人，且其半年内不可网投。
+            </div>
+            <div v-else class="muted iv-tip">通过后由 HR 决定直接发 Offer 或安排下一轮。</div>
+          </template>
+        </div>
+        <div class="iv-field">
+          <div class="iv-label">评分</div>
+          <a-rate v-model:value="ivForm.score" :disabled="ivReadonly" />
+        </div>
+        <div class="iv-field">
+          <div class="iv-label">面试反馈 <span v-if="!ivReadonly" class="req">*</span></div>
+          <a-textarea v-model:value="ivForm.feedback" :rows="4" :disabled="ivReadonly" placeholder="请填写本轮面试评价" />
+        </div>
+        <div class="iv-actions">
+          <template v-if="ivReadonly">
+            <a-button @click="ivOpen = false">关闭</a-button>
+          </template>
+          <template v-else>
+            <a-button @click="ivOpen = false">取消</a-button>
+            <a-button type="primary" :loading="ivSaving" @click="saveInterviewFeedback">提交反馈</a-button>
+          </template>
+        </div>
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
@@ -119,6 +172,7 @@ import {
   type NoticeMessage
 } from '@/api/notice'
 import ApprovalDetailDrawer from './components/ApprovalDetailDrawer.vue'
+import { fetchMyInterviews, submitInterviewFeedback } from '@/api/interview'
 import { useUserStore } from '@/stores/user'
 
 /** 列表项：站内消息 + 直接由待审批单据合成的待办 */
@@ -187,6 +241,102 @@ const drawerOpen = ref(false)
 const activeId = ref<string | null>(null)
 /** 抽屉里处理完的待办，回来时同步成已读 */
 const activeNoticeId = ref<string>('')
+
+/* 面试待办：直接在当前页面维护面试结果 */
+const ivOpen = ref(false)
+const ivLoading = ref(false)
+const ivSaving = ref(false)
+const ivNoticeId = ref('')
+/** 面试已结束（已维护结果）：只展示，不提供取消/提交反馈 */
+const ivReadonly = ref(false)
+const ivForm = reactive({
+  id: '',
+  candidateName: '',
+  position: '',
+  roundNo: 1,
+  scheduledAt: '',
+  method: '',
+  location: '',
+  result: 'PASS' as 'PASS' | 'FAIL',
+  score: 4 as number | undefined,
+  feedback: ''
+})
+const ivMethodText = computed(() => {
+  const map: Record<string, string> = { ONSITE: '现场面试', VIDEO: '视频面试', PHONE: '电话面试' }
+  return map[ivForm.method] || ivForm.method || '—'
+})
+
+async function openInterviewFeedback(m: MsgItem) {
+  ivNoticeId.value = m.noticeId || ''
+  ivForm.id = String(m.bizId || '')
+  ivForm.candidateName = ''
+  ivForm.position = ''
+  ivForm.roundNo = 1
+  ivForm.scheduledAt = ''
+  ivForm.method = ''
+  ivForm.location = ''
+  ivForm.result = 'PASS'
+  ivForm.score = 4
+  ivForm.feedback = ''
+  ivReadonly.value = false
+  ivOpen.value = true
+  ivLoading.value = true
+  try {
+    const res = await fetchMyInterviews()
+    const t = (res.data || []).find((x) => String(x.id) === String(m.bizId))
+    if (!t) {
+      ivOpen.value = false
+      message.warning('该面试已完成或不是您的面试')
+      return
+    }
+    ivForm.candidateName = t.candidateName || ''
+    ivForm.position = t.position || ''
+    ivForm.roundNo = t.roundNo
+    ivForm.scheduledAt = t.scheduledAt || ''
+    ivForm.method = t.method || ''
+    ivForm.location = t.location || ''
+    if (t.status === 'DONE') {
+      ivReadonly.value = true
+      ivForm.result = (t.result as 'PASS' | 'FAIL') || 'PASS'
+      ivForm.score = t.score ?? 0
+      ivForm.feedback = t.feedback || ''
+    }
+  } catch (e: any) {
+    ivOpen.value = false
+    message.error(e?.message || '加载面试信息失败')
+  } finally {
+    ivLoading.value = false
+  }
+}
+
+async function saveInterviewFeedback() {
+  if (!ivForm.result) {
+    message.warning('请选择本轮面试结果')
+    return
+  }
+  if (!ivForm.feedback.trim()) {
+    message.warning('请填写面试反馈')
+    return
+  }
+  ivSaving.value = true
+  try {
+    await submitInterviewFeedback(ivForm.id, {
+      score: ivForm.score,
+      feedback: ivForm.feedback.trim(),
+      result: ivForm.result
+    })
+    message.success(ivForm.result === 'FAIL' ? '反馈已提交，候选人已淘汰' : '反馈已提交')
+    ivOpen.value = false
+    if (ivNoticeId.value) {
+      await markNoticesRead([ivNoticeId.value]).catch(() => {})
+    }
+    await load()
+  } catch (e: any) {
+    message.error(e?.message || '提交失败')
+  } finally {
+    ivSaving.value = false
+  }
+}
 
 onMounted(() => {
   loadAllApps()
@@ -342,6 +492,11 @@ function isClickable(m: MsgItem) {
 
 async function openItem(m: MsgItem) {
   if (!isClickable(m)) return
+  if (m.kind === 1 && m.bizType === 'EHR_INTERVIEW') {
+    // 面试待办：直接弹出维护面试结果，不跳转 EHR
+    await openInterviewFeedback(m)
+    return
+  }
   if (m.kind === 1 && m.link && /^https?:\/\//i.test(m.link)) {
     // 跨应用待办（如「关闭离职/减员员工账号」）：直接跳到对应应用；置读由业务处理完后服务端统一完成
     window.open(m.link, '_blank', 'noopener')
@@ -555,6 +710,44 @@ async function markRead(m: MsgItem) {
   border-bottom: none;
 }
 
+.iv-meta {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.iv-meta .iv-label {
+  display: inline-block;
+  width: 64px;
+  color: #8c8c8c;
+}
+.iv-field {
+  margin-bottom: 14px;
+}
+.iv-field > .iv-label {
+  margin-bottom: 6px;
+  color: #595959;
+}
+.iv-warn {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #cf1322;
+}
+.iv-tip {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.req {
+  color: #cf1322;
+}
+.iv-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .tbl-empty {
   height: 100%;
   min-height: 220px;

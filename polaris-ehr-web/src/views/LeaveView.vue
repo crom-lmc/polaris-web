@@ -55,7 +55,7 @@
               <a-tag color="blue">{{ record.leaveTypeName }}</a-tag>
             </template>
             <template v-else-if="column.key === 'range'">
-              <div>{{ record.startDate }} {{ periodText(record.startPeriod) }} ~ {{ record.endDate }} {{ periodText(record.endPeriod) }}</div>
+              <div>{{ leaveRangeText(record) }}</div>
               <div class="muted cell-sub">
                 {{ record.days }} 天
                 <span v-if="record.dayMode === 'WORKDAY'">· 工作日</span>
@@ -75,6 +75,7 @@
             </template>
             <template v-else-if="column.key === 'action'">
               <div class="row-actions">
+                <a class="act" @click="openDetail(record)">详情</a>
                 <a
                   v-if="runningBriefForRow(record)"
                   class="act"
@@ -99,10 +100,6 @@
                   class="act"
                   @click="openEarlyReturn(record)"
                 >销假</a>
-                <span
-                  v-if="!runningBriefForRow(record) && !rejectedBriefForRow(record) && !((record.status === 0 || record.status === 1) && record.mine)"
-                  class="muted"
-                >—</span>
               </div>
             </template>
           </template>
@@ -136,13 +133,29 @@
         </a-form-item>
         <a-row :gutter="12">
           <a-col :span="12">
-            <a-form-item label="开始半天">
-              <a-select v-model:value="applyForm.startPeriod" :options="periodOptions" />
+            <a-form-item label="开始时间" required>
+              <a-time-picker
+                v-model:value="applyForm.startTime"
+                format="HH:mm"
+                value-format="HH:mm"
+                :minute-step="30"
+                :show-now="false"
+                style="width: 100%"
+                placeholder="如 09:00"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="结束半天">
-              <a-select v-model:value="applyForm.endPeriod" :options="periodOptions" />
+            <a-form-item label="结束时间" required>
+              <a-time-picker
+                v-model:value="applyForm.endTime"
+                format="HH:mm"
+                value-format="HH:mm"
+                :minute-step="30"
+                :show-now="false"
+                style="width: 100%"
+                placeholder="如 18:00"
+              />
             </a-form-item>
           </a-col>
         </a-row>
@@ -159,13 +172,13 @@
           :description="conflictText"
         />
         <a-form-item
-          v-if="currentRule && currentRule.attachmentRequired === 1"
+          v-if="currentRule && (currentRule.attachmentRequired === 1 || !!currentRule.proofHint)"
           label="证明材料"
-          required
-          extra="病假 / 婚假 / 产假等类型需上传证明，支持 pdf、图片、Word、压缩包"
+          :required="currentRule.attachmentRequired === 1"
+          :extra="proofExtra"
         >
           <a-upload
-            :max-count="1"
+            multiple
             :custom-request="customUpload"
             :file-list="attachmentFiles"
             accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.zip"
@@ -232,6 +245,47 @@
       </a-form>
     </a-modal>
 
+    <a-modal
+      v-model:open="detailOpen"
+      title="请假详情"
+      :footer="null"
+      width="640px"
+      centered
+      destroy-on-close
+    >
+      <template v-if="detailRecord">
+        <a-descriptions :column="2" size="small" bordered>
+          <a-descriptions-item label="申请人">{{ detailRecord.applicantName || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="类型">{{ detailRecord.leaveTypeName }}</a-descriptions-item>
+          <a-descriptions-item label="请假日期" :span="2">
+            {{ leaveRangeText(detailRecord) }}
+          </a-descriptions-item>
+          <a-descriptions-item label="天数">{{ detailRecord.days }} 天</a-descriptions-item>
+          <a-descriptions-item label="状态">
+            <a-tag :color="statusColor(detailRecord.status)">{{ detailRecord.statusName }}</a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="事由" :span="2">{{ detailRecord.reason || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="审批人">{{ detailRecord.approverName || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="审批意见">{{ detailRecord.approveNote || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="提交时间" :span="2">{{ detailRecord.createdAt || '—' }}</a-descriptions-item>
+        </a-descriptions>
+        <div class="detail-proof">
+          <div class="detail-proof-title">证明材料</div>
+          <a-spin :spinning="detailLoading">
+            <a-list v-if="detailAttachments.length" size="small" :data-source="detailAttachments">
+              <template #renderItem="{ item }">
+                <a-list-item>
+                  <span class="proof-name">{{ item.fileName || item.attachmentId }}</span>
+                  <a @click="downloadAttachment(item)">下载</a>
+                </a-list-item>
+              </template>
+            </a-list>
+            <a-empty v-else description="未上传证明材料" />
+          </a-spin>
+        </div>
+      </template>
+    </a-modal>
+
     <!-- 审批动作、流程进度、意见都在审批中心抽屉里完成，本页不再本地审批 -->
     <approval-detail-drawer
       v-model:open="approvalDrawerOpen"
@@ -249,11 +303,13 @@ import dayjs from 'dayjs'
 import {
   applyLeave,
   cancelLeave,
+  downloadEhrAttachment,
   earlyReturnLeave,
   leaveConflicts,
   leaveDelegateOptions as fetchLeaveDelegateOptions,
   leaveRules,
   leaveTypeOptions as fetchLeaveTypeOptions,
+  listEhrAttachments,
   myLeaveQuotas,
   pageLeaves,
   teamLeaves,
@@ -389,32 +445,44 @@ function periodText(p?: string | null) {
   return ''
 }
 
+/** 请假时段展示：优先精确到半小时的时间，旧数据回退到上午/下午 */
+function leaveRangeText(record: LeaveItem) {
+  const start = record.startTime || periodText(record.startPeriod)
+  const end = record.endTime || periodText(record.endPeriod)
+  return `${record.startDate} ${start} ~ ${record.endDate} ${end}`
+}
+
 /* ---------- 申请 ---------- */
 const applyOpen = ref(false)
 const saving = ref(false)
 const applyForm = reactive<{
   leaveType: string
   range: string[] | undefined
-  startPeriod: string
-  endPeriod: string
+  startTime: string
+  endTime: string
   dayMode: string
   reason: string
   delegateAccountId?: string
   attachmentId?: string
+  attachmentIds: string[]
 }>({
   leaveType: 'ANNUAL',
   range: undefined,
-  startPeriod: 'AM',
-  endPeriod: 'PM',
+  startTime: '09:00',
+  endTime: '18:00',
   dayMode: 'NATURAL',
   reason: '',
-  attachmentId: undefined
+  attachmentId: undefined,
+  attachmentIds: []
 })
 
-const periodOptions = [
-  { value: 'AM', label: '上午' },
-  { value: 'PM', label: '下午' }
+/** 工作时长口径与默认考勤规则一致：09:00-12:00、13:00-18:00，全天 480 分钟 */
+const WORK_WINDOWS: Array<[number, number]> = [
+  [9 * 60, 12 * 60],
+  [13 * 60, 18 * 60]
 ]
+const WORK_MINUTES_PER_DAY = 480
+
 const dayModeOptions = [
   { value: 'NATURAL', label: '自然日（含周末）' },
   { value: 'WORKDAY', label: '工作日（跳过周末 / 节假日）' }
@@ -443,6 +511,18 @@ const conflictText = computed(() =>
     .join('；')
 )
 
+/** 证明材料提示：规则 proofHint / proofTypes / proofMinHours 同步展示 */
+const proofExtra = computed(() => {
+  const r = currentRule.value
+  if (!r) return ''
+  const parts: string[] = []
+  if (r.attachmentRequired === 1) parts.push('该请假类型必须上传证明材料')
+  if (r.proofHint) parts.push(r.proofHint)
+  if (r.proofTypes) parts.push(`支持格式：${r.proofTypes}`)
+  if (r.proofMinHours) parts.push(`请假满 ${r.proofMinHours} 小时需上传证明`)
+  return parts.length ? parts.join('；') : '支持 pdf、图片、Word、压缩包'
+})
+
 /** 部门负责人请假必须指定审批转办人；普通人打开弹窗时 required=false，隐藏该字段 */
 const delegateCtx = ref<LeaveDelegateOptions>({ required: false, options: [] })
 const delegateSelectOptions = computed(() =>
@@ -458,26 +538,38 @@ const leaveTypeOptions = ref<TypeOption[]>([])
 const days = computed(() => {
   const r = applyForm.range
   if (!r || r.length !== 2) return 0
-  const start = dayjs(r[0])
-  const end = dayjs(r[1])
-  if (end.isBefore(start, 'day')) return 0
+  const start = dayjs(`${r[0]} ${applyForm.startTime}`)
+  const end = dayjs(`${r[1]} ${applyForm.endTime}`)
+  if (!start.isValid() || !end.isValid() || !start.isBefore(end)) return 0
   let total = 0
-  let cur = start
+  let cur = start.startOf('day')
   while (!cur.isAfter(end, 'day')) {
-    const fraction = cur.isSame(start, 'day')
-      ? (applyForm.startPeriod === 'AM' ? 1 : 0.5)
-      : cur.isSame(end, 'day')
-        ? (applyForm.endPeriod === 'PM' ? 1 : 0.5)
-        : 1
-    if (applyForm.dayMode === 'WORKDAY' && (cur.day() === 0 || cur.day() === 6)) {
-      cur = cur.add(1, 'day')
-      continue
+    const isWorkday = cur.day() !== 0 && cur.day() !== 6
+    if (applyForm.dayMode !== 'WORKDAY' || isWorkday) {
+      const fromMin = cur.isSame(start, 'day') ? start.hour() * 60 + start.minute() : 0
+      const toMin = cur.isSame(end, 'day') ? end.hour() * 60 + end.minute() : 24 * 60
+      for (const [ws, we] of WORK_WINDOWS) {
+        const from = Math.max(ws, fromMin)
+        const to = Math.min(we, toMin)
+        if (to > from) total += to - from
+      }
     }
-    total += fraction
     cur = cur.add(1, 'day')
   }
-  return total
+  return Number((total / WORK_MINUTES_PER_DAY).toFixed(2))
 })
+
+/** 起止时间校验：结束不能早于开始，且至少半小时 */
+function timeRangeError(): string {
+  const r = applyForm.range
+  if (!r || r.length !== 2) return '请选择请假日期'
+  if (!applyForm.startTime || !applyForm.endTime) return '请选择开始时间和结束时间'
+  const start = dayjs(`${r[0]} ${applyForm.startTime}`)
+  const end = dayjs(`${r[1]} ${applyForm.endTime}`)
+  if (!end.isAfter(start)) return '结束时间不能早于开始时间'
+  if (end.diff(start, 'minute') < 30) return '请假时长至少 30 分钟'
+  return ''
+}
 
 function onRangeChange() {
   conflicts.value = []
@@ -491,12 +583,13 @@ function onRangeChange() {
 function openApply() {
   applyForm.leaveType = 'ANNUAL'
   applyForm.range = undefined
-  applyForm.startPeriod = 'AM'
-  applyForm.endPeriod = 'PM'
+  applyForm.startTime = '09:00'
+  applyForm.endTime = '18:00'
   applyForm.dayMode = 'NATURAL'
   applyForm.reason = ''
   applyForm.delegateAccountId = undefined
   applyForm.attachmentId = undefined
+  applyForm.attachmentIds = []
   attachmentFiles.value = []
   conflicts.value = []
   delegateCtx.value = { required: false, options: [] }
@@ -520,13 +613,19 @@ function openApply() {
     .catch(() => {})
 }
 
-/** 证明附件上传：自定义请求直传后端，成功后拿附件ID */
+/** 证明附件上传：支持多选，逐个直传后端并收集附件ID */
 function customUpload(options: any) {
   const file = options.file as File
   uploadEhrAttachment(file)
     .then((res) => {
-      applyForm.attachmentId = res.id
-      attachmentFiles.value = [{ uid: res.id, name: res.fileName, status: 'done' }]
+      if (!applyForm.attachmentIds.includes(res.id)) {
+        applyForm.attachmentIds = [...applyForm.attachmentIds, res.id]
+      }
+      applyForm.attachmentId = applyForm.attachmentIds[0]
+      attachmentFiles.value = [
+        ...attachmentFiles.value.filter((f) => f.uid !== (file as any).uid && f.uid !== res.id),
+        { uid: res.id, name: res.fileName || file.name, status: 'done' }
+      ]
       options.onSuccess?.(res)
     })
     .catch((e: any) => {
@@ -535,9 +634,11 @@ function customUpload(options: any) {
     })
 }
 
-function onAttachmentRemove() {
-  applyForm.attachmentId = undefined
-  attachmentFiles.value = []
+function onAttachmentRemove(file: any) {
+  const id = file?.uid
+  applyForm.attachmentIds = applyForm.attachmentIds.filter((x) => x !== id)
+  attachmentFiles.value = attachmentFiles.value.filter((f) => f.uid !== id)
+  applyForm.attachmentId = applyForm.attachmentIds[0]
 }
 
 async function submitApply() {
@@ -545,15 +646,20 @@ async function submitApply() {
     message.warning('请选择请假日期')
     return
   }
+  const timeError = timeRangeError()
+  if (timeError) {
+    message.warning(timeError)
+    return
+  }
   if (days.value <= 0) {
-    message.warning('所选时段请假天数为 0，请调整半天或日期')
+    message.warning('所选时段请假天数为 0，请调整时间或日期')
     return
   }
   if (currentRule.value && days.value < currentRule.value.minDays) {
     message.warning(`该类型最少请 ${currentRule.value.minDays} 天`)
     return
   }
-  if (currentRule.value && currentRule.value.attachmentRequired === 1 && !applyForm.attachmentId) {
+  if (currentRule.value && currentRule.value.attachmentRequired === 1 && !applyForm.attachmentIds.length) {
     message.warning('该请假类型必须上传证明材料')
     return
   }
@@ -571,11 +677,12 @@ async function submitApply() {
       leaveType: applyForm.leaveType,
       startDate: applyForm.range[0],
       endDate: applyForm.range[1],
-      startPeriod: applyForm.startPeriod,
-      endPeriod: applyForm.endPeriod,
+      startTime: applyForm.startTime,
+      endTime: applyForm.endTime,
       dayMode: applyForm.dayMode,
       reason: applyForm.reason.trim(),
-      attachmentId: applyForm.attachmentId,
+      attachmentId: applyForm.attachmentIds[0],
+      attachmentIds: [...applyForm.attachmentIds],
       delegateAccountId: applyForm.delegateAccountId
     })
     message.success('已提交，等待审批')
@@ -620,6 +727,48 @@ async function submitEarlyReturn() {
     message.error(e?.message || '销假失败')
   } finally {
     earlySaving.value = false
+  }
+}
+
+/* ---------- 详情 / 证明材料 ---------- */
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detailRecord = ref<LeaveItem | null>(null)
+const detailAttachments = ref<{ attachmentId: string; fileName?: string }[]>([])
+
+async function openDetail(record: LeaveItem) {
+  detailRecord.value = record
+  detailAttachments.value = []
+  detailOpen.value = true
+  detailLoading.value = true
+  try {
+    const list = await listEhrAttachments('LEAVE', record.id)
+    detailAttachments.value = (list || []).map((a) => ({ attachmentId: a.id, fileName: a.fileName }))
+  } catch {
+    /* 无 employee:view 权限时退回列表里的主附件 */
+  } finally {
+    if (!detailAttachments.value.length && record.attachmentId) {
+      detailAttachments.value = [{ attachmentId: record.attachmentId, fileName: record.attachmentName }]
+    }
+    detailLoading.value = false
+  }
+}
+
+function saveBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function downloadAttachment(item: { attachmentId: string; fileName?: string }) {
+  try {
+    const res: any = await downloadEhrAttachment(item.attachmentId)
+    saveBlob(res.data, item.fileName || `证明材料-${item.attachmentId}`)
+  } catch (e: any) {
+    message.error(e?.message || '证明材料下载失败')
   }
 }
 
@@ -715,6 +864,22 @@ onMounted(() => {
 
 .danger {
   color: #ff4d4f;
+}
+
+.detail-proof {
+  margin-top: 16px;
+}
+.detail-proof-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.proof-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 </style>

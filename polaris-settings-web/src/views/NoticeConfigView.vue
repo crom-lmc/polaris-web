@@ -203,6 +203,40 @@
             </a-form-item>
           </a-col>
         </a-row>
+
+        <a-form-item label="指定接收人">
+          <a-select
+            v-model:value="receiverAccounts"
+            mode="multiple"
+            show-search
+            allow-clear
+            option-filter-prop="label"
+            :options="employeeOptions"
+            :loading="receiverLoading"
+            placeholder="可搜姓名 / 工号，可多选"
+          />
+        </a-form-item>
+
+        <a-form-item label="指定接收部门（含下级）">
+          <a-tree-select
+            v-model:value="receiverOrgs"
+            :tree-data="orgTreeData"
+            tree-checkable
+            allow-clear
+            show-search
+            tree-node-filter-prop="title"
+            :loading="receiverLoading"
+            placeholder="可与接收人混合配置"
+            max-tag-count="responsive"
+          />
+        </a-form-item>
+
+        <a-alert
+          type="info"
+          show-icon
+          style="margin-bottom: 4px"
+          message="接收人与接收部门可混合配置；两者都不配置时，由业务方触发待办/消息时自行决定发给谁。"
+        />
       </a-form>
     </a-modal>
   </div>
@@ -216,9 +250,13 @@ import { fetchApps, type AppBrief } from '@/api/approval'
 import {
   createNoticeRule,
   deleteNoticeRule,
+  fetchReceiverEmployees,
+  fetchReceiverOrgs,
   listNoticeRules,
   updateNoticeRule,
-  type NoticeRule
+  type NoticeRule,
+  type ReceiverEmployee,
+  type ReceiverOrgNode
 } from '@/api/notice'
 
 const store = useUserStore()
@@ -399,8 +437,63 @@ const form = reactive({
 const emailChecked = ref(false)
 const enabledChecked = ref(true)
 
+/* ---------------- 指定接收人 / 接收部门（存规则，业务方触发时解析） ---------------- */
+
+const receiverAccounts = ref<string[]>([])
+const receiverOrgs = ref<string[]>([])
+const receiverLoading = ref(false)
+const employees = ref<ReceiverEmployee[]>([])
+const orgTreeData = ref<Array<{ title: string; value: string; children?: any[] }>>([])
+
+const employeeOptions = computed(() =>
+  employees.value.map((e) => ({ value: e.id, label: `${e.name}${e.empNo ? `（${e.empNo}）` : ''}` }))
+)
+
+/** 扁平组织节点组树；叶子不带 children 键，避免显示展开箭头 */
+function buildOrgTree(list: ReceiverOrgNode[]) {
+  const map = new Map<string, { title: string; value: string; children?: any[] }>()
+  list.forEach((n) => map.set(n.id, { title: n.name, value: n.id, children: [] }))
+  const roots: Array<{ title: string; value: string; children?: any[] }> = []
+  for (const n of list) {
+    const node = map.get(n.id)!
+    const parent = n.parentId ? map.get(n.parentId) : undefined
+    if (parent) parent.children!.push(node)
+    else roots.push(node)
+  }
+  const walk = (ns: Array<{ children?: any[] }>) =>
+    ns.forEach((x) => {
+      if (x.children?.length) walk(x.children)
+      else delete x.children
+    })
+  walk(roots)
+  return roots
+}
+
+async function loadReceivers() {
+  receiverLoading.value = true
+  try {
+    const [emps, orgs] = await Promise.all([fetchReceiverEmployees(), fetchReceiverOrgs()])
+    employees.value = emps || []
+    orgTreeData.value = buildOrgTree(orgs || [])
+  } catch {
+    // 选人数据加载失败不阻塞规则维护；留空即可，业务方会兜底
+    employees.value = []
+    orgTreeData.value = []
+  } finally {
+    receiverLoading.value = false
+  }
+}
+
+/** 逗号分隔串 → 字符串数组（编辑回显用） */
+function splitIds(csv?: string) {
+  return (csv || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 onMounted(async () => {
-  await Promise.all([load(), loadApps()])
+  await Promise.all([load(), loadApps(), loadReceivers()])
 })
 
 /** 应用清单用于树分组和「归属应用」下拉；失败不影响主流程，按编码兜底 */
@@ -437,6 +530,8 @@ function openCreate() {
   })
   emailChecked.value = false
   enabledChecked.value = true
+  receiverAccounts.value = []
+  receiverOrgs.value = []
   modalOpen.value = true
 }
 
@@ -453,6 +548,8 @@ function openEdit(record: NoticeRule) {
   })
   emailChecked.value = record.email === 1
   enabledChecked.value = record.enabled === 1
+  receiverAccounts.value = splitIds(record.receiverAccountIds)
+  receiverOrgs.value = splitIds(record.receiverOrgIds)
   modalOpen.value = true
 }
 
@@ -467,7 +564,9 @@ async function submit() {
     const payload = {
       ...form,
       email: emailChecked.value ? 1 : 0,
-      enabled: enabledChecked.value ? 1 : 0
+      enabled: enabledChecked.value ? 1 : 0,
+      receiverAccountIds: receiverAccounts.value.join(','),
+      receiverOrgIds: receiverOrgs.value.join(',')
     }
     if (editing.value) {
       await updateNoticeRule(editing.value.id, payload)
@@ -533,6 +632,9 @@ function remove(record: NoticeRule) {
    外壳要给受控高度（同字典管理页），否则没数据时卡片会缩成内容高。 */
 .notice-page {
   height: 100%;
+  /* 外层 .content 已有 16px 内边距，height:100% 必须按 border-box 算，
+     否则内容高 = 100% + 上下各 16px，会多出一条竖向滚动条 */
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
 }

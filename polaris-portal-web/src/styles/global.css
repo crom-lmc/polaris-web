@@ -66,6 +66,23 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 页面内容不足一屏时，让页脚始终贴在视口底部 */
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#app > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#app > div > main {
+  flex: 1;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -121,4 +138,17 @@ a {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* 必填星号不占布局：必填与选填标签文字左边缘对齐 */
+.ant-form-item-label > label {
+  position: relative;
+  padding-left: 10px;
+}
+.ant-form-item-label > label.ant-form-item-required::before {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
 }

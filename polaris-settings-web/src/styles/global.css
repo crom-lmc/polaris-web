@@ -65,6 +65,14 @@ body {
   color: var(--text-base);
 }
 
+/* 根级兜底：整页布局是 100vh + overflow:hidden，文档本身永远不该出现横向滚动条。
+   一旦出现，说明有挂到 body 的浮层（下拉/弹窗/tooltip 这类 teleport 容器）超出视口宽度，
+   不在这里拦住就会在窗口底部露出一条横跨全宽的滚动条。 */
+html,
+body {
+  overflow-x: hidden;
+}
+
 .page-container {
   padding: 16px;
 }
@@ -303,4 +311,17 @@ body {
   z-index: 3;
   background: var(--panel-bg, var(--header-bg)) !important;
   border-left: 1px solid var(--panel-border, var(--header-border));
+}
+
+/* 必填星号不占布局：必填与选填标签文字左边缘对齐 */
+.ant-form-item-label > label {
+  position: relative;
+  padding-left: 10px;
+}
+.ant-form-item-label > label.ant-form-item-required::before {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
 }

@@ -8,6 +8,17 @@ const router = createRouter({
     { path: '/', component: () => import('@/views/HomeView.vue'), meta: { title: '首页' } },
     { path: '/article/:id', component: () => import('@/views/ArticleView.vue'), meta: { title: '文章详情' } },
     { path: '/list', component: () => import('@/views/ArticleListView.vue'), meta: { title: '内容列表' } },
+    { path: '/careers', component: () => import('@/views/CareersView.vue'), meta: { title: '加入我们' } },
+    {
+      path: '/careers/progress',
+      component: () => import('@/views/JobProgressView.vue'),
+      meta: { title: '投递进度' }
+    },
+    {
+      path: '/careers/:id',
+      component: () => import('@/views/JobDetailView.vue'),
+      meta: { title: '职位详情' }
+    },
     { path: '/callback', component: () => import('@/views/CallbackView.vue'), meta: { public: true, title: '登录中' } },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ],

@@ -318,3 +318,16 @@ body {
   background: var(--panel-bg, var(--header-bg)) !important;
   border-left: 1px solid var(--panel-border, var(--header-border));
 }
+/* 必填星号改为绝对定位，不参与标签文字排版：必填与选填标签左边缘保持对齐。
+   统一给 label 预留 10px 左侧空间，星号落在该空间内，文字起点不变。 */
+.ant-form-item-label > label {
+  position: relative;
+  padding-left: 10px;
+}
+.ant-form-item-label > label.ant-form-item-required::before {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+}

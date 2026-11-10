@@ -26,6 +26,10 @@ function goCategory(id: number) {
   router.push({ path: '/list', query: { categoryId: String(id) } })
 }
 
+function onCategoryMenu({ key }: { key: string }) {
+  goCategory(Number(key))
+}
+
 function onSearch() {
   const q = kw.value.trim()
   if (!q) return
@@ -60,15 +64,24 @@ function onMenu({ key }: { key: string }) {
 
       <nav class="nav">
         <a class="nav-item" :class="{ active: route.path === '/' }" @click="router.push('/')">首页</a>
+        <a-dropdown :trigger="['hover']" placement="bottomLeft">
+          <a class="nav-item nav-more" :class="{ active: !!route.query.categoryId }">
+            内容分类
+            <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
+              <path d="M2 4.5 6 8.5l4-4" fill="none" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+          </a>
+          <template #overlay>
+            <a-menu @click="onCategoryMenu">
+              <a-menu-item v-for="c in categories" :key="String(c.id)">{{ c.name }}</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
         <a
-          v-for="c in categories.slice(0, 6)"
-          :key="c.id"
-          class="nav-item"
-          :class="{ active: route.query.categoryId === String(c.id) }"
-          @click="goCategory(c.id)"
-        >
-          {{ c.name }}
-        </a>
+          class="nav-item nav-careers"
+          :class="{ active: route.path.startsWith('/careers') }"
+          @click="router.push('/careers')"
+        >加入我们</a>
       </nav>
 
       <div class="actions">
@@ -182,6 +195,21 @@ function onMenu({ key }: { key: string }) {
 .nav-item.active {
   color: var(--accent);
   background: var(--accent-soft);
+}
+
+/* 分类一级菜单：悬停展开二级分类；加入我们固定在导航最右侧 */
+.nav-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-more svg {
+  opacity: 0.7;
+}
+
+.nav-careers {
+  margin-left: auto;
 }
 
 .actions {

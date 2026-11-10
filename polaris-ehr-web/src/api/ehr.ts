@@ -266,6 +266,14 @@ export interface EmployeeItem {
   orgPathName?: string
   position?: string
   hireDate?: string | null
+  /** 司龄起算日 yyyy-MM-dd */
+  seniorityStartDate?: string | null
+  /** 首次参加工作日期（含前司，按社保核定） yyyy-MM-dd */
+  firstWorkDate?: string | null
+  /** 当前司龄（年，保留 1 位） */
+  seniorityYears?: string | null
+  /** 最近一次司龄核定时间；为空表示未核定，提交入职前必须先核定 */
+  seniorityConfirmedAt?: string | null
   /** 试用期时长（月）：1-12；免试用期为 null */
   probationMonths?: number | null
   /** 是否免试用期 */
@@ -326,6 +334,10 @@ export interface EmployeeSaveBody {
   orgId: string
   position?: string
   hireDate?: string | null
+  /** 司龄起算日 yyyy-MM-dd（必填） */
+  seniorityStartDate?: string | null
+  /** 首次参加工作日期（含前司，按社保核定，必填） yyyy-MM-dd */
+  firstWorkDate?: string | null
   /** 试用期时长（月）：1-12；免试用期时无需传 */
   probationMonths?: number | null
   /** 是否免试用期：true 时入职审批通过后直接转正式 */
@@ -1007,12 +1019,17 @@ export interface LeaveItem {
   endDate: string
   startPeriod?: string
   endPeriod?: string
+  /** 精确到半小时的开始/结束时间 HH:mm */
+  startTime?: string
+  endTime?: string
   dayMode?: string
   days: number
   reason: string
   returnDate?: string | null
   attachmentId?: string | null
   attachmentName?: string
+  /** 证明材料列表（详情接口返回） */
+  attachments?: LeaveAttachmentRef[]
   status: number
   statusName: string
   /** 提交时按部门负责人快照的审批人账户ID；为空表示由有审批权的人兜底 */
@@ -1042,9 +1059,14 @@ export function applyLeave(body: {
   endDate: string
   startPeriod?: string
   endPeriod?: string
+  /** 精确到半小时的开始/结束时间 HH:mm */
+  startTime?: string
+  endTime?: string
   dayMode?: string
   reason: string
   attachmentId?: string
+  /** 证明材料附件ID列表（一单可传多个） */
+  attachmentIds?: string[]
   /** 审批转办人账户ID：部门负责人请假必填 */
   delegateAccountId?: string
 }) {
@@ -1086,12 +1108,25 @@ export interface LeaveTypeRule {
   quotaRequired: number
   defaultQuotaDays: number
   attachmentRequired: number
+  /** 允许的证明文件类型，如 pdf,jpg；空=不限 */
+  proofTypes?: string
+  /** 请假折算小时达到该值才强制证明（0=所有时长都要） */
+  proofMinHours?: number
+  /** 证明上传提示（员工手册口径） */
+  proofHint?: string
   minDays: number
   maxDaysPerRequest: number
   minNoticeDays: number
   allowPastDays: number
   needDelegate: number
   sortNo: number
+}
+
+/** 请假证明材料（详情） */
+export interface LeaveAttachmentRef {
+  id?: string
+  attachmentId: string
+  fileName?: string
 }
 
 export interface QuotaLogItem {
@@ -1383,6 +1418,11 @@ export const confirmAttendanceMonthly = (month: string, employeeId: string) =>
     params: { month, employeeId }
   })
 
+export const unlockAttendanceMonthly = (month: string, employeeId: string, reason: string) =>
+  request.post<never, AttendanceMonthItem>('/api/ehr/attendance/monthly/unlock', null, {
+    params: { month, employeeId, reason }
+  })
+
 export function createAnnouncement(body: AnnouncementSaveBody) {
   return request.post<never, AnnouncementItem>('/api/ehr/announcements/manage', body)
 }
@@ -1422,6 +1462,33 @@ export interface RecruitCandidate {
   offerId?: string
   offerStatus?: string
   createdAt?: string
+  jobId?: string
+  jobTitle?: string
+  gender?: number
+  birthday?: string
+  education?: string
+  school?: string
+  major?: string
+  workYears?: string
+  currentCompany?: string
+  expectedSalary?: string
+  idCard?: string
+  resumeFileId?: string
+  resumeFileName?: string
+  employeeId?: string
+  employeeStatus?: string
+  employeeStatusLabel?: string
+  accountOpened?: boolean
+  appliedAt?: string
+  lastStageAt?: string
+  activeApplyCount?: number
+  /** 已通过的最大面试轮次 */
+  interviewRoundNo?: number
+  /** 已约未反馈的面试场次 */
+  interviewPendingCount?: number
+  interviewNextAt?: string
+  lastCommAt?: string
+  lastCommContent?: string
 }
 
 export interface RecruitCandidateBody {
@@ -1433,10 +1500,22 @@ export interface RecruitCandidateBody {
   orgId?: string
   stage?: string
   remark?: string
+  jobId?: string
+  gender?: number
+  birthday?: string
+  education?: string
+  school?: string
+  major?: string
+  workYears?: number
+  currentCompany?: string
+  expectedSalary?: number
+  idCard?: string
+  resumeFileId?: string
 }
 
 export interface RecruitOffer {
   id: string
+  offerNo?: string
   candidateId: string
   candidateName?: string
   candidateMobile?: string
@@ -1451,15 +1530,63 @@ export interface RecruitOffer {
   employeeName?: string
   employeeStatus?: string
   createdAt?: string
+  jobId?: string
+  confirmedAt?: string
+  confirmedBy?: string
 }
 
 export interface RecruitOfferBody {
   candidateId: string
+  jobId?: string
   position: string
   salary: number
   expectedOnboardDate: string
   orgId: string
   remark?: string
+}
+
+export interface JobPost {
+  id: string
+  jobNo: string
+  title: string
+  orgId?: string
+  orgPath?: string
+  jobType?: string
+  workCity?: string
+  headcount?: number
+  salaryMin?: string
+  salaryMax?: string
+  salaryRange?: string
+  educationReq?: string
+  experienceReq?: string
+  description?: string
+  requirement?: string
+  tags?: string
+  status: string
+  publishAt?: string
+  closeAt?: string
+  sortNo?: number
+  ownerId?: string
+  applyCount?: number
+  createdAt?: string
+}
+
+export interface JobPostBody {
+  title: string
+  orgId?: string
+  jobType?: string
+  workCity?: string
+  headcount?: number
+  salaryMin?: number
+  salaryMax?: number
+  educationReq?: string
+  experienceReq?: string
+  description?: string
+  requirement?: string
+  tags?: string
+  closeAt?: string
+  sortNo?: number
+  ownerId?: string
 }
 
 export const listRecruitCandidates = (params: {
@@ -1494,6 +1621,508 @@ export const createRecruitOffer = (body: RecruitOfferBody) =>
 export const cancelRecruitOffer = (id: string) =>
   request.post<never, void>(`/api/ehr/recruits/offers/${id}/cancel`)
 
-export const convertRecruitOffer = (id: string) =>
-  request.post<never, RecruitOffer>(`/api/ehr/recruits/offers/${id}/convert`)
+/** 线下确认 Offer：APPROVED → CONFIRMED */
+export const confirmRecruitOffer = (id: string) =>
+  request.post<never, RecruitOffer>(`/api/ehr/recruits/offers/${id}/confirm`)
+
+/** 候选人放弃 Offer */
+export const declineRecruitOffer = (id: string, reason?: string) =>
+  request.post<never, RecruitOffer>(`/api/ehr/recruits/offers/${id}/decline`, { reason })
+
+/** 办理入职：确认后的 Offer 生成待入职员工档案（幂等） */
+export const onboardRecruitOffer = (id: string) =>
+  request.post<never, RecruitOffer>(`/api/ehr/recruits/offers/${id}/onboard`)
+
+/* ---------------- 招聘多轮面试 ---------------- */
+
+export interface RecruitInterview {
+  id: string
+  candidateId: string
+  candidateName?: string
+  jobId?: string
+  interviewNo?: string
+  roundNo: number
+  interviewerId?: string
+  interviewerName?: string
+  scheduledAt?: string
+  method?: string
+  location?: string
+  status: string
+  score?: number
+  feedback?: string
+  feedbackAt?: string
+  roundResult?: string
+  decidedAt?: string
+  remark?: string
+}
+
+export interface InterviewBody {
+  interviewerIds: string[]
+  scheduledAt: string
+  method?: string
+  location?: string
+  remark?: string
+}
+
+export interface InterviewTodo {
+  id: string
+  candidateId: string
+  candidateName?: string
+  position?: string
+  roundNo: number
+  scheduledAt?: string
+  method?: string
+  location?: string
+  status?: string
+  score?: number
+  feedback?: string
+  result?: 'PASS' | 'FAIL'
+  interviewNo?: string
+  feedbackAt?: string
+}
+
+export interface CandidateComm {
+  id: string
+  candidateId: string
+  type: string
+  content: string
+  expectedSalary?: string
+  occurredAt?: string
+  operatorName?: string
+  createdAt?: string
+}
+
+export interface EmployeeLookup {
+  employeeId: string
+  name: string
+  position?: string
+  email?: string
+  department?: string
+}
+
+export const listRecruitInterviews = (candidateId: string) =>
+  request.get<never, RecruitInterview[]>(`/api/ehr/recruits/candidates/${candidateId}/interviews`)
+
+export const createRecruitInterview = (candidateId: string, body: InterviewBody) =>
+  request.post<never, RecruitInterview[]>(`/api/ehr/recruits/candidates/${candidateId}/interviews`, body)
+
+export const cancelRecruitInterview = (id: string, remark?: string) =>
+  request.post<never, void>(`/api/ehr/recruits/interviews/${id}/cancel`, { remark })
+
+export const listMyInterviews = () =>
+  request.get<never, InterviewTodo[]>('/api/ehr/recruits/interviews/my')
+
+export const submitInterviewFeedback = (
+  id: string,
+  body: { score?: number; feedback: string; result: 'PASS' | 'FAIL' }
+) => request.post<never, void>(`/api/ehr/recruits/interviews/${id}/feedback`, body)
+
+export const listCandidateComms = (candidateId: string) =>
+  request.get<never, CandidateComm[]>(`/api/ehr/recruits/candidates/${candidateId}/communications`)
+
+export const addCandidateComm = (
+  candidateId: string,
+  body: { type?: string; content: string; expectedSalary?: number; occurredAt?: string }
+) => request.post<never, CandidateComm>(`/api/ehr/recruits/candidates/${candidateId}/communications`, body)
+
+export const searchEmployees = (keyword: string) =>
+  request.get<never, EmployeeLookup[]>('/api/ehr/employees/lookup', { params: { keyword } })
+
+/* 招聘职位（P3-2） */
+export const listJobPosts = (params: { status?: string; keyword?: string; page?: number; size?: number }) =>
+  request.get<never, PageData<JobPost>>('/api/ehr/jobs', { params })
+
+export const createJobPost = (body: JobPostBody) => request.post<never, JobPost>('/api/ehr/jobs', body)
+
+export const updateJobPost = (id: string, body: JobPostBody) =>
+  request.put<never, JobPost>(`/api/ehr/jobs/${id}`, body)
+
+export const publishJobPost = (id: string) => request.post<never, void>(`/api/ehr/jobs/${id}/publish`)
+
+export const closeJobPost = (id: string) => request.post<never, void>(`/api/ehr/jobs/${id}/close`)
+
+export const deleteJobPost = (id: string) => request.delete<never, void>(`/api/ehr/jobs/${id}`)
+
+/* ---------------- P4 考勤日结果 / 打卡 / 补卡 / 规则 / 工作日历 ---------------- */
+
+/** 考勤日结果（AttendanceDailyVO） */
+export interface AttendanceDailyItem {
+  id: string
+  employeeId: string
+  employeeName?: string
+  workDate: string
+  shiftStart?: string | null
+  shiftEnd?: string | null
+  firstIn?: string | null
+  lastOut?: string | null
+  lateMinutes: number
+  earlyMinutes: number
+  absentMinutes: number
+  absentHours: number
+  workMinutes: number
+  overtimeMinutes: number
+  /** WORKDAY / REST / LEGAL_HOLIDAY */
+  dayType?: string
+  /** NORMAL / LATE / EARLY / LATE_EARLY / ABSENT / MISSING_PUNCH / LEAVE / REST / HOLIDAY */
+  status: string
+  statusName?: string
+  leaveId?: string | null
+  leaveType?: string | null
+  correctionStatus?: number
+  remark?: string
+}
+
+/** 打卡流水（AttendancePunch） */
+export interface AttendancePunchItem {
+  id: string
+  employeeId: string
+  punchTime: string
+  /** IN / OUT，空=自动判定 */
+  punchType?: string | null
+  /** DEVICE / MOCK / MANUAL / CORRECTION */
+  source?: string
+  deviceNo?: string
+  location?: string
+  remark?: string
+  createdAt?: string
+}
+
+export interface AttendancePunchBody {
+  employeeId: string | number
+  punchTime: string
+  punchType?: string
+  remark?: string
+}
+
+/** 补卡申请（AttendanceCorrectionVO） */
+export interface AttendanceCorrectionItem {
+  id: string
+  employeeId: string
+  employeeName?: string
+  workDate: string
+  /** MISSING_PUNCH / OVERTIME_PUNCH */
+  type: string
+  /** IN / OUT */
+  punchType: string
+  punchTime: string
+  reason?: string
+  /** 0 待审批 / 1 已通过 / 2 已驳回 */
+  status: number
+  statusName?: string
+  approveNote?: string
+  approvedAt?: string
+  applicantName?: string
+  createdAt?: string
+}
+
+export interface AttendanceCorrectionBody {
+  workDate: string
+  punchType: string
+  punchTime: string
+  reason?: string
+  type?: string
+}
+
+/** 考勤规则适用范围 */
+export interface AttendanceRuleScopeItem {
+  id?: string
+  /** ALL / ORG / EMPLOYEE */
+  scopeType: string
+  scopeId?: string | number | null
+  priority?: number | null
+}
+
+/** 考勤规则时间段 */
+export interface AttendanceRuleSegmentItem {
+  id?: string
+  seq?: number | null
+  name?: string | null
+  startTime?: string | null
+  endTime?: string | null
+  workMinutes?: number | null
+  needPunch?: number | null
+  crossDay?: number | null
+}
+
+/** 考勤规则（AttendanceRuleVO） */
+export interface AttendanceRuleItem {
+  id: string
+  code: string
+  name: string
+  /** 1 启用 / 0 停用 */
+  status: number
+  workStart?: string | null
+  workEnd?: string | null
+  restStart?: string | null
+  restEnd?: string | null
+  workHours?: number | null
+  lateGrace?: number | null
+  earlyGrace?: number | null
+  absentMinMinutes?: number | null
+  flexible?: number | null
+  crossDay?: number | null
+  requirePunch?: number | null
+  color?: string | null
+  remark?: string | null
+  scopes?: AttendanceRuleScopeItem[]
+  segments?: AttendanceRuleSegmentItem[]
+}
+
+export interface AttendanceRuleBody {
+  code: string
+  name: string
+  status?: number
+  workStart: string
+  workEnd: string
+  restStart?: string | null
+  restEnd?: string | null
+  workHours?: number | null
+  lateGrace?: number | null
+  earlyGrace?: number | null
+  absentMinMinutes?: number | null
+  flexible?: number | null
+  crossDay?: number | null
+  requirePunch?: number | null
+  color?: string | null
+  remark?: string | null
+  scopes?: AttendanceRuleScopeItem[]
+  segments?: AttendanceRuleSegmentItem[]
+}
+
+/** 工作日历（WorkCalendarVO） */
+export interface WorkCalendarDay {
+  workDate: string
+  /** 1 工作日 / 0 休息日 */
+  isWorkday: number
+  holidayName?: string
+  isConfigured?: boolean
+  /** MANUAL 手动配置 / PRESET 法定节假日预设 / DEFAULT 默认推算 */
+  source?: string
+}
+
+export interface WorkCalendarSaveItem {
+  workDate: string
+  isWorkday: number
+  holidayName?: string
+}
+
+/** 我的考勤（当前登录员工本人，无需 HR 权限） */
+export const myAttendance = (month: string) =>
+  request.get<never, AttendanceDailyItem[]>('/api/ehr/attendance/my', { params: { month } })
+
+export const pageAttendanceDaily = (params: {
+  month: string
+  employeeId?: string
+  status?: string
+  page?: number
+  size?: number
+}) => request.get<never, PageData<AttendanceDailyItem>>('/api/ehr/attendance/daily', { params })
+
+export const generateAttendanceDaily = (date: string) =>
+  request.post<never, number>('/api/ehr/attendance/daily/generate', null, { params: { date } })
+
+export const pageAttendancePunches = (params: {
+  employeeId?: string
+  date?: string
+  page?: number
+  size?: number
+}) => request.get<never, PageData<AttendancePunchItem>>('/api/ehr/attendance/punches', { params })
+
+export const addAttendancePunch = (body: AttendancePunchBody) =>
+  request.post<never, AttendancePunchItem>('/api/ehr/attendance/punches', body)
+
+export const applyAttendanceCorrection = (body: AttendanceCorrectionBody) =>
+  request.post<never, AttendanceCorrectionItem>('/api/ehr/attendance/corrections', body)
+
+export const pageAttendanceCorrections = (params: {
+  status?: number
+  month?: string
+  page?: number
+  size?: number
+}) => request.get<never, PageData<AttendanceCorrectionItem>>('/api/ehr/attendance/corrections', { params })
+
+export const approveAttendanceCorrection = (id: string, note?: string) =>
+  request.post<never, AttendanceCorrectionItem>(`/api/ehr/attendance/corrections/${id}/approve`, { note })
+
+export const rejectAttendanceCorrection = (id: string, note?: string) =>
+  request.post<never, AttendanceCorrectionItem>(`/api/ehr/attendance/corrections/${id}/reject`, { note })
+
+export const pageAttendanceRules = (params: { keyword?: string; page?: number; size?: number }) =>
+  request.get<never, PageData<AttendanceRuleItem>>('/api/ehr/attendance/rules', { params })
+
+export const getAttendanceRule = (id: string) =>
+  request.get<never, AttendanceRuleItem>(`/api/ehr/attendance/rules/${id}`)
+
+export const createAttendanceRule = (body: AttendanceRuleBody) =>
+  request.post<never, AttendanceRuleItem>('/api/ehr/attendance/rules', body)
+
+export const updateAttendanceRule = (id: string, body: AttendanceRuleBody) =>
+  request.put<never, AttendanceRuleItem>(`/api/ehr/attendance/rules/${id}`, body)
+
+export const toggleAttendanceRule = (id: string) =>
+  request.post<never, AttendanceRuleItem>(`/api/ehr/attendance/rules/${id}/toggle`)
+
+export const deleteAttendanceRule = (id: string) =>
+  request.delete<never, void>(`/api/ehr/attendance/rules/${id}`)
+
+export const listWorkCalendar = (month: string) =>
+  request.get<never, WorkCalendarDay[]>('/api/ehr/attendance/calendar', { params: { month } })
+
+export const saveWorkCalendar = (items: WorkCalendarSaveItem[]) =>
+  request.post<never, void>('/api/ehr/attendance/calendar', items)
+
+/** CSV 导入工作日历：日期,是否工作日,节假日名称 */
+export const importWorkCalendarCsv = (file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return request.post<never, number>('/api/ehr/attendance/calendar/import', form)
+}
+
+/** 下一年工作日历状态：11 月起未更新时 showButton=true */
+export interface CalendarNextYearStatus {
+  nextYear: number
+  applied: boolean
+  appliedAt?: string | null
+  appliedBy?: string
+  showButton: boolean
+  holidayCount: number
+  makeupCount: number
+}
+export const calendarNextYearStatus = () =>
+  request.get<never, CalendarNextYearStatus>('/api/ehr/attendance/calendar/next-year-status')
+
+/** 一键更新下一年工作日历（写入法定节假日与调休上班日） */
+export const applyNextYearCalendar = () =>
+  request.post<never, { nextYear: number; inserted: number; skipped: number }>(
+    '/api/ehr/attendance/calendar/apply-next-year',
+  )
+
+/** 手动触发模拟考勤；不传日期默认生成昨天 */
+export const runAttendanceMock = (date?: string) =>
+  request.post<never, number>('/api/ehr/attendance/mock/run', null, { params: { date } })
+
+/* ---------------- P4 年假策略 ---------------- */
+
+export interface AnnualLeavePolicyItem {
+  id: string
+  name: string
+  /** 1 启用 / 0 停用 */
+  enabled: number
+  tier1Years?: number | null
+  tier1Days?: number | null
+  tier2Years?: number | null
+  tier2Days?: number | null
+  tier3Years?: number | null
+  tier3Days?: number | null
+  carryoverEnabled?: number | null
+  carryoverMaxDays?: number | null
+  /** 结转额度失效月份（次年） */
+  carryoverExpireMonth?: number | null
+  effectiveFrom?: string | null
+  remark?: string | null
+  createdAt?: string
+}
+
+export type AnnualLeavePolicyBody = Omit<AnnualLeavePolicyItem, 'id' | 'createdAt'>
+
+export const listAnnualLeavePolicies = () =>
+  request.get<never, AnnualLeavePolicyItem[]>('/api/ehr/admin/annual-leave-policies')
+
+export const createAnnualLeavePolicy = (body: AnnualLeavePolicyBody) =>
+  request.post<never, AnnualLeavePolicyItem>('/api/ehr/admin/annual-leave-policies', body)
+
+export const updateAnnualLeavePolicy = (id: string, body: AnnualLeavePolicyBody) =>
+  request.put<never, AnnualLeavePolicyItem>(`/api/ehr/admin/annual-leave-policies/${id}`, body)
+
+export const enableAnnualLeavePolicy = (id: string) =>
+  request.post<never, AnnualLeavePolicyItem>(`/api/ehr/admin/annual-leave-policies/${id}/enable`)
+
+export const generateAnnualLeave = (year: number) =>
+  request.post<never, number>('/api/ehr/admin/annual-leave/generate', null, { params: { year } })
+
+/* ---------------- P4 司龄核定 ---------------- */
+
+export interface SeniorityItem {
+  employeeId: string
+  empNo?: string
+  name?: string
+  orgId?: string
+  orgName?: string
+  hireDate?: string | null
+  seniorityStartDate?: string | null
+  firstWorkDate?: string | null
+  seniorityYears?: number | null
+  priorYears?: number | null
+  totalYears?: number | null
+  /** SOCIAL_SECURITY / MANUAL / FIRST_HIRE */
+  source?: string
+  confirmedAt?: string
+}
+
+export interface SeniorityRecordItem {
+  id: string
+  employeeId: string
+  effectiveDate?: string | null
+  seniorityStartDate?: string | null
+  firstWorkDate?: string | null
+  priorYears?: number | null
+  totalYears?: number | null
+  source?: string
+  proofFileId?: string | null
+  remark?: string | null
+  confirmedBy?: string | null
+  confirmedAt?: string
+  createdAt?: string
+}
+
+/** 司龄「前司工作段」：一人可多段、可不连续，每段必须上传证明附件 */
+export interface SenioritySegmentItem {
+  id?: string
+  employeeId?: string
+  recordId?: string
+  company?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  proofFileId?: string | number | null
+  proofFileName?: string | null
+  remark?: string | null
+}
+
+export interface SenioritySegmentBody {
+  company?: string | null
+  startDate: string
+  endDate: string
+  proofFileId: string | number
+  proofFileName?: string | null
+  remark?: string
+}
+
+export interface SeniorityConfirmBody {
+  effectiveDate?: string | null
+  seniorityStartDate: string
+  firstWorkDate: string
+  priorYears?: number | null
+  totalYears?: number | null
+  source?: string
+  proofFileId?: string | number | null
+  remark?: string
+  /** 前司多段工作经历；传了就按各段自动加总前司年限 */
+  segments?: SenioritySegmentBody[]
+}
+
+export const senioritySegments = (employeeId: string) =>
+  request.get<never, SenioritySegmentItem[]>(`/api/ehr/admin/seniority/${employeeId}/segments`)
+
+export const pageSeniority = (params: {
+  keyword?: string
+  employeeId?: string
+  page?: number
+  size?: number
+}) => request.get<never, PageData<SeniorityItem>>('/api/ehr/admin/seniority', { params })
+
+export const seniorityRecords = (employeeId: string) =>
+  request.get<never, SeniorityRecordItem[]>(`/api/ehr/admin/seniority/${employeeId}/records`)
+
+export const confirmSeniority = (employeeId: string, body: SeniorityConfirmBody) =>
+  request.post<never, SeniorityItem>(`/api/ehr/admin/seniority/${employeeId}`, body)
 

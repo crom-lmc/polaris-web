@@ -37,6 +37,9 @@
               <template v-else-if="column.key === 'appCode'">
                 {{ appNameOf(record.appCode) }}
               </template>
+              <template v-else-if="column.key === 'remark'">
+                {{ remarkOf(record) }}
+              </template>
               <template v-else-if="column.key === 'separatorChar'">
                 {{ record.separatorChar || '（空）' }}
               </template>
@@ -204,6 +207,7 @@ const columns = [
   { title: '序号', key: 'index', width: 60 },
   { title: '应用', key: 'appCode', width: 110, ellipsis: true },
   { title: '数据库表名', dataIndex: 'tableName', key: 'tableName', width: 170, ellipsis: true },
+  { title: '备注', key: 'remark', width: 150, ellipsis: true },
   { title: '前缀', dataIndex: 'prefix', key: 'prefix', width: 80 },
   { title: '分隔符', key: 'separatorChar', width: 80, align: 'center' as const },
   { title: '长度', dataIndex: 'seqLength', key: 'seqLength', width: 70, align: 'center' as const },
@@ -236,6 +240,43 @@ const appNameMap = computed(() => {
 function appNameOf(code: string) {
   if (!code) return '通用'
   return appNameMap.value.get(code) || code
+}
+
+/* ---------------- 备注：读库表注释，说明这条规则对应哪个业务 ---------------- */
+
+/** 表名 → 业务说明（取数据库表注释，简洁一句话） */
+const remarkMap = ref<Record<string, string>>({})
+
+/** 少数表没开实体元数据，注释读不到时兜底 */
+const REMARK_FALLBACK: Record<string, string> = {
+  appr_instance: '审批实例'
+}
+
+/** 表注释常带补充说明（如「录用Offer（审批通过后自动生成待入职档案）」），括号前一句就够用 */
+function briefComment(comment: string) {
+  return (comment || '').split(/[（(]/)[0].trim() || comment
+}
+
+async function loadRemarks() {
+  const codes = Array.from(new Set(rows.value.map((r) => r.appCode).filter(Boolean)))
+  const map: Record<string, string> = {}
+  await Promise.all(
+    codes.map(async (code) => {
+      try {
+        const list = await fetchEntityTables(code)
+        for (const t of list) {
+          if (t.comment) map[t.table] = briefComment(t.comment)
+        }
+      } catch {
+        // 单个应用元数据读不到就跳过，该应用的备注留空
+      }
+    })
+  )
+  remarkMap.value = map
+}
+
+function remarkOf(record: CodeRule) {
+  return remarkMap.value[record.tableName] || REMARK_FALLBACK[record.tableName] || '—'
 }
 
 /** 只保留「已开通实体元数据」的应用，避免选了表读不出来 */
@@ -350,6 +391,7 @@ async function load() {
   loading.value = true
   try {
     rows.value = await listCodeRules(keyword.value || undefined)
+    void loadRemarks()
   } catch (e: any) {
     message.error(e?.message || '加载失败')
   } finally {

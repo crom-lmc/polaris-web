@@ -78,6 +78,7 @@
             <template #icon><reload-outlined /></template>
             刷新
           </a-button>
+          <a-button v-if="canViewSeniority" @click="openSeniorityLedger">司龄台账</a-button>
           <span class="spacer" />
           <a-button v-if="canExport" :loading="exporting" @click="doExport">
             <template #icon><download-outlined /></template>
@@ -106,6 +107,7 @@
             row-key="id"
             size="middle"
             :pagination="pagination"
+            :scroll="{ x: tableScrollX }"
             @change="onTableChange"
           >
             <template #bodyCell="{ column, record }">
@@ -158,15 +160,23 @@
                   <a v-if="canEdit && canEditRecord(record)" @click="openEdit(record)">
                     {{ record.status === 10 ? '编辑' : '变更' }}
                   </a>
-                  <a-popconfirm
-                    v-if="canEdit && record.status === 10"
-                    title="提交后交由审批中心按「入职审批流程」审批，终审通过时自动开通统一账号。确定提交？"
-                    ok-text="提交"
-                    cancel-text="取消"
-                    @confirm="doSubmitDraft(record)"
-                  >
-                    <a>提交入职</a>
-                  </a-popconfirm>
+                  <a v-if="canEdit && !record.seniorityConfirmedAt" @click="openSeniority(record)">司龄核定</a>
+                  <template v-if="canEdit && record.status === 10">
+                    <a
+                      v-if="!record.seniorityConfirmedAt"
+                      class="op-warn"
+                      @click="message.warning('提交入职前请先完成司龄核定（点击本行「司龄核定」）')"
+                    >提交入职</a>
+                    <a-popconfirm
+                      v-else
+                      title="提交后交由审批中心按「入职审批流程」审批，终审通过时自动开通统一账号。确定提交？"
+                      ok-text="提交"
+                      cancel-text="取消"
+                      @confirm="doSubmitDraft(record)"
+                    >
+                      <a>提交入职</a>
+                    </a-popconfirm>
+                  </template>
                   <a-popconfirm
                     v-if="canEdit && record.status === 25"
                     :title="record.exemptProbation ? '该员工免试用期，办理入职后直接成为正式员工，确定办理入职？' : '办理入职后该员工进入试用期，确定办理入职？'"
@@ -233,18 +243,10 @@
     >
       <a-tabs v-model:active-key="formTab" class="emp-form-tabs">
         <a-tab-pane key="base" tab="基本信息">
-      <a-alert
-        v-if="personalOnly"
-        type="info"
-        show-icon
-        class="mb12"
-        message="变更员工信息：提交后统一进审批，通过后生效"
-        description="可改：手机号、婚姻状况、政治面貌、最高学历、现居住址、紧急联系人及电话，以及银行卡、教育背景、工作经历、家庭成员（子表修改先暂存本页，随「提交变更」一并进审批）。姓名、所属组织、职位、入职日期、身份证如需调整，请走人事异动。"
-      />
       <a-form layout="vertical">
         <div v-if="!personalOnly" class="form-hint">
           标 <span class="req-star">*</span> 的项为「提交入职」的前置条件（工号、邮箱由系统生成，备注选填）；提交入职还要求
-          银行卡、教育背景、工作经历、家庭成员各至少 1 条。
+          银行卡、教育背景、工作经历、家庭成员各至少 1 条，并先在列表「司龄核定」完成核定。
         </div>
         <a-row :gutter="12">
           <a-col :span="6">
@@ -319,6 +321,40 @@
                 :disabled-date="(d: any) => !!d && d < dayjs().startOf('day')"
                 placeholder="不能早于今天"
               />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="6">
+            <a-form-item label="司龄起算日" required>
+              <a-date-picker
+                v-model:value="form.seniorityStartDate"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+                :disabled="personalOnly"
+                placeholder="默认入职日期"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="首次参加工作日期" required>
+              <a-date-picker
+                v-model:value="form.firstWorkDate"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+                :disabled="personalOnly"
+                placeholder="含前司，按社保核定"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label="当前司龄">
+              <a-input :value="form.seniorityYears ? `${form.seniorityYears} 年` : '—'" disabled />
+            </a-form-item>
+          </a-col>
+          <a-col :span="6">
+            <a-form-item label=" ">
+              <span class="probation-hint">年假档位按累计工龄（含前司）计算</span>
             </a-form-item>
           </a-col>
         </a-row>
@@ -455,17 +491,6 @@
         <a-form-item label="现居住址" required>
           <a-input v-model:value="form.currentAddress" :maxlength="255" />
         </a-form-item>
-
-        <template v-if="!editing">
-          <a-form-item class="mt12">
-            <a-alert
-              type="info"
-              show-icon
-              message="保存后为「待入职」草稿，此时不开通账号"
-              description="在列表里点「提交入职」，由审批中心按「入职审批流程」模板审批；终审通过后状态为「入职审批通过」并自动开通统一账号（默认授权 统一账号中心 / 内容门户 / 人力中心，初始密码由系统生成），再由 HR 点「入职」转入试用期（免试用期则直接成为正式员工）。"
-            />
-          </a-form-item>
-        </template>
 
         <a-form-item label="备注" class="mt12">
           <a-textarea v-model:value="form.remark" :rows="2" :maxlength="255" :disabled="personalOnly" />
@@ -1100,6 +1125,190 @@
         </a-result>
       </template>
     </a-modal>
+
+    <!-- 司龄台账 -->
+    <a-drawer v-model:open="seniorityLedgerOpen" title="司龄台账" width="1200px" destroy-on-close>
+      <div class="list-toolbar">
+        <a-input-search
+          v-model:value="seniorityKeyword"
+          placeholder="姓名 / 工号"
+          allow-clear
+          style="width: 220px"
+          @search="loadSeniorityLedger"
+        />
+        <a-button @click="loadSeniorityLedger">
+          <template #icon><reload-outlined /></template>
+          刷新
+        </a-button>
+      </div>
+      <a-table
+        :columns="seniorityColumns"
+        :data-source="seniorityRows"
+        :loading="seniorityLoading"
+        row-key="employeeId"
+        size="middle"
+        :scroll="{ x: 1140 }"
+        :pagination="seniorityPagination"
+        @change="onSeniorityTableChange"
+      >
+        <template #emptyText>
+          <a-empty v-if="!seniorityLoading" description="暂无司龄数据" />
+        </template>
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'confirmedAt'">{{ record.confirmedAt || '未核定' }}</template>
+          <template v-else-if="column.key === 'source'">{{ senioritySourceText(record.source) }}</template>
+          <template v-else-if="column.key === 'action'">
+            <a @click="openSenioritySegments(record)">查看</a>
+          </template>
+        </template>
+      </a-table>
+    </a-drawer>
+
+    <!-- 前司工作记录 -->
+    <a-modal v-model:open="segmentsViewOpen" :footer="null" width="880px" centered destroy-on-close>
+      <template #title>
+        前司工作记录 · {{ segmentsViewTarget?.name || '' }}
+        <span class="seg-summary">
+          前司 {{ segmentsViewTarget?.priorYears ?? 0 }} 年 · 累计 {{ segmentsViewTarget?.totalYears ?? 0 }} 年
+        </span>
+      </template>
+      <a-table
+        :columns="segmentViewColumns"
+        :data-source="segmentsViewRows"
+        :loading="segmentsViewLoading"
+        :row-key="segmentRowKey"
+        size="small"
+        :pagination="false"
+      >
+        <template #emptyText>
+          <a-empty v-if="!segmentsViewLoading" description="无前司工作记录" />
+        </template>
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'proofFileName'">
+            <a v-if="record.proofFileName" @click="downloadProof(record)">{{ record.proofFileName }}</a>
+            <span v-else class="muted">未上传</span>
+          </template>
+        </template>
+      </a-table>
+    </a-modal>
+
+    <!-- 司龄核定 -->
+    <a-modal
+      v-model:open="seniorityOpen"
+      title="司龄核定"
+      :confirm-loading="senioritySaving"
+      ok-text="提交核定"
+      cancel-text="取消"
+      width="1040px"
+      centered
+      destroy-on-close
+      :body-style="{ maxHeight: '74vh', overflowY: 'auto', overflowX: 'hidden' }"
+      @ok="submitSeniority"
+    >
+      <template v-if="seniorityTarget">
+        <a-descriptions :column="4" size="small" bordered class="mb12">
+          <a-descriptions-item label="员工">
+            {{ seniorityTarget.name || '—' }}
+            <span v-if="seniorityTarget.empNo" class="muted">（{{ seniorityTarget.empNo }}）</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="组织">{{ seniorityTarget.orgName || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="入职日期">{{ seniorityTarget.hireDate || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="当前司龄">
+            {{ seniorityTarget.seniorityYears ?? '—' }} 年
+          </a-descriptions-item>
+        </a-descriptions>
+
+        <a-form layout="vertical">
+          <a-row :gutter="12">
+            <a-col :span="8">
+              <a-form-item label="核定生效日">
+                <a-date-picker v-model:value="seniorityForm.effectiveDate" value-format="YYYY-MM-DD" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="司龄起算日" required>
+                <a-date-picker v-model:value="seniorityForm.seniorityStartDate" value-format="YYYY-MM-DD" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="首次参加工作日期" :required="!senioritySegmentRows.length">
+                <a-date-picker
+                  v-if="!senioritySegmentRows.length"
+                  v-model:value="seniorityForm.firstWorkDate"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                />
+                <a-input v-else :value="seniorityFirstWorkText" disabled />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <div class="seg-head">
+            <span>前司工作经历（可多段、可不连续，断档不计工龄；每段必须上传证明）</span>
+            <a-button type="link" size="small" @click="addSenioritySegment()">+ 添加一段</a-button>
+          </div>
+          <div v-if="senioritySegmentRows.length" class="seg-list">
+            <div v-for="(seg, i) in senioritySegmentRows" :key="seg.key" class="seg-item">
+              <div class="seg-grid">
+                <a-input v-model:value="seg.company" placeholder="单位名称（选填）" />
+                <a-date-picker
+                  v-model:value="seg.startDate"
+                  value-format="YYYY-MM-DD"
+                  placeholder="开始时间"
+                  style="width: 100%"
+                />
+                <a-date-picker
+                  v-model:value="seg.endDate"
+                  value-format="YYYY-MM-DD"
+                  placeholder="结束时间"
+                  style="width: 100%"
+                />
+                <a-input v-model:value="seg.remark" placeholder="备注（选填）" class="seg-span2" />
+                <div class="seg-proof">
+                  <a-upload :show-upload-list="false" :before-upload="seniorityProofUploader(seg)">
+                    <a-button size="small">
+                      <UploadOutlined />
+                      {{ seg.proofFileName ? '重新上传证明' : '上传证明' }}
+                    </a-button>
+                  </a-upload>
+                  <span v-if="seg.proofFileName" class="seg-file" :title="seg.proofFileName">{{ seg.proofFileName }}</span>
+                  <a-button type="link" danger size="small" @click="removeSenioritySegment(i)">删除</a-button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="muted seg-empty">无前司经历可不填；有前司经历请逐段添加，每段上传社保 / 离职证明。</div>
+
+          <a-row :gutter="12">
+            <a-col :span="8">
+              <a-form-item label="前司累计年限">
+                <a-input-number
+                  v-if="!senioritySegmentRows.length"
+                  v-model:value="seniorityForm.priorYears"
+                  :min="0"
+                  :step="0.5"
+                  style="width: 100%"
+                />
+                <a-input v-else :value="seniorityPriorText" disabled />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="累计工龄（自动加总）">
+                <a-input :value="seniorityTotalText" disabled />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="核定依据">
+                <a-select v-model:value="seniorityForm.source" :options="senioritySourceOptions" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item label="备注">
+            <a-input v-model:value="seniorityForm.remark" :maxlength="100" placeholder="选填" />
+          </a-form-item>
+        </a-form>
+      </template>
+    </a-modal>
   </div>
 </template>
 
@@ -1124,8 +1333,10 @@ import {
   bizOptions,
   closeAccountEmployee,
   confirmEmployeeImport,
+  confirmSeniority,
   dictOptions,
   downloadImportError,
+  downloadEhrAttachment,
   downloadImportTemplate,
   employeeProfile,
   exportContractsXlsx,
@@ -1134,9 +1345,11 @@ import {
   onboardEmployee,
   orgTree,
   pageEmployees,
+  pageSeniority,
   reduceEmployee,
   regularizeApply,
   sensitiveEmployeeDetail,
+  senioritySegments,
   submitDraft,
   submitEmpChange,
   submitRehireApply,
@@ -1145,6 +1358,7 @@ import {
   updateEmployee,
   updateFamily,
   updateWork,
+  uploadEhrAttachment,
   type AccountBrief,
   type BankBody,
   type DictOption,
@@ -1155,6 +1369,9 @@ import {
   type ImportPreview,
   type ImportResult,
   type OrgNode,
+  type SeniorityConfirmBody,
+  type SeniorityItem,
+  type SenioritySegmentItem,
   type WorkBody
 } from '@/api/ehr'
 import { useUserStore } from '@/stores/user'
@@ -1187,6 +1404,7 @@ const canSensitive = computed(() => store.can('employee:sensitive:view'))
 const canExport = computed(() => store.can('employee:export'))
 const canContractExport = computed(() => store.can('contract:view'))
 const canImport = computed(() => store.can('employee:import'))
+const canViewSeniority = computed(() => store.can('employee:view'))
 /** 组织树要 org:view；普通员工没有，左侧只能空着 */
 const canSeeOrgTree = computed(() => store.can('org:view'))
 
@@ -1403,13 +1621,16 @@ const columns = computed(() => {
   // 已经按组织筛选时，右侧每一行都是同一个组织，这一列没有信息量
   if (!selectedOrgId.value) cols.splice(4, 0, { title: '所属组织', key: 'org', width: 200, ellipsis: true })
   cols.push(
-    { title: '登录账号', key: 'account', width: 130 },
+    { title: '登录账号', key: 'account', width: 200, ellipsis: true },
     { title: '离职日期', dataIndex: 'resignDate', key: 'resignDate', width: 110 },
     // 操作列：横向滚动时始终贴住右边（改用 CSS sticky，见 .emp-table 样式）
     { title: '操作', key: 'action', width: 240 }
   )
   return cols
 })
+
+/** 表格总宽：交给 a-table 自己横向滚动，表头表体才能严格对齐，也不会撑出页面级滚动条 */
+const tableScrollX = computed(() => columns.value.reduce((sum, c) => sum + (c.width || 0), 0))
 
 async function loadOrgs(keepSelection = true) {
   orgLoading.value = true
@@ -1521,6 +1742,9 @@ const form = reactive<{
   emergencyPhone: string
   currentAddress: string
   hireDate?: string
+  seniorityStartDate?: string
+  firstWorkDate?: string
+  seniorityYears?: string
   probationMonths?: number
   exemptProbation: boolean
   remark: string
@@ -1546,6 +1770,9 @@ const form = reactive<{
   emergencyPhone: '',
   currentAddress: '',
   hireDate: undefined,
+  seniorityStartDate: undefined,
+  firstWorkDate: undefined,
+  seniorityYears: undefined,
   probationMonths: 3,
   exemptProbation: false,
   remark: ''
@@ -2052,6 +2279,9 @@ function resetForm() {
   form.emergencyPhone = ''
   form.currentAddress = ''
   form.hireDate = undefined
+  form.seniorityStartDate = undefined
+  form.firstWorkDate = undefined
+  form.seniorityYears = undefined
   form.probationMonths = 3
   form.exemptProbation = false
   form.remark = ''
@@ -2106,6 +2336,9 @@ async function openEdit(row: EmployeeItem) {
   form.emergencyPhone = source.emergencyPhone || ''
   form.currentAddress = row.currentAddress || ''
   form.hireDate = row.hireDate || undefined
+  form.seniorityStartDate = row.seniorityStartDate || row.hireDate || undefined
+  form.firstWorkDate = row.firstWorkDate || row.hireDate || undefined
+  form.seniorityYears = row.seniorityYears ?? undefined
   form.exemptProbation = !!row.exemptProbation
   form.probationMonths = row.probationMonths ?? (row.exemptProbation ? undefined : 3)
   form.remark = row.remark || ''
@@ -2143,6 +2376,11 @@ async function submit() {
       message.warning('试用期时长必填，范围 1-12 个月；确无试用期请勾选「免试用期」')
       return
     }
+  }
+  // P4-4：司龄起算日与首次参加工作日期是年假档位依据，建档时必填
+  if (!personalOnly.value && (!form.seniorityStartDate || !form.firstWorkDate)) {
+    message.warning('请填写司龄起算日与首次参加工作日期（含前司，按社保核定）')
+    return
   }
   saving.value = true
   // empNo 不提交（后端自动生成且禁改）；邮箱不提交（后端按姓名拼音自动生成）；籍贯由省/市/区县/详细地址结构化传递
@@ -2691,6 +2929,392 @@ function dueTag(row: EmployeeItem): { text: string; color: string } | null {
   return { text: days === 0 ? '今日转正到期' : `转正 T-${days}`, color }
 }
 
+/* ---------- 司龄台账 / 核定 ---------- */
+interface SeniorityTarget {
+  employeeId: string
+  name?: string
+  empNo?: string
+  orgName?: string
+  hireDate?: string | null
+  seniorityStartDate?: string | null
+  firstWorkDate?: string | null
+  seniorityYears?: string | number | null
+  priorYears?: number | null
+  totalYears?: number | null
+  source?: string
+}
+
+const senioritySourceOptions = [
+  { value: 'SOCIAL_SECURITY', label: '社保核定' },
+  { value: 'MANUAL', label: '手工核定' },
+  { value: 'FIRST_HIRE', label: '入职默认' }
+]
+
+function senioritySourceText(source?: string) {
+  if (source === 'SOCIAL_SECURITY') return '社保核定'
+  if (source === 'FIRST_HIRE') return '入职默认'
+  if (source === 'MANUAL') return '手工核定'
+  if (source === 'AUTO') return '系统自动核算'
+  return source || '—'
+}
+
+/* 台账 */
+const seniorityLedgerOpen = ref(false)
+const seniorityKeyword = ref('')
+const seniorityRows = ref<SeniorityItem[]>([])
+const seniorityLoading = ref(false)
+const seniorityTotal = ref(0)
+const seniorityPage = ref(1)
+const senioritySize = ref(10)
+
+const seniorityColumns = [
+  { title: '工号', dataIndex: 'empNo', width: 100 },
+  { title: '姓名', dataIndex: 'name', width: 100 },
+  { title: '组织', dataIndex: 'orgName', width: 160 },
+  { title: '入职日期', dataIndex: 'hireDate', width: 110 },
+  { title: '司龄起算日', dataIndex: 'seniorityStartDate', width: 110 },
+  { title: '首次工作日期', dataIndex: 'firstWorkDate', width: 120 },
+  { title: '本单位司龄', dataIndex: 'seniorityYears', width: 100 },
+  { title: '累计工龄', dataIndex: 'totalYears', width: 100 },
+  { title: '核定时间', key: 'confirmedAt', width: 160 },
+  { title: '操作', key: 'action', width: 80 }
+]
+
+/* 台账：查看某人的前司工作记录 */
+const segmentsViewOpen = ref(false)
+const segmentsViewTarget = ref<SeniorityItem | null>(null)
+const segmentsViewRows = ref<SenioritySegmentItem[]>([])
+const segmentsViewLoading = ref(false)
+const segmentViewColumns = [
+  { title: '单位名称', dataIndex: 'company', ellipsis: true },
+  { title: '开始时间', dataIndex: 'startDate', width: 110 },
+  { title: '结束时间', dataIndex: 'endDate', width: 110 },
+  { title: '证明材料', key: 'proofFileName', width: 220, ellipsis: true },
+  { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true }
+]
+
+/** 分段行没有可靠的唯一 ID（雪花 ID 转 JSON 数字会丢精度），用单位+起止拼 key */
+function segmentRowKey(record: SenioritySegmentItem) {
+  return [record.company || '', record.startDate || '', record.endDate || ''].join('|')
+}
+
+async function openSenioritySegments(record: SeniorityItem) {
+  segmentsViewTarget.value = record
+  segmentsViewOpen.value = true
+  segmentsViewLoading.value = true
+  try {
+    segmentsViewRows.value = (await senioritySegments(record.employeeId)) || []
+  } catch {
+    segmentsViewRows.value = []
+  } finally {
+    segmentsViewLoading.value = false
+  }
+}
+
+/* 证明材料下载：真实附件走接口；模拟数据（proofFileId 为 0）现场生成一份占位 PDF */
+async function downloadProof(row: SenioritySegmentItem) {
+  const name = row.proofFileName || '离职证明.pdf'
+  const id = row.proofFileId == null ? '' : String(row.proofFileId)
+  if (id && id !== '0') {
+    try {
+      const res: any = await downloadEhrAttachment(id)
+      saveBlob(res.data, name)
+      return
+    } catch (e: any) {
+      // 落盘文件丢失时退回占位文件，避免点下载没有任何反馈
+      message.warning(e?.message || '附件已丢失，已为你生成占位文件')
+    }
+  }
+  saveBlob(buildMockProofPdf(row), name)
+}
+
+/** 生成一份可正常打开的单页 PDF（模拟证明材料） */
+function buildMockProofPdf(row: SenioritySegmentItem) {
+  const lines = [
+    'Mock Employment Proof (demo data)',
+    `Company: ${row.company || '-'}`.replace(/[^\x20-\x7E]/g, '?'),
+    `Period: ${row.startDate || '-'} to ${row.endDate || '-'}`
+  ]
+  const stream = `BT /F1 14 Tf 60 760 Td 20 TL ${lines.map((l) => `(${l}) Tj T*`).join(' ')} ET`
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets: number[] = []
+  objects.forEach((body, i) => {
+    offsets.push(pdf.length)
+    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`
+  })
+  const xref = pdf.length
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  offsets.forEach((o) => {
+    pdf += `${String(o).padStart(10, '0')} 00000 n \n`
+  })
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`
+  return new Blob([pdf], { type: 'application/pdf' })
+}
+
+const seniorityPagination = computed(() => ({
+  current: seniorityPage.value,
+  pageSize: senioritySize.value,
+  total: seniorityTotal.value,
+  showSizeChanger: true,
+  showTotal: (t: number) => `共 ${t} 条`
+}))
+
+async function loadSeniorityLedger() {
+  if (!canViewSeniority.value) return
+  seniorityLoading.value = true
+  try {
+    const data = await pageSeniority({
+      keyword: seniorityKeyword.value || undefined,
+      page: seniorityPage.value,
+      size: senioritySize.value
+    })
+    seniorityRows.value = data.list || []
+    seniorityTotal.value = data.total || 0
+  } catch (e: any) {
+    message.error(e?.message || '加载司龄台账失败')
+  } finally {
+    seniorityLoading.value = false
+  }
+}
+
+function onSeniorityTableChange(p: any) {
+  seniorityPage.value = p.current || 1
+  senioritySize.value = p.pageSize || 10
+  loadSeniorityLedger()
+}
+
+function openSeniorityLedger() {
+  seniorityLedgerOpen.value = true
+  seniorityPage.value = 1
+  loadSeniorityLedger()
+}
+
+/* 核定弹窗 */
+const seniorityOpen = ref(false)
+const senioritySaving = ref(false)
+const seniorityTarget = ref<SeniorityTarget | null>(null)
+
+const seniorityForm = reactive({
+  effectiveDate: dayjs().format('YYYY-MM-DD'),
+  seniorityStartDate: '',
+  firstWorkDate: '',
+  priorYears: 0 as number | undefined,
+  source: 'MANUAL',
+  remark: ''
+})
+
+/** 前司工作段：可多段、可不连续，每段起止日期 + 证明附件 */
+interface SenioritySegmentRow {
+  key: number
+  company?: string
+  startDate?: string
+  endDate?: string
+  proofFileId?: string
+  proofFileName?: string
+  remark?: string
+}
+
+const senioritySegmentRows = ref<SenioritySegmentRow[]>([])
+let senioritySegmentKey = 0
+
+function addSenioritySegment(init?: Partial<SenioritySegmentRow>) {
+  senioritySegmentRows.value.push({ key: ++senioritySegmentKey, ...init })
+}
+
+function removeSenioritySegment(index: number) {
+  senioritySegmentRows.value.splice(index, 1)
+}
+
+function seniorityProofUploader(seg: SenioritySegmentRow) {
+  return (file: File) => uploadSeniorityProof(seg, file)
+}
+
+async function uploadSeniorityProof(seg: SenioritySegmentRow, file: File) {
+  if (file.size > 20 * 1024 * 1024) {
+    message.error('证明附件不能超过 20MB')
+    return false
+  }
+  try {
+    const att = await uploadEhrAttachment(file, 'SENIORITY')
+    seg.proofFileId = String(att.id)
+    seg.proofFileName = att.fileName
+    message.success('证明已上传')
+  } catch (e: any) {
+    message.error(e?.message || '证明上传失败')
+  }
+  return false
+}
+
+/** 多段经历合并后的年限：断档不计、重叠只算一次，算法与后端一致（365.25 天/年，含首尾） */
+function mergeSegmentYears() {
+  const segs = senioritySegmentRows.value
+    .filter((s) => s.startDate && s.endDate && !dayjs(s.endDate).isBefore(dayjs(s.startDate)))
+    .map((s) => [dayjs(s.startDate).valueOf(), dayjs(s.endDate).valueOf()] as [number, number])
+    .sort((a, b) => a[0] - b[0])
+  let days = 0
+  let curStart = -1
+  let curEnd = -1
+  for (const [start, end] of segs) {
+    if (curStart < 0) {
+      curStart = start
+      curEnd = end
+    } else if (start <= curEnd + 86400000) {
+      if (end > curEnd) curEnd = end
+    } else {
+      days += Math.round((curEnd - curStart) / 86400000) + 1
+      curStart = start
+      curEnd = end
+    }
+  }
+  if (curStart >= 0) days += Math.round((curEnd - curStart) / 86400000) + 1
+  return Math.floor((days / 365.25) * 10) / 10
+}
+
+const seniorityPriorYears = computed(() =>
+  senioritySegmentRows.value.some((s) => s.startDate || s.endDate)
+    ? mergeSegmentYears()
+    : Number(seniorityForm.priorYears || 0)
+)
+
+const seniorityLocalYears = computed(() => {
+  if (!seniorityForm.seniorityStartDate || !seniorityForm.effectiveDate) return 0
+  const days = dayjs(seniorityForm.effectiveDate).diff(dayjs(seniorityForm.seniorityStartDate), 'day')
+  return days <= 0 ? 0 : Math.floor((days / 365.25) * 10) / 10
+})
+
+const seniorityTotalYears = computed(() =>
+  Math.floor((seniorityPriorYears.value + seniorityLocalYears.value) * 10) / 10
+)
+
+const seniorityPriorText = computed(() => `按各段自动加总：${seniorityPriorYears.value.toFixed(1)} 年`)
+const seniorityTotalText = computed(
+  () =>
+    `${seniorityTotalYears.value.toFixed(1)} 年（前司 ${seniorityPriorYears.value.toFixed(1)} + 本单位 ${seniorityLocalYears.value.toFixed(1)}）`
+)
+
+function earliestSegmentStart() {
+  const starts = senioritySegmentRows.value.map((s) => s.startDate).filter(Boolean) as string[]
+  return starts.length ? starts.sort()[0] : ''
+}
+
+const seniorityFirstWorkText = computed(() => {
+  const earliest = earliestSegmentStart()
+  return earliest ? `${earliest}（取最早一段，之前空档不计）` : '—'
+})
+
+function targetFromRecord(record: EmployeeItem | SeniorityItem): SeniorityTarget {
+  const employeeId = 'employeeId' in record ? record.employeeId : record.id
+  return {
+    employeeId,
+    name: record.name,
+    empNo: record.empNo,
+    orgName: record.orgName,
+    hireDate: record.hireDate,
+    seniorityStartDate: 'seniorityStartDate' in record ? record.seniorityStartDate : null,
+    firstWorkDate: 'firstWorkDate' in record ? record.firstWorkDate : null,
+    seniorityYears: 'seniorityYears' in record ? record.seniorityYears : null,
+    priorYears: 'priorYears' in record ? record.priorYears : null,
+    totalYears: 'totalYears' in record ? record.totalYears : null,
+    source: 'source' in record ? record.source : undefined
+  }
+}
+
+async function openSeniority(record: EmployeeItem | SeniorityItem) {
+  const target = targetFromRecord(record)
+  seniorityTarget.value = target
+  seniorityForm.effectiveDate = dayjs().format('YYYY-MM-DD')
+  seniorityForm.seniorityStartDate = target.seniorityStartDate || target.hireDate || ''
+  seniorityForm.firstWorkDate = target.firstWorkDate || target.hireDate || ''
+  seniorityForm.priorYears = Number(target.priorYears ?? 0)
+  seniorityForm.source = target.source || 'MANUAL'
+  seniorityForm.remark = ''
+  senioritySegmentRows.value = []
+  seniorityOpen.value = true
+  await loadSenioritySegmentRows(target.employeeId)
+}
+
+async function loadSenioritySegmentRows(employeeId: string) {
+  try {
+    const rows = await senioritySegments(employeeId)
+    senioritySegmentRows.value = (rows || []).map((r) => ({
+      key: ++senioritySegmentKey,
+      company: r.company || undefined,
+      startDate: r.startDate || undefined,
+      endDate: r.endDate || undefined,
+      proofFileId: r.proofFileId == null ? undefined : String(r.proofFileId),
+      proofFileName: r.proofFileName || undefined,
+      remark: r.remark || undefined
+    }))
+  } catch {
+    // 没有历史分段（或旧数据未分段）时按空处理
+    senioritySegmentRows.value = []
+  }
+}
+
+async function submitSeniority() {
+  const target = seniorityTarget.value
+  if (!target) return
+  if (!seniorityForm.seniorityStartDate) {
+    message.warning('请选择司龄起算日')
+    return
+  }
+  const rows = senioritySegmentRows.value
+  for (let i = 0; i < rows.length; i++) {
+    const seg = rows[i]
+    if (!seg.startDate || !seg.endDate) {
+      message.warning(`第 ${i + 1} 段工作经历请补全起止日期`)
+      return
+    }
+    if (!seg.proofFileId) {
+      message.warning(`第 ${i + 1} 段工作经历请上传证明附件`)
+      return
+    }
+  }
+  const firstWork = rows.length ? earliestSegmentStart() : seniorityForm.firstWorkDate
+  if (!firstWork) {
+    message.warning('请选择首次参加工作日期')
+    return
+  }
+  const body: SeniorityConfirmBody = {
+    effectiveDate: seniorityForm.effectiveDate || null,
+    seniorityStartDate: seniorityForm.seniorityStartDate,
+    firstWorkDate: firstWork,
+    priorYears: rows.length ? null : (seniorityForm.priorYears ?? null),
+    totalYears: null,
+    source: seniorityForm.source,
+    proofFileId: null,
+    remark: seniorityForm.remark.trim(),
+    segments: rows.map((seg) => ({
+      company: seg.company || null,
+      startDate: seg.startDate as string,
+      endDate: seg.endDate as string,
+      proofFileId: seg.proofFileId as string,
+      proofFileName: seg.proofFileName || null,
+      remark: seg.remark || ''
+    }))
+  }
+  senioritySaving.value = true
+  try {
+    await confirmSeniority(target.employeeId, body)
+    message.success(`司龄核定已提交，累计工龄 ${seniorityTotalYears.value.toFixed(1)} 年`)
+    seniorityOpen.value = false
+    await loadSenioritySegmentRows(target.employeeId)
+    await refreshAll()
+    if (seniorityLedgerOpen.value) await loadSeniorityLedger()
+  } catch (e: any) {
+    message.error(e?.message || '司龄核定失败')
+  } finally {
+    senioritySaving.value = false
+  }
+}
+
 onMounted(async () => {
   const route = useRoute()
   // 看板卡片跳转：/employees?status=40 或 ?orgId=xxx，进入即带筛选
@@ -2713,6 +3337,61 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* 司龄核定：前司多段工作经历编辑区 */
+.seg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.seg-list {
+  margin-bottom: 10px;
+}
+.seg-item {
+  padding: 10px 0;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
+}
+.seg-item:last-child {
+  border-bottom: none;
+}
+/* 每段经历三列栅格：单位/开始/结束 各一格，备注占两格，证明材料占一格不撑满 */
+.seg-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.seg-grid > * {
+  min-width: 0;
+}
+.seg-span2 {
+  grid-column: span 2;
+}
+.seg-proof {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.seg-file {
+  overflow: hidden;
+  max-width: 96px;
+  font-size: 12px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seg-summary {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--muted);
+}
+.seg-empty {
+  margin-bottom: 10px;
+  font-size: 12px;
+}
 /* 表单顶部提示：说明哪些是「提交入职」的前置条件 */
 .form-hint {
   margin-bottom: 10px;
@@ -2723,6 +3402,11 @@ onMounted(async () => {
   background: var(--surface-2, #fafafa);
   border-left: 2px solid #d9d9d9;
   border-radius: 2px;
+}
+/* 未完成司龄核定的「提交入职」入口：橙色提示，点击给出引导 */
+.op-warn {
+  color: #fa8c16;
+  cursor: pointer;
 }
 .probation-hint {
   display: inline-block;
@@ -2915,6 +3599,14 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+.account-cell > span:last-child {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .st-tag {
