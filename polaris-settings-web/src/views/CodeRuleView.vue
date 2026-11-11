@@ -4,7 +4,7 @@
       <section class="panel">
         <div class="panel-head">
           <span>
-            单号规则
+            单号配置
             <span class="muted head-sub">业务方生成数据前调 /internal/code-rules/next 取号；审批单号由发起审批时自动生成</span>
           </span>
           <a-space :size="8">

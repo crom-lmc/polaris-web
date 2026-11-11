@@ -132,7 +132,7 @@
     >
       <a-form layout="vertical">
         <a-form-item label="请假类型" required>
-          <a-select v-model:value="applyForm.leaveType" :options="leaveTypeOptions" />
+          <a-select v-model:value="applyForm.leaveType" :options="leaveTypeOptions" @change="onLeaveTypeChange" />
         </a-form-item>
         <a-form-item label="请假日期" required>
           <a-range-picker
@@ -152,6 +152,7 @@
                 value-format="HH:mm"
                 :minute-step="30"
                 :show-now="false"
+                :disabled="!!policyOfType"
                 style="width: 100%"
                 placeholder="如 09:00"
               />
@@ -165,6 +166,7 @@
                 value-format="HH:mm"
                 :minute-step="30"
                 :show-now="false"
+                :disabled="!!policyOfType"
                 style="width: 100%"
                 placeholder="如 18:00"
               />
@@ -172,8 +174,10 @@
           </a-col>
         </a-row>
         <a-form-item label="天数计算方式">
-          <a-select v-model:value="applyForm.dayMode" :options="dayModeOptions" />
+          <a-select v-model:value="applyForm.dayMode" :options="dayModeOptions" :disabled="!!policyOfType" />
         </a-form-item>
+        <a-alert v-if="cityPolicyHint" type="info" show-icon class="mb12" :message="cityPolicyHint" />
+        <a-alert v-if="cityPolicyMissing" type="warning" show-icon class="mb12" :message="cityPolicyMissing" />
         <a-alert v-if="currentRule" type="info" show-icon class="mb12" :message="ruleHint" />
         <a-alert
           v-if="conflicts.length"
@@ -318,7 +322,9 @@ import {
   downloadEhrAttachment,
   earlyReturnLeave,
   leaveConflicts,
+  leaveCityPolicy,
   leaveDelegateOptions as fetchLeaveDelegateOptions,
+  leavePlan,
   leaveRules,
   leaveTypeOptions as fetchLeaveTypeOptions,
   listEhrAttachments,
@@ -327,6 +333,7 @@ import {
   teamLeaves,
   uploadEhrAttachment,
   waiveAnnualCarryover,
+  type LeaveCityPolicy,
   type LeaveDelegateOptions,
   type LeaveItem,
   type LeaveQuotaItem,
@@ -483,7 +490,7 @@ const applyForm = reactive<{
   range: undefined,
   startTime: '09:00',
   endTime: '18:00',
-  dayMode: 'NATURAL',
+  dayMode: 'WORKDAY',
   reason: '',
   attachmentId: undefined,
   attachmentIds: []
@@ -509,6 +516,27 @@ const attachmentFiles = ref<any[]>([])
 
 const currentRule = computed(() => rules.value[applyForm.leaveType])
 const quotaItem = computed(() => quotas.value[applyForm.leaveType])
+/** 城市假期政策（婚假 / 产假 / 陪产假）：按所属二级单位城市固定天数与计算方式 */
+const cityPolicy = ref<LeaveCityPolicy | null>(null)
+const policyOfType = computed(() => cityPolicy.value?.policies?.[applyForm.leaveType])
+const cityPolicyHint = computed(() => {
+  const p = policyOfType.value
+  if (!p) return ''
+  const label = leaveTypeOptions.value.find((o) => o.value === applyForm.leaveType)?.label || '该假期'
+  const mode = p.dayMode === 'WORKDAY' ? '工作日（跳过周末 / 法定节假日）' : '自然日（含周末和法定节假日）'
+  return `${cityPolicy.value?.city || '未配置城市'}：${label}固定 ${p.days} 天，按${mode}计算，选择开始日期后自动带出结束日期`
+})
+/** 城市政策类假期但当前城市未配置天数：提交会被后端拒绝，提前提示 */
+const CITY_POLICY_TYPES = ['MARRIAGE', 'MATERNITY', 'PATERNITY']
+const cityPolicyMissing = computed(() => {
+  if (!cityPolicy.value) return ''
+  if (!CITY_POLICY_TYPES.includes(applyForm.leaveType) || policyOfType.value) return ''
+  const label = leaveTypeOptions.value.find((o) => o.value === applyForm.leaveType)?.label || '该假期'
+  const city = cityPolicy.value.city
+  return city
+    ? `城市「${city}」未配置${label}天数，请联系 HR 在埋点配置中维护`
+    : '当前员工未配置所属城市，无法申请该类假期，请联系 HR 维护二级单位城市'
+})
 const ruleHint = computed(() => {
   const r = currentRule.value
   if (!r) return ''
@@ -516,6 +544,7 @@ const ruleHint = computed(() => {
   if (r.minNoticeDays > 0) parts.push(`需提前 ${r.minNoticeDays} 天申请`)
   if (r.allowPastDays > 0) parts.push(`最多补请 ${r.allowPastDays} 天`)
   if (r.quotaRequired === 1) parts.push(`当前剩余 ${quotaItem.value?.availableDays ?? 0} 天`)
+  if (r.oneTimeOnly === 1) parts.push('该假期只能一次性休完，天数以员工手册为准')
   return parts.join('；')
 })
 const conflictText = computed(() =>
@@ -584,7 +613,7 @@ function timeRangeError(): string {
   return ''
 }
 
-function onRangeChange() {
+function loadConflicts() {
   conflicts.value = []
   const r = applyForm.range
   if (!r || r.length !== 2) return
@@ -593,12 +622,49 @@ function onRangeChange() {
     .catch(() => {})
 }
 
+/** 城市政策类假期天数固定：按开始日期试算结束日期并自动回填 */
+async function syncPolicyEnd(start: string) {
+  try {
+    const plan = await leavePlan(applyForm.leaveType, start)
+    if (plan?.endDate) {
+      if (plan.dayMode) applyForm.dayMode = plan.dayMode
+      applyForm.range = [start, plan.endDate]
+    }
+  } catch (e: any) {
+    message.warning(e?.message || '按城市政策试算结束日期失败')
+  }
+}
+
+function onRangeChange() {
+  conflicts.value = []
+  const r = applyForm.range
+  if (!r || r.length !== 2) return
+  if (policyOfType.value && r[0]) {
+    syncPolicyEnd(r[0]).then(loadConflicts)
+    return
+  }
+  loadConflicts()
+}
+
+/** 切换到城市政策类假期时锁定天数计算方式，已有开始日期则重算结束日期 */
+function onLeaveTypeChange() {
+  const p = policyOfType.value
+  conflicts.value = []
+  if (!p) return
+  applyForm.dayMode = p.dayMode
+  // 固定天数按整天计算，起止时间统一回落到标准工作时间
+  applyForm.startTime = '09:00'
+  applyForm.endTime = '18:00'
+  const r = applyForm.range
+  if (r && r[0]) syncPolicyEnd(r[0]).then(loadConflicts)
+}
+
 function openApply() {
   applyForm.leaveType = 'ANNUAL'
   applyForm.range = undefined
   applyForm.startTime = '09:00'
   applyForm.endTime = '18:00'
-  applyForm.dayMode = 'NATURAL'
+  applyForm.dayMode = 'WORKDAY'
   applyForm.reason = ''
   applyForm.delegateAccountId = undefined
   applyForm.attachmentId = undefined
@@ -606,7 +672,11 @@ function openApply() {
   attachmentFiles.value = []
   conflicts.value = []
   delegateCtx.value = { required: false, options: [] }
+  cityPolicy.value = null
   applyOpen.value = true
+  leaveCityPolicy()
+    .then((p) => (cityPolicy.value = p))
+    .catch(() => {})
   fetchLeaveDelegateOptions()
     .then((d) => (delegateCtx.value = d))
     .catch(() => {})
@@ -738,6 +808,8 @@ async function submitEarlyReturn() {
     reload()
   } catch (e: any) {
     message.error(e?.message || '销假失败')
+    // 失败多为单据状态已变化（例如已在别处销假），刷新列表同步真实状态
+    reload()
   } finally {
     earlySaving.value = false
   }

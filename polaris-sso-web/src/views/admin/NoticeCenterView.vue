@@ -367,6 +367,9 @@ async function load() {
     const noticeItems = (noticeRes.data || [])
       .filter((m) => {
         if (m.kind !== 1) return true
+        // 待办被置读即代表已办结（审批结束由服务端统一置读），不再展示；
+        // 仍在途的待办即使被点开过也保持原样（打开审批抽屉不会置读）
+        if (m.readAt) return false
         const inst = m.bizId ? instMap.get(String(m.bizId)) : undefined
         const key = inst ? String(inst.id) : m.bizId ? String(m.bizId) : `notice-${m.id}`
         if (seenTodo.has(key)) return false
@@ -431,7 +434,7 @@ function bizTypeApp(bizType?: string) {
   return idx > 0 ? bizType.slice(0, idx) : bizType
 }
 
-/** 待办：只要还在途就一直显示，已读只影响红点；审批完成后由服务端不再返回，自然消失 */
+/** 待办：已办结的在 load 时按置读剔除，这里只剩在途待办 */
 const rawTodos = computed(() => rows.value.filter((m) => m.kind === 1))
 
 /** 待办页签角标：未读待办数 */

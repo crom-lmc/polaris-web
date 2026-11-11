@@ -89,6 +89,8 @@ export interface OrgNode {
   email?: string
   /** 办公地点 */
   address?: string
+  /** 所在城市（字典 ehr.job_city）：二级单位配置，下级部门按直属二级单位继承 */
+  city?: string
   /** 编制人数 */
   headcount?: number | null
   /** 成本中心 */
@@ -140,6 +142,8 @@ export interface OrgSaveBody {
   email?: string
   /** 办公地点 */
   address?: string
+  /** 所在城市（字典 ehr.job_city）：二级单位配置 */
+  city?: string
   /** 编制人数 */
   headcount?: number | null
   /** 成本中心 */
@@ -1134,6 +1138,8 @@ export interface LeaveTypeRule {
   minNoticeDays: number
   allowPastDays: number
   needDelegate: number
+  /** 是否只能一次性休完（婚假、产假/陪产假等） */
+  oneTimeOnly?: number
   sortNo: number
 }
 
@@ -1226,6 +1232,36 @@ export interface LeaveDelegateOptions {
 
 export function leaveDelegateOptions() {
   return request.get<never, LeaveDelegateOptions>('/api/ehr/leaves/delegate-options')
+}
+
+/** 城市假期政策：婚假 / 产假 / 陪产假按员工所属二级单位城市配置天数 */
+export interface LeaveCityPolicyItem {
+  days: number
+  /** NATURAL 自然日（含周末/法定节假日） / WORKDAY 工作日 */
+  dayMode: 'NATURAL' | 'WORKDAY'
+}
+
+export interface LeaveCityPolicy {
+  /** 员工所属二级单位城市 */
+  city?: string
+  /** 该城市三类假期的政策；未配置的类型不返回 */
+  policies: Record<string, LeaveCityPolicyItem>
+  /** 试算结果：假期类型 / 天数 / 计算方式 / 结束日期 */
+  type?: string
+  days?: number
+  dayMode?: string
+  endDate?: string
+}
+
+export function leaveCityPolicy() {
+  return request.get<never, LeaveCityPolicy>('/api/ehr/leaves/city-policy')
+}
+
+/** 按开始日期试算结束日期（天数固定的城市政策类假期） */
+export function leavePlan(leaveType: string, startDate: string) {
+  return request.get<never, LeaveCityPolicy>('/api/ehr/leaves/plan', {
+    params: { leaveType, startDate }
+  })
 }
 
 /* ---------------- 通知管理（人力中心发布 → 账号中心通知中心展示） ---------------- */

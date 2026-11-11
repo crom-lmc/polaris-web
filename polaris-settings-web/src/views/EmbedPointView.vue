@@ -27,7 +27,7 @@
 
       <section class="panel embed-main">
         <div class="panel-head">
-          <span>埋点管理</span>
+          <span>埋点配置</span>
           <a-space :size="8">
             <a-input
               v-model:value="keyword"
@@ -91,7 +91,7 @@
         </a-descriptions>
 
         <!-- 试用期提醒收件人：部门多选 + 人员多选 + 直属主管复选 -->
-        <template v-if="isReceiver">
+        <template v-if="editor === 'receiver'">
           <a-divider orientation="left">收件人维护</a-divider>
           <a-form layout="vertical">
             <a-form-item label="按部门（含所有下级）">
@@ -132,7 +132,7 @@
         </template>
 
         <!-- 新开账户默认授权角色：角色编码多选 -->
-        <template v-if="isRoles">
+        <template v-if="editor === 'roles'">
           <a-divider orientation="left">默认授权角色</a-divider>
           <a-form layout="vertical">
             <a-form-item label="角色编码（可输入后回车新增）">
@@ -149,20 +149,185 @@
           </a-form>
         </template>
 
-        <!-- 结构化维护的埋点（收件人/默认角色）不再展示原始 JSON，避免两处冲突 -->
-        <template v-if="!isStructured">
-          <div class="value-head">
-            <span>Value（JSON）</span>
-            <a-button v-if="drawerMode === 'edit'" size="small" @click="formatValue">格式化</a-button>
+        <!-- 新开账户默认开通应用：应用多选 -->
+        <template v-if="editor === 'apps'">
+          <a-divider orientation="left">默认开通应用</a-divider>
+          <a-form layout="vertical">
+            <a-form-item label="应用（可多选，新开账户自动授权）">
+              <a-select
+                v-model:value="defaultApps"
+                mode="multiple"
+                allow-clear
+                option-filter-prop="label"
+                show-search
+                :options="appOptions"
+                :disabled="isReadonly"
+                placeholder="选择新开账户默认开通的应用"
+                @change="syncAppsJson"
+              />
+            </a-form-item>
+          </a-form>
+        </template>
+
+        <!-- 模拟考勤定时任务开关：布尔开关 -->
+        <template v-if="editor === 'switch'">
+          <a-divider orientation="left">开关配置</a-divider>
+          <a-form layout="vertical">
+            <a-form-item :label="current?.name || '开关'">
+              <a-switch
+                v-model:checked="mockEnabled"
+                :disabled="isReadonly"
+                checked-children="开启"
+                un-checked-children="关闭"
+                @change="syncSwitchJson"
+              />
+              <span class="muted switch-tip">开关状态保存后即时生效（配置中心 60 秒缓存）</span>
+            </a-form-item>
+          </a-form>
+        </template>
+
+        <!-- 到期提醒节点：到期前 N 天提醒，可配置多个 -->
+        <template v-if="editor === 'offsets'">
+          <a-divider orientation="left">提醒节点</a-divider>
+          <a-form layout="vertical">
+            <a-form-item label="到期前提醒（天，输入后回车新增，可多个）">
+              <a-select
+                v-model:value="offsetTags"
+                mode="tags"
+                allow-clear
+                :disabled="isReadonly"
+                placeholder="如 30、7、1"
+                @change="syncOffsetsJson"
+              />
+            </a-form-item>
+          </a-form>
+        </template>
+
+        <!-- HR 部门：直接选组织节点（含全部下级），不再按名称模糊匹配 -->
+        <template v-if="editor === 'orgs'">
+          <a-divider orientation="left">HR 部门</a-divider>
+          <a-form layout="vertical">
+            <a-form-item label="组织节点（含所有下级部门）">
+              <a-tree-select
+                v-model:value="hrOrgIds"
+                :tree-data="orgTreeData"
+                tree-checkable
+                allow-clear
+                show-search
+                tree-node-filter-prop="title"
+                :loading="receiverLoading"
+                :disabled="isReadonly"
+                placeholder="选择 HR 部门，保存后按该部门及下级部门发待办"
+                max-tag-count="responsive"
+                @change="syncHrOrgJson"
+              />
+            </a-form-item>
+          </a-form>
+        </template>
+
+        <!-- 城市假期政策：按城市分行维护婚假/产假/陪产假天数 -->
+        <template v-if="editor === 'cityPolicy'">
+          <a-divider orientation="left">城市假期政策</a-divider>
+          <div class="city-policy-body">
+            <div class="city-policy-tip muted hint-line">
+              婚假的天数与计算方式（自然日 / 工作日）均可配置；产假和陪产假天数固定按自然日（含周末 / 法定节假日），后端强制自然日。
+            </div>
+            <a-table
+              :columns="cityPolicyColumns"
+              :data-source="cityPolicyRows"
+              row-key="city"
+              size="small"
+              :pagination="false"
+              :bordered="true"
+              class="city-policy-table"
+            >
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.key === 'city'">
+                  <a-select
+                    v-if="!isReadonly"
+                    v-model:value="record.city"
+                    :options="cityOptions"
+                    allow-clear
+                    show-search
+                    option-filter-prop="label"
+                    placeholder="选择城市"
+                    style="width: 100%"
+                    @change="onCityRowChange"
+                  />
+                  <span v-else>{{ record.city || '—' }}</span>
+                </template>
+                <template v-else-if="column.key === 'marriageDays'">
+                  <a-input-number
+                    v-if="!isReadonly"
+                    v-model:value="record.marriageDays"
+                    :min="0"
+                    :max="365"
+                    style="width: 100%"
+                    placeholder="婚假天数"
+                    @change="onCityRowChange"
+                  />
+                  <span v-else>{{ record.marriageDays ?? '—' }}</span>
+                </template>
+                <template v-else-if="column.key === 'marriageMode'">
+                  <a-select
+                    v-if="!isReadonly"
+                    v-model:value="record.marriageMode"
+                    :options="MARRIAGE_MODE_OPTIONS"
+                    style="width: 100%"
+                    @change="onCityRowChange"
+                  />
+                  <span v-else>{{ record.marriageMode === 'WORKDAY' ? '工作日' : '自然日' }}</span>
+                </template>
+                <template v-else-if="column.key === 'maternityDays'">
+                  <a-input-number
+                    v-if="!isReadonly"
+                    v-model:value="record.maternityDays"
+                    :min="0"
+                    :max="365"
+                    style="width: 100%"
+                    placeholder="产假天数"
+                    @change="onCityRowChange"
+                  />
+                  <span v-else>{{ record.maternityDays ?? '—' }}</span>
+                </template>
+                <template v-else-if="column.key === 'paternityDays'">
+                  <a-input-number
+                    v-if="!isReadonly"
+                    v-model:value="record.paternityDays"
+                    :min="0"
+                    :max="365"
+                    style="width: 100%"
+                    placeholder="陪产假天数"
+                    @change="onCityRowChange"
+                  />
+                  <span v-else>{{ record.paternityDays ?? '—' }}</span>
+                </template>
+                <template v-else-if="column.key === 'op'">
+                  <a
+                    v-if="!isReadonly"
+                    class="danger"
+                    @click="removeCityRow(index)"
+                  >删除</a>
+                  <span v-else class="muted">—</span>
+                </template>
+              </template>
+            </a-table>
+            <div v-if="!isReadonly" class="city-policy-actions">
+              <a-button type="dashed" block @click="addCityRow">+ 新增城市</a-button>
+            </div>
           </div>
-          <a-textarea
-            v-model:value="form.value"
-            class="json-input mono"
-            :rows="12"
-            spellcheck="false"
-            :disabled="isReadonly"
-            @blur="onValueBlur"
+        </template>
+
+        <!-- 未登记结构化编辑器的埋点：只读预览，不提供 JSON 编辑入口 -->
+        <template v-if="editor === 'unknown'">
+          <a-alert
+            type="warning"
+            show-icon
+            class="unknown-tip"
+            message="该埋点暂未提供结构化维护表单"
+            description="请在 EmbedPointView.vue 的 EDITOR_BY_CODE 中登记编辑类型后再维护；页面不再支持直接编辑 JSON。"
           />
+          <pre class="json-preview mono">{{ form.value }}</pre>
         </template>
       </template>
 
@@ -216,6 +381,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import { fetchApps, fetchRoles, type AppBrief, type RoleBrief } from '@/api/approval'
+import { listItems } from '@/api/settings'
 import {
   fetchEmbedPointHistories,
   fetchEmbedReceiverEmployees,
@@ -232,6 +398,18 @@ import {
 const RECEIVER_KEY = 'ehr.probation.reminder.receivers'
 /** 新开账户默认授权角色：结构化维护 */
 const ROLE_KEY = 'ehr.account.default-roles'
+/** 新开账户默认开通应用：结构化维护 */
+const DEFAULT_APPS_KEY = 'ehr.account.default-apps'
+/** 模拟考勤定时任务开关：结构化维护 */
+const MOCK_ENABLED_KEY = 'ehr.attendance.mock.enabled'
+/** 试用期到期提醒节点：结构化维护 */
+const PROBATION_OFFSETS_KEY = 'ehr.reminder.probation-offsets'
+/** 合同到期提醒节点：结构化维护 */
+const CONTRACT_OFFSETS_KEY = 'ehr.reminder.contract-offsets'
+/** HR 部门（组织节点）：结构化维护 */
+const HR_ORG_NAME_KEY = 'ehr.notice.hr-org-name'
+/** 城市假期政策（婚假 / 产假 / 陪产假按城市配置天数与计算方式）：结构化维护 */
+const CITY_POLICY_KEY = 'ehr.leave.city-policy'
 const COMMON_APP = '__common__'
 
 const store = useUserStore()
@@ -249,6 +427,16 @@ const historyColumns = [
   { title: '保存时间', key: 'createdAt', width: 170 },
   { title: '操作人', dataIndex: 'operatedName', key: 'operatedName', width: 120, ellipsis: true },
   { title: '操作', key: 'action', width: 100 }
+]
+
+/** 城市假期政策表格列 */
+const cityPolicyColumns: any[] = [
+  { title: '城市', key: 'city', width: 140, ellipsis: true },
+  { title: '婚假天数', key: 'marriageDays', width: 110 },
+  { title: '婚假计算方式', key: 'marriageMode', width: 170 },
+  { title: '产假天数', key: 'maternityDays', width: 110 },
+  { title: '陪产假天数', key: 'paternityDays', width: 120 },
+  { title: '操作', key: 'op', width: 80, align: 'center' }
 ]
 
 const rows = ref<EmbedPoint[]>([])
@@ -381,18 +569,62 @@ const form = reactive({ name: '', value: '' })
 
 /** 当前维护的 key */
 const currentCode = computed(() => current.value?.code || '')
-const isReceiver = computed(() => currentCode.value === RECEIVER_KEY)
-const isRoles = computed(() => currentCode.value === ROLE_KEY)
 /** 查看/历史快照与编辑页同构，仅禁用全部控件 */
 const isReadonly = computed(() => drawerMode.value !== 'edit')
-/** 结构化维护的埋点不再展示原始 JSON 输入框 */
-const isStructured = computed(() => isReceiver.value || isRoles.value)
+
+/**
+ * 每个埋点 key 对应的结构化编辑器。
+ * 约定：所有埋点必须登记结构化表单，页面不再提供原始 JSON 编辑入口；
+ * 新增埋点时先在此登记 editor（未登记的会提示"暂未提供结构化维护表单"）。
+ */
+type EmbedEditor =
+  | 'receiver'
+  | 'roles'
+  | 'cityPolicy'
+  | 'apps'
+  | 'switch'
+  | 'offsets'
+  | 'orgs'
+  | 'unknown'
+const EDITOR_BY_CODE: Record<string, EmbedEditor> = {
+  [RECEIVER_KEY]: 'receiver',
+  [ROLE_KEY]: 'roles',
+  [CITY_POLICY_KEY]: 'cityPolicy',
+  [DEFAULT_APPS_KEY]: 'apps',
+  [MOCK_ENABLED_KEY]: 'switch',
+  [PROBATION_OFFSETS_KEY]: 'offsets',
+  [CONTRACT_OFFSETS_KEY]: 'offsets',
+  [HR_ORG_NAME_KEY]: 'orgs'
+}
+const editor = computed<EmbedEditor>(() => EDITOR_BY_CODE[currentCode.value] || 'unknown')
 
 /* 结构化编辑：部门 / 人员 / 直属主管，改动后回写 JSON 文本 */
 const orgIds = ref<string[]>([])
 const accountIds = ref<string[]>([])
 const directSupervisor = ref(true)
 const roleCodes = ref<string[]>([])
+/** 新开账户默认开通应用（appCode 列表） */
+const defaultApps = ref<string[]>([])
+/** 模拟考勤定时任务开关 */
+const mockEnabled = ref(false)
+/** 到期提醒节点（天） */
+const offsetTags = ref<string[]>([])
+/** HR 部门组织节点（含全部下级） */
+const hrOrgIds = ref<string[]>([])
+/** 城市假期政策：每行一个城市 */
+interface CityPolicyRow {
+  city: string
+  marriageDays?: number | null
+  marriageMode?: 'NATURAL' | 'WORKDAY'
+  maternityDays?: number | null
+  paternityDays?: number | null
+}
+const cityPolicyRows = ref<CityPolicyRow[]>([])
+const cityOptions = ref<{ value: string; label: string }[]>([])
+const MARRIAGE_MODE_OPTIONS = [
+  { value: 'NATURAL', label: '自然日（含周末 / 节假日）' },
+  { value: 'WORKDAY', label: '工作日（跳过周末 / 节假日）' }
+]
 /** 全量角色，默认授权角色下拉可选所有角色（仍支持 tags 手动输入） */
 const roles = ref<RoleBrief[]>([])
 const receiverLoading = ref(false)
@@ -409,6 +641,9 @@ const roleOptions = computed(() =>
     label: r.appCode ? `${r.name}（${r.code} · ${r.appCode}）` : `${r.name}（${r.code}）`
   }))
 )
+
+/** 默认开通应用的可选项：来自应用注册表 */
+const appOptions = computed(() => apps.value.map((a) => ({ value: a.code, label: a.name })))
 
 async function loadRoles() {
   try {
@@ -471,6 +706,30 @@ function applyStructured(code: string, raw: string) {
     directSupervisor.value = obj.directSupervisor !== false
   } else if (code === ROLE_KEY) {
     roleCodes.value = Array.isArray(obj.roleCodes) ? obj.roleCodes.map(String) : []
+  } else if (code === DEFAULT_APPS_KEY) {
+    defaultApps.value = Array.isArray(obj.apps) ? obj.apps.map(String) : []
+  } else if (code === MOCK_ENABLED_KEY) {
+    mockEnabled.value = obj.enabled === true
+  } else if (code === PROBATION_OFFSETS_KEY || code === CONTRACT_OFFSETS_KEY) {
+    offsetTags.value = Array.isArray(obj.offsets) ? obj.offsets.map(String) : []
+  } else if (code === HR_ORG_NAME_KEY) {
+    hrOrgIds.value = Array.isArray(obj.orgIds) ? obj.orgIds.map(String) : []
+  } else if (code === CITY_POLICY_KEY) {
+    const rows: CityPolicyRow[] = []
+    if (obj && typeof obj === 'object') {
+      for (const [city, cfg] of Object.entries(obj)) {
+        if (!cfg || typeof cfg !== 'object') continue
+        const anyCfg = cfg as any
+        rows.push({
+          city,
+          marriageDays: anyCfg.MARRIAGE?.days ?? null,
+          marriageMode: anyCfg.MARRIAGE?.dayMode === 'WORKDAY' ? 'WORKDAY' : 'NATURAL',
+          maternityDays: anyCfg.MATERNITY?.days ?? null,
+          paternityDays: anyCfg.PATERNITY?.days ?? null
+        })
+      }
+    }
+    cityPolicyRows.value = rows
   }
 }
 
@@ -486,28 +745,81 @@ function syncRolesJson() {
   form.value = JSON.stringify({ roleCodes: roleCodes.value }, null, 2)
 }
 
-function onValueBlur() {
-  if (!currentCode.value) return
-  if (!parseJson(form.value)) {
-    message.warning('当前内容不是合法 JSON，结构化选项未同步')
-    return
-  }
-  applyStructured(currentCode.value, form.value)
+function syncAppsJson() {
+  form.value = JSON.stringify({ apps: defaultApps.value }, null, 2)
 }
 
-function formatValue() {
-  const obj = parseJson(form.value)
-  if (obj === null) {
-    message.error('埋点值必须是合法 JSON')
-    return
+function syncSwitchJson() {
+  form.value = JSON.stringify({ enabled: mockEnabled.value }, null, 2)
+}
+
+/** 提醒节点：去重、降序、只保留正整数 */
+function syncOffsetsJson() {
+  const raw = offsetTags.value
+  const nums = [...new Set(
+    raw.map((v) => Number(String(v).trim())).filter((n) => Number.isFinite(n) && n > 0)
+  )].sort((a, b) => b - a)
+  offsetTags.value = nums.map(String)
+  if (nums.length !== raw.length) {
+    message.warning('提醒天数需为正整数，非法项已忽略')
   }
-  form.value = JSON.stringify(obj, null, 2)
+  form.value = JSON.stringify({ offsets: nums }, null, 2)
+}
+
+function syncHrOrgJson() {
+  form.value = JSON.stringify({ orgIds: hrOrgIds.value }, null, 2)
+}
+
+/** 城市政策表格 → JSON；只保留有至少一项配置的行 */
+function syncCityPolicyJson() {
+  const out: Record<string, any> = {}
+  for (const row of cityPolicyRows.value) {
+    if (!row.city) continue
+    const cfg: Record<string, any> = {}
+    if (row.marriageDays != null && row.marriageDays > 0) {
+      cfg.MARRIAGE = { days: row.marriageDays, dayMode: row.marriageMode || 'NATURAL' }
+    }
+    if (row.maternityDays != null && row.maternityDays > 0) {
+      cfg.MATERNITY = { days: row.maternityDays }
+    }
+    if (row.paternityDays != null && row.paternityDays > 0) {
+      cfg.PATERNITY = { days: row.paternityDays }
+    }
+    if (Object.keys(cfg).length) out[row.city] = cfg
+  }
+  form.value = JSON.stringify(out, null, 2)
+}
+
+function addCityRow() {
+  cityPolicyRows.value = [
+    ...cityPolicyRows.value,
+    { city: '', marriageDays: null, marriageMode: 'NATURAL', maternityDays: null, paternityDays: null }
+  ]
+}
+
+function removeCityRow(idx: number) {
+  cityPolicyRows.value = cityPolicyRows.value.filter((_, i) => i !== idx)
+  syncCityPolicyJson()
+}
+
+async function loadCityOptions() {
+  try {
+    const list = await listItems('ehr.job_city', true)
+    cityOptions.value = (list || []).map((i: any) => ({ value: i.value, label: i.label || i.value }))
+  } catch {
+    cityOptions.value = []
+  }
+}
+
+function onCityRowChange() {
+  syncCityPolicyJson()
 }
 
 function openView(record: EmbedPoint) {
   current.value = record
   drawerMode.value = 'view'
   form.value = pretty(record.value)
+  applyStructured(record.code, record.value)
   drawerOpen.value = true
 }
 
@@ -518,6 +830,9 @@ function openEdit(record: EmbedPoint) {
   form.value = pretty(record.value)
   applyStructured(record.code, record.value)
   drawerOpen.value = true
+  if (record.code === CITY_POLICY_KEY) {
+    loadCityOptions()
+  }
 }
 
 async function submit() {
@@ -689,23 +1004,61 @@ async function load() {
   margin-bottom: 16px;
 }
 
-.value-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 16px 0 8px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.json-input {
+.json-preview {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+  background: #fafafa;
   font-size: 12px;
   line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.unknown-tip {
+  margin-top: 16px;
+}
+
+.switch-tip {
+  margin-left: 8px;
+  font-size: 12px;
 }
 
 .drawer-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* 城市假期政策表格 */
+.city-policy-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.city-policy-tip {
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.08);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.city-policy-table :deep(td) {
+  padding: 4px 8px !important;
+  vertical-align: middle;
+}
+
+.city-policy-actions {
+  margin-top: 4px;
+}
+
+.city-policy-table :deep(.ant-input-number),
+.city-policy-table :deep(.ant-select) {
+  width: 100%;
 }
 </style>

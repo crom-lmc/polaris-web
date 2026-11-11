@@ -290,6 +290,25 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row v-if="canShowCityRow" :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="所在城市">
+              <template v-if="canEditCity">
+                <a-select
+                  v-model:value="form.city"
+                  :options="cityOptions"
+                  placeholder="选择城市（婚假 / 产假 / 陪产假按城市政策）"
+                  allow-clear
+                />
+              </template>
+              <template v-else>
+                <div class="inherited-city">
+                  <span class="inherited-city-value">{{ effectiveCityDisplay }}</span>
+                </div>
+              </template>
+            </a-form-item>
+          </a-col>
+        </a-row>
         <a-form-item label="备注">
           <a-textarea v-model:value="form.remark" :rows="2" :maxlength="255" />
         </a-form-item>
@@ -379,6 +398,7 @@
         <a-descriptions-item label="含下级人数">{{ viewNode.totalEmployeeCount ?? 0 }} 人</a-descriptions-item>
         <a-descriptions-item label="编制人数">{{ viewNode.headcount ?? '—' }}</a-descriptions-item>
         <a-descriptions-item label="办公地点">{{ viewNode.address || '—' }}</a-descriptions-item>
+        <a-descriptions-item label="所在城市">{{ viewNode.city || '—' }}</a-descriptions-item>
         <a-descriptions-item label="成本中心">{{ viewNode.costCenter || '—' }}</a-descriptions-item>
         <a-descriptions-item label="成立日期">{{ viewNode.establishDate || '—' }}</a-descriptions-item>
         <a-descriptions-item label="联系电话">{{ viewNode.phone || '—' }}</a-descriptions-item>
@@ -508,12 +528,14 @@ import {
 import {
   createOrg,
   deleteOrg,
+  dictOptions,
   orgLeaderChanges,
   orgTree,
   pageEmployees,
   setOrgLeader,
   setOrgStatus,
   updateOrg,
+  type DictOption,
   type EmployeeItem,
   type LeaderChange,
   type OrgNode,
@@ -745,6 +767,7 @@ const form = reactive<{
   code: string
   email: string
   address: string
+  city: string
   headcount: number | null
   costCenter: string
   establishDate: string | null
@@ -759,6 +782,7 @@ const form = reactive<{
   code: '',
   email: '',
   address: '',
+  city: '',
   headcount: null,
   costCenter: '',
   establishDate: null,
@@ -820,6 +844,28 @@ const parentLabel = computed(() => {
   return p ? `${p.name}（${p.typeName}）` : '—'
 })
 
+/* ---------- 所在城市：仅二级单位（depth=2）可编辑，下级部门自动继承上级城市 ---------- */
+const cityOptions = ref<DictOption[]>([])
+/** 是否展示城市行：根节点 depth=1 也不展示（它下面直接出 depth=2 的子公司才是城市持有者） */
+const canShowCityRow = computed(() => {
+  if (modalMode.value === 'create') {
+    return parentNode.value?.depth != null && parentNode.value.depth >= 1
+  }
+  return editingNode.value?.depth != null && editingNode.value.depth >= 2
+})
+/** 是否可编辑城市：创建时父节点 depth=1 → 新建的子节点 depth=2；编辑时节点自身 depth=2 */
+const canEditCity = computed(() => {
+  if (modalMode.value === 'create') return parentNode.value?.depth === 1
+  return editingNode.value?.depth === 2
+})
+/** 只读展示时的有效城市：编辑模式用后端已解析好的 editingNode.city，创建模式用父节点已解析好的 city */
+const effectiveCityDisplay = computed(() => {
+  if (modalMode.value === 'create') {
+    return parentNode.value?.city || '未配置（上级二级单位未设置城市）'
+  }
+  return editingNode.value?.city || '未配置'
+})
+
 function resetForm() {
   form.parentId = null
   form.type = 'GROUP'
@@ -828,6 +874,7 @@ function resetForm() {
   form.code = ''
   form.email = ''
   form.address = ''
+  form.city = ''
   form.headcount = null
   form.costCenter = ''
   form.establishDate = null
@@ -859,6 +906,7 @@ function openEdit(node: OrgNode) {
   form.code = node.code || ''
   form.email = node.email || ''
   form.address = node.address || ''
+  form.city = node.city || ''
   form.headcount = node.headcount == null ? null : node.headcount
   form.costCenter = node.costCenter || ''
   form.establishDate = node.establishDate || null
@@ -879,6 +927,8 @@ async function submit() {
     shortName: form.shortName,
     email: form.email,
     address: form.address,
+    // 子节点（depth>2）城市自动继承上级，前端不提交，后端也强制忽略
+    city: canEditCity.value ? form.city || undefined : undefined,
     headcount: form.headcount,
     costCenter: form.costCenter,
     establishDate: form.establishDate,
@@ -1082,6 +1132,11 @@ async function doRemove(node: OrgNode) {
 
 onMounted(() => {
   load(false)
+  dictOptions('ehr.job_city')
+    .then((list) => (cityOptions.value = list || []))
+    .catch(() => {
+      cityOptions.value = []
+    })
 })
 </script>
 
@@ -1090,6 +1145,23 @@ onMounted(() => {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* 子节点继承上级城市的只读展示 */
+.inherited-city {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background: #fafafa;
+  line-height: 1.5;
+}
+
+.inherited-city-value {
+  font-size: 13px;
+  color: #333;
 }
 
 .toolbar {

@@ -49,7 +49,7 @@
           </a-sub-menu>
           <a-menu-item v-if="store.can('dict:view')" key="/dicts">
             <template #icon><control-outlined /></template>
-            字典管理
+            字典配置
           </a-menu-item>
           <a-sub-menu
             v-if="store.can('approval:view') || store.can('approval:template') || store.can('approval:scene') || store.can('approval:bizpoint')"
@@ -71,11 +71,11 @@
           </a-menu-item>
           <a-menu-item v-if="store.can('embed:view')" key="/embed-points">
             <template #icon><api-outlined /></template>
-            埋点管理
+            埋点配置
           </a-menu-item>
           <a-menu-item v-if="store.can('code:view')" key="/code-rules">
             <template #icon><number-outlined /></template>
-            单号规则
+            单号配置
           </a-menu-item>
         </a-menu>
       </a-layout-sider>
