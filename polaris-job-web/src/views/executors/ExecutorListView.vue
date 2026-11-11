@@ -31,36 +31,43 @@ function relTime(v?: string) {
 
 <template>
   <section class="view">
-    <div class="panel">
-      <div class="panel-head">
-        <span>执行器</span>
-        <div class="actions">
-          <button class="btn" @click="load">刷新</button>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="executor-grid" :class="{ loading }">
-          <div v-for="e in data" :key="e.id" class="executor-card">
-            <div class="executor-head">
-              <span class="dot" :class="e.online ? 'dot-green' : 'dot-red'"></span>
-              <span class="executor-name">{{ e.appCode }}</span>
-              <span class="tag tag-blue">{{ appLabel(e.appCode) }}</span>
-            </div>
-            <div class="executor-meta">
-              地址：<span class="mono">{{ e.address || '—' }}</span><br />
-              最后心跳：<span class="mono">{{ formatDateTime(e.lastHeartbeat) }}</span>
-              <template v-if="relTime(e.lastHeartbeat)">（{{ relTime(e.lastHeartbeat) }}）</template><br />
-              注册任务：{{ e.jobCount }} 个 · 版本：{{ e.version || '—' }} · 实例：{{ e.online ? '1/1' : '0/1' }}
-            </div>
-            <div v-if="e.handlers && e.handlers.length" class="hint">
-              Handler：{{ e.handlers.map((h) => h.name).join('、') }}
-            </div>
-          </div>
-          <div v-if="!data.length" class="executor-card executor-empty">
-            新增服务接入后自动出现在这里
-          </div>
-        </div>
-      </div>
-    </div>
+    <a-card :bordered="false" title="执行器">
+      <template #extra>
+        <a-button @click="load">刷新</a-button>
+      </template>
+
+      <a-spin :spinning="loading">
+        <a-row :gutter="[12, 12]">
+          <a-col v-for="e in data" :key="e.id" :xs="24" :md="12">
+            <a-card size="small" :bordered="true">
+              <template #title>
+                <a-badge :status="e.online ? 'success' : 'error'" :text="e.appCode" />
+                <a-tag color="blue" style="margin-left: 8px">{{ appLabel(e.appCode) }}</a-tag>
+              </template>
+              <a-descriptions :column="1" size="small">
+                <a-descriptions-item label="地址">
+                  <span class="mono">{{ e.address || '—' }}</span>
+                </a-descriptions-item>
+                <a-descriptions-item label="最后心跳">
+                  <span class="mono">{{ formatDateTime(e.lastHeartbeat) }}</span>
+                  <span v-if="relTime(e.lastHeartbeat)" class="text-secondary">
+                    （{{ relTime(e.lastHeartbeat) }}）
+                  </span>
+                </a-descriptions-item>
+                <a-descriptions-item label="注册任务">
+                  {{ e.jobCount }} 个 · 版本 {{ e.version || '—' }} · 实例 {{ e.online ? '1/1' : '0/1' }}
+                </a-descriptions-item>
+              </a-descriptions>
+              <div v-if="e.handlers && e.handlers.length" style="margin-top: 8px">
+                <a-space wrap :size="[4, 4]">
+                  <a-tag v-for="h in e.handlers" :key="h.name">{{ h.name }}</a-tag>
+                </a-space>
+              </div>
+            </a-card>
+          </a-col>
+        </a-row>
+        <a-empty v-if="!loading && !data.length" description="新增服务接入后自动出现在这里" />
+      </a-spin>
+    </a-card>
   </section>
 </template>

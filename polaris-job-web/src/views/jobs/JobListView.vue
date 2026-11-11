@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -23,14 +23,14 @@ import { compareIdDesc, formatDateTime, formatDuration } from '@/utils/format'
 const router = useRouter()
 const user = useUserStore()
 
-const size = 20
+const pageSize = ref(20)
 const loading = ref(false)
 const rows = ref<JobInfo[]>([])
 const total = ref(0)
 const page = ref(1)
 const keyword = ref('')
-const appCode = ref('')
-const status = ref('')
+const appCode = ref<string | undefined>()
+const status = ref<number | undefined>()
 
 const latest = ref<Record<string, JobLogVO>>({})
 
@@ -56,7 +56,27 @@ const failRate = computed(() => {
   if (!stats.todayRuns) return '0%'
   return Math.round((stats.todayFail / stats.todayRuns) * 100) + '%'
 })
-const maxPage = computed(() => Math.max(1, Math.ceil(total.value / size)))
+
+const appOptions = APP_CODES.map((c) => ({ value: c, label: appLabel(c) }))
+const statusOptions = [
+  { value: 1, label: '运行中' },
+  { value: 0, label: '已暂停' }
+]
+
+const columns = [
+  { title: '任务名称', key: 'name', dataIndex: 'name' },
+  { title: '调度计划', key: 'plan', width: 190 },
+  { title: '状态 / 最近结果', key: 'state', width: 230 },
+  { title: '操作', key: 'action', width: 250 }
+]
+
+const pagination = computed(() => ({
+  current: page.value,
+  pageSize: pageSize.value,
+  total: total.value,
+  showSizeChanger: false,
+  showTotal: (t: number) => `共 ${t} 条`
+}))
 
 async function loadStats() {
   const now = dayjs()
@@ -68,7 +88,12 @@ async function loadStats() {
       listJobs({ page: 1, size: 1, status: 1 }),
       listLogs({ page: 1, size: 1, startTime: fmtTime(dayStart), endTime: fmtTime(now) }),
       listLogs({ page: 1, size: 1, status: 2, startTime: fmtTime(dayStart), endTime: fmtTime(now) }),
-      listLogs({ page: 1, size: 1, startTime: fmtTime(yesterdayStart), endTime: fmtTime(dayStart.subtract(1, 'second')) }),
+      listLogs({
+        page: 1,
+        size: 1,
+        startTime: fmtTime(yesterdayStart),
+        endTime: fmtTime(dayStart.subtract(1, 'second'))
+      }),
       listExecutors()
     ])
     stats.total = all.total
@@ -100,10 +125,10 @@ async function loadRows() {
     const [r, logs] = await Promise.all([
       listJobs({
         page: page.value,
-        size,
+        size: pageSize.value,
         keyword: keyword.value || undefined,
         appCode: appCode.value || undefined,
-        status: status.value === '' ? undefined : Number(status.value)
+        status: status.value
       }),
       loadRecentLogs()
     ])
@@ -127,6 +152,38 @@ async function refresh() {
 
 onMounted(refresh)
 
+/* 列表区固定高度：表格在卡片内滚动，页面本身不出现垂直滚动条 */
+const scrollY = ref(240)
+
+function updateScrollY() {
+  const body = document.querySelector('.fill-card > .ant-card-body') as HTMLElement | null
+  const table = body?.querySelector('.ant-table-wrapper') as HTMLElement | null
+  if (!body || !table) return
+  const style = getComputedStyle(body)
+  const padTop = parseFloat(style.paddingTop) || 0
+  const padBottom = parseFloat(style.paddingBottom) || 0
+  const toolbar = body.querySelector('.ant-space') as HTMLElement | null
+  const header = table.querySelector('.ant-table-header') as HTMLElement | null
+  const pager = table.querySelector('.ant-pagination') as HTMLElement | null
+  // 逐项量取，保证表头与分页器始终留在卡片内，只让表体滚动
+  const used =
+    padTop +
+    padBottom +
+    (toolbar ? toolbar.offsetHeight + 12 : 44) +
+    (header ? header.offsetHeight : 47) +
+    (pager ? pager.offsetHeight + 16 : 40)
+  scrollY.value = Math.max(1, body.clientHeight - used)
+}
+
+onMounted(() => {
+  window.addEventListener('resize', updateScrollY)
+  requestAnimationFrame(updateScrollY)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateScrollY)
+})
+
 function search() {
   page.value = 1
   loadRows()
@@ -134,16 +191,20 @@ function search() {
 
 function reset() {
   keyword.value = ''
-  appCode.value = ''
-  status.value = ''
+  appCode.value = undefined
+  status.value = undefined
   page.value = 1
   loadRows()
 }
 
 function goto(p: number) {
-  if (p < 1 || p > maxPage.value || p === page.value) return
+  if (p < 1 || p === page.value) return
   page.value = p
   loadRows()
+}
+
+function onTableChange(pag: { current?: number }) {
+  goto(pag.current || 1)
 }
 
 function triggerText(job: JobInfo) {
@@ -153,12 +214,12 @@ function triggerText(job: JobInfo) {
 }
 
 const RESULT_TEXT: Record<number, string> = { 0: '执行中', 1: '成功', 2: '失败', 3: '超时', 4: '取消' }
-const RESULT_CLASS: Record<number, string> = {
-  0: 'tag-blue',
-  1: 'tag-green',
-  2: 'tag-red',
-  3: 'tag-orange',
-  4: 'tag-gray'
+const RESULT_COLOR: Record<number, string> = {
+  0: 'processing',
+  1: 'success',
+  2: 'error',
+  3: 'warning',
+  4: 'default'
 }
 
 function resultText(log?: JobLogVO) {
@@ -167,6 +228,10 @@ function resultText(log?: JobLogVO) {
   if (log.status === 1 && log.durationMs != null) return `${base} · ${formatDuration(log.durationMs)}`
   if (log.status === 2 && log.retryIndex > 0) return `${base} · 重试中`
   return base
+}
+
+function resultColor(log?: JobLogVO) {
+  return log ? RESULT_COLOR[log.status] || 'default' : 'default'
 }
 
 async function onRun(row: JobInfo) {
@@ -199,7 +264,8 @@ const drawerOpen = ref(false)
 const drawerMode = ref<'create' | 'edit'>('create')
 const editingId = ref<string | null>(null)
 const saving = ref(false)
-const paramRows = ref<Array<{ key: string; value: string }>>([])
+let paramSeq = 0
+const paramRows = ref<Array<{ id: number; key: string; value: string }>>([])
 const cronPreview = ref<string[]>([])
 const cronError = ref('')
 const cronChecked = ref(false)
@@ -223,6 +289,23 @@ function emptyForm(): JobSaveRequest {
 }
 
 const form = ref<JobSaveRequest>(emptyForm())
+
+const enabled = computed({
+  get: () => form.value.status === 1,
+  set: (v: boolean) => {
+    form.value.status = v ? 1 : 0
+  }
+})
+
+const paramColumns = [
+  { title: '参数名', key: 'key', width: '38%' },
+  { title: '参数值', key: 'value' },
+  { title: '操作', key: 'op', width: 70 }
+]
+
+function addParam() {
+  paramRows.value.push({ id: ++paramSeq, key: '', value: '' })
+}
 
 function openCreate() {
   drawerMode.value = 'create'
@@ -253,7 +336,11 @@ function openEdit(row: JobInfo) {
     blockStrategy: row.blockStrategy,
     status: row.status
   }
-  paramRows.value = Object.entries(row.params || {}).map(([key, value]) => ({ key, value }))
+  paramRows.value = Object.entries(row.params || {}).map(([key, value]) => ({
+    id: ++paramSeq,
+    key,
+    value
+  }))
   cronPreview.value = []
   cronError.value = ''
   cronChecked.value = false
@@ -329,7 +416,6 @@ async function save() {
 
 async function removeJob() {
   if (editingId.value == null) return
-  if (!window.confirm(`确认删除「${form.value.name}」？`)) return
   try {
     await deleteJob(editingId.value)
     message.success('已删除')
@@ -342,21 +428,22 @@ async function removeJob() {
 </script>
 
 <template>
-  <section class="view jobs">
+  <section class="view">
     <div class="stat-row">
-      <div class="stat-card">
-        <div class="stat-label">任务总数</div>
-        <div class="stat-value">{{ stats.total }}</div>
+      <a-card :bordered="false" class="stat-card" :body-style="{ padding: '14px 16px' }">
+        <a-statistic title="任务总数" :value="stats.total" />
         <div class="stat-foot">覆盖 {{ stats.apps }} 个服务</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">运行中</div>
-        <div class="stat-value">{{ stats.running }} <small>个</small></div>
+      </a-card>
+      <a-card :bordered="false" class="stat-card" :body-style="{ padding: '14px 16px' }">
+        <a-statistic title="运行中" :value="stats.running">
+          <template #suffix><span class="stat-unit">个</span></template>
+        </a-statistic>
         <div class="stat-foot">{{ stats.paused }} 个已暂停</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">今日执行</div>
-        <div class="stat-value">{{ stats.todayRuns }} <small>次</small></div>
+      </a-card>
+      <a-card :bordered="false" class="stat-card" :body-style="{ padding: '14px 16px' }">
+        <a-statistic title="今日执行" :value="stats.todayRuns">
+          <template #suffix><span class="stat-unit">次</span></template>
+        </a-statistic>
         <div class="stat-foot">
           <span v-if="trend !== null" :class="trend >= 0 ? 'trend-up' : 'trend-down'">
             {{ trend >= 0 ? '▲' : '▼' }} {{ Math.abs(trend) }}%
@@ -364,308 +451,310 @@ async function removeJob() {
           <span v-else>—</span>
           较昨日
         </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">今日失败</div>
-        <div class="stat-value" :style="stats.todayFail ? 'color:#ff4d4f' : ''">{{ stats.todayFail }} <small>次</small></div>
+      </a-card>
+      <a-card :bordered="false" class="stat-card" :body-style="{ padding: '14px 16px' }">
+        <a-statistic
+          title="今日失败"
+          :value="stats.todayFail"
+          :value-style="stats.todayFail ? { color: 'var(--danger)' } : undefined"
+        >
+          <template #suffix><span class="stat-unit">次</span></template>
+        </a-statistic>
         <div class="stat-foot">失败率 {{ failRate }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">执行器在线</div>
-        <div class="stat-value">{{ stats.online }} / {{ stats.execTotal }}</div>
+      </a-card>
+      <a-card :bordered="false" class="stat-card" :body-style="{ padding: '14px 16px' }">
+        <a-statistic title="执行器在线" :value="stats.online">
+          <template #suffix><span class="stat-unit">/ {{ stats.execTotal }}</span></template>
+        </a-statistic>
         <div class="stat-foot">
-          <span class="dot" :class="stats.online ? 'dot-green' : 'dot-red'"></span>
-          {{ stats.online ? '心跳正常' : '暂无在线执行器' }}
+          <a-badge :status="stats.online ? 'success' : 'error'" :text="stats.online ? '心跳正常' : '暂无在线执行器'" />
         </div>
-      </div>
+      </a-card>
     </div>
 
-    <div class="panel">
-      <div class="panel-head">
-        <span>调用链路</span>
-        <div class="actions">
-          <span class="tag tag-gray">执行逻辑在应用内，调度中心只负责触发</span>
-        </div>
+    <a-card :bordered="false" title="调用链路">
+      <template #extra>
+        <a-tag>执行逻辑在应用内，调度中心只负责触发</a-tag>
+      </template>
+      <div class="flow">
+        <div class="flow-step"><b>① 扫描任务</b><span class="cn">每 5 秒读取 job_info</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step"><b>② 命中触发</b><span class="cn">下次执行时间到期（行锁防重复）</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step"><b>③ Feign 调用</b><span>JobApi#run(appCode, handler)</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step"><b>④ 应用内分发</b><span>JobDispatcher → approvalCallbackRetry</span></div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step"><b>⑤ 回写结果</b><span class="cn">job_log · 失败重试 · 超限报警</span></div>
       </div>
-      <div class="panel-body">
-        <div class="flow">
-          <div class="flow-step"><b>① 扫描任务</b><span class="cn">每 5 秒读取 job_info</span></div>
-          <span class="flow-arrow">→</span>
-          <div class="flow-step"><b>② 命中触发</b><span class="cn">下次执行时间到期（行锁防重复）</span></div>
-          <span class="flow-arrow">→</span>
-          <div class="flow-step"><b>③ Feign 调用</b><span>JobApi#run(appCode, handler)</span></div>
-          <span class="flow-arrow">→</span>
-          <div class="flow-step"><b>④ 应用内分发</b><span>JobDispatcher → approvalCallbackRetry</span></div>
-          <span class="flow-arrow">→</span>
-          <div class="flow-step"><b>⑤ 回写结果</b><span class="cn">job_log · 失败重试 · 超限报警</span></div>
-        </div>
-        <div class="hint">
-          调用超时只代表调度中心放弃等待，应用侧任务仍会继续执行。耗时较长的任务应返回「已受理」并异步执行，由任务自身回报最终结果。
-        </div>
+      <div class="hint">
+        调用超时只代表调度中心放弃等待，应用侧任务仍会继续执行。耗时较长的任务应返回「已受理」并异步执行，由任务自身回报最终结果。
       </div>
-    </div>
+    </a-card>
 
-    <div class="panel table-panel">
-      <div class="panel-head">
-        <span>任务列表</span>
-        <div class="actions">
-          <button class="btn" @click="refresh">刷新</button>
-          <button v-if="user.hasPerm('job:manage')" class="btn btn-primary" @click="openCreate">新建任务</button>
-        </div>
-      </div>
+    <a-card :bordered="false" title="任务列表" class="fill-card">
+      <template #extra>
+        <a-space>
+          <a-button @click="refresh">刷新</a-button>
+          <a-button v-if="user.hasPerm('job:manage')" type="primary" @click="openCreate">新建任务</a-button>
+        </a-space>
+      </template>
 
-      <div class="toolbar">
-        <div class="field">
-          <label>所属应用</label>
-          <select v-model="appCode" class="select">
-            <option value="">全部</option>
-            <option v-for="c in APP_CODES" :key="c" :value="c">{{ appLabel(c) }}</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>状态</label>
-          <select v-model="status" class="select">
-            <option value="">全部</option>
-            <option value="1">运行中</option>
-            <option value="0">已暂停</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>关键字</label>
-          <input
-            v-model="keyword"
-            class="input search-input"
-            placeholder="任务名称 / Handler"
-            @keyup.enter="search"
-          />
-        </div>
-        <button class="btn btn-primary" @click="search">查询</button>
-        <button class="btn" @click="reset">重置</button>
-      </div>
+      <a-space wrap style="margin-bottom: 12px">
+        <a-select
+          v-model:value="appCode"
+          style="width: 160px"
+          placeholder="所属应用"
+          allow-clear
+          :options="appOptions"
+        />
+        <a-select
+          v-model:value="status"
+          style="width: 140px"
+          placeholder="状态"
+          allow-clear
+          :options="statusOptions"
+        />
+        <a-input
+          v-model:value="keyword"
+          style="width: 220px"
+          placeholder="任务名称 / Handler"
+          allow-clear
+          @press-enter="search"
+        />
+        <a-button type="primary" @click="search">查询</a-button>
+        <a-button @click="reset">重置</a-button>
+      </a-space>
 
-      <div class="table-wrap" :class="{ loading }">
-        <table class="jobs-table">
-          <thead>
-            <tr>
-              <th style="width: 38%">任务名称</th>
-              <th style="width: 170px">调度计划</th>
-              <th style="width: 200px">状态 / 最近结果</th>
-              <th style="width: 210px">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="job in rows" :key="job.id">
-              <td>
-                <div class="job-name">
-                  {{ job.name }}<span class="tag tag-blue">{{ appLabel(job.appCode) }}</span>
-                </div>
-                <div class="job-meta">
-                  <span class="call-label">Handler</span><span class="mono">{{ job.handler }}</span>
-                </div>
-              </td>
-              <td>
-                <div class="mono">{{ triggerText(job) }}</div>
-                <div class="job-meta mono">下次 {{ formatDateTime(job.nextFireTime) }}</div>
-              </td>
-              <td>
-                <span class="dot" :class="job.status === 1 ? 'dot-green' : 'dot-orange'"></span>
-                {{ job.status === 1 ? '运行中' : '已暂停' }}
-                <span class="tag" :class="latest[job.id] ? RESULT_CLASS[latest[job.id].status] : 'tag-gray'">
-                  {{ resultText(latest[job.id]) }}
-                </span>
-              </td>
-              <td>
-                <div class="cell-actions">
-                  <button v-if="user.hasPerm('job:run')" class="btn-link" @click="onRun(job)">执行一次</button>
-                  <button v-if="user.hasPerm('job:manage')" class="btn-link" @click="onToggle(job)">
-                    {{ job.status === 1 ? '暂停' : '恢复' }}
-                  </button>
-                  <button v-if="user.hasPerm('job:manage')" class="btn-link" @click="openEdit(job)">编辑</button>
-                  <button class="btn-link" @click="goLogs(job)">日志</button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!loading && !rows.length">
-              <td colspan="4" class="empty-cell">暂无任务数据</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="pager">
-        <span>共 {{ total }} 条</span>
-        <span class="pg" :class="{ disabled: page <= 1 }" @click="goto(page - 1)">‹</span>
-        <span class="pg active">{{ page }}</span>
-        <span class="pg" :class="{ disabled: page >= maxPage }" @click="goto(page + 1)">›</span>
-      </div>
-    </div>
-
-    <!-- 新建 / 编辑抽屉 -->
-    <div class="overlay" :class="{ open: drawerOpen }" @click="drawerOpen = false"></div>
-    <div class="drawer" :class="{ open: drawerOpen }">
-      <div class="drawer-head">
-        <div class="drawer-title">
-          {{ drawerMode === 'create' ? '新建任务' : '编辑任务 · ' + form.name }}
-        </div>
-        <button class="drawer-close" @click="drawerOpen = false">✕</button>
-      </div>
-      <div class="drawer-body">
-        <div class="section">
-          <div class="section-title">基本信息</div>
-          <div class="form-row">
-            <div class="form-item">
-              <label>任务名称</label>
-              <input v-model="form.name" class="input" placeholder="如：司龄每日刷新" />
+      <a-table
+        row-key="id"
+        size="middle"
+        :loading="loading"
+        :columns="columns"
+        :data-source="rows"
+        :pagination="pagination"
+        :scroll="{ y: scrollY }"
+        @change="onTableChange"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'name'">
+            <div style="font-weight: 500">
+              {{ record.name }}
+              <a-tag color="blue" style="margin-left: 6px">{{ appLabel(record.appCode) }}</a-tag>
             </div>
-            <div class="form-item">
-              <label>所属应用</label>
-              <select v-model="form.appCode" class="select">
-                <option v-for="c in APP_CODES" :key="c" :value="c">{{ appLabel(c) }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-item">
-              <label>Handler（应用内 Bean 名）</label>
-              <input v-model="form.handler" class="input mono" placeholder="如：annualLeaveRefresh" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-item">
-              <label>任务描述</label>
-              <input v-model="form.description" class="input" placeholder="可选" />
-            </div>
-          </div>
-          <div class="hint">
-            中心只按「应用 + Handler」调用统一入口 <span class="mono">POST /internal/jobs/run</span>，不感知 Feign 接口名与方法名。
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">触发配置</div>
-          <div class="form-row">
-            <div class="form-item">
-              <label>触发方式</label>
-              <div class="radio-group">
-                <div class="radio" :class="{ active: form.triggerType === 'CRON' }" @click="form.triggerType = 'CRON'">CRON</div>
-                <div class="radio" :class="{ active: form.triggerType === 'FIXED_RATE' }" @click="form.triggerType = 'FIXED_RATE'">固定频率</div>
-                <div class="radio" :class="{ active: form.triggerType === 'FIXED_DELAY' }" @click="form.triggerType = 'FIXED_DELAY'">固定延迟</div>
-              </div>
-            </div>
-          </div>
-          <template v-if="form.triggerType === 'CRON'">
-            <div class="form-row">
-              <div class="form-item">
-                <label>CRON 表达式（6 位 Quartz）</label>
-                <input
-                  v-model="form.cronExpr"
-                  class="input mono"
-                  :class="{ invalid: !!cronError }"
-                  placeholder="0 30 9 * * ?"
-                  @blur="checkCron"
-                />
-              </div>
-            </div>
-            <div class="chips">
-              <span v-for="c in CRON_CHIPS" :key="c.expr" class="chip" @click="pickCron(c.expr)">{{ c.label }}</span>
-            </div>
-            <div class="cron-msg" :class="cronError ? 'err' : 'ok'">
-              <template v-if="cronError">✕ {{ cronError }}</template>
-              <template v-else-if="cronChecked">✓ 校验通过，保存时后端会二次校验</template>
-            </div>
-            <div v-if="cronPreview.length" class="next-run">
-              未来 {{ cronPreview.length }} 次执行：<br />
-              <b>{{ cronPreview[0] }}</b>
-              <span v-if="cronPreview.length > 1"> · {{ cronPreview.slice(1).join(' · ') }}</span>
-            </div>
+            <div class="text-secondary mono">{{ record.handler }}</div>
           </template>
-          <div v-else class="form-row">
-            <div class="form-item">
-              <label>间隔（秒）</label>
-              <input v-model.number="form.intervalSec" class="input" type="number" min="1" />
-            </div>
-          </div>
+          <template v-else-if="column.key === 'plan'">
+            <div class="mono">{{ triggerText(record) }}</div>
+            <div class="text-secondary mono">下次 {{ formatDateTime(record.nextFireTime) }}</div>
+          </template>
+          <template v-else-if="column.key === 'state'">
+            <a-badge
+              :status="record.status === 1 ? 'success' : 'warning'"
+              :text="record.status === 1 ? '运行中' : '已暂停'"
+            />
+            <a-tag :color="resultColor(latest[record.id])" style="margin-left: 8px">
+              {{ resultText(latest[record.id]) }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space :size="4">
+              <a-button v-if="user.hasPerm('job:run')" type="link" size="small" @click="onRun(record)">
+                执行一次
+              </a-button>
+              <a-button v-if="user.hasPerm('job:manage')" type="link" size="small" @click="onToggle(record)">
+                {{ record.status === 1 ? '暂停' : '恢复' }}
+              </a-button>
+              <a-button v-if="user.hasPerm('job:manage')" type="link" size="small" @click="openEdit(record)">
+                编辑
+              </a-button>
+              <a-button type="link" size="small" @click="goLogs(record)">日志</a-button>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+    </a-card>
+
+    <a-drawer
+      v-model:open="drawerOpen"
+      :width="560"
+      :title="drawerMode === 'create' ? '新建任务' : '编辑任务 · ' + form.name"
+      :body-style="{ paddingBottom: '8px' }"
+    >
+      <a-form layout="vertical">
+        <a-divider orientation="left" plain>基本信息</a-divider>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="任务名称">
+              <a-input v-model:value="form.name" placeholder="如：司龄每日刷新" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="所属应用">
+              <a-select v-model:value="form.appCode" :options="appOptions" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="Handler（应用内 Bean 名）">
+          <a-input v-model:value="form.handler" placeholder="如：annualLeaveRefresh" />
+        </a-form-item>
+        <a-form-item label="任务描述">
+          <a-input v-model:value="form.description" placeholder="可选" />
+        </a-form-item>
+        <div class="hint" style="margin: -8px 0 16px">
+          中心只按「应用 + Handler」调用统一入口 <span class="mono">POST /internal/jobs/run</span>，不感知 Feign
+          接口名与方法名。
         </div>
 
-        <div class="section">
-          <div class="section-title">执行配置</div>
-          <div class="form-row">
-            <div class="form-item">
-              <label>超时时间（秒）</label>
-              <input v-model.number="form.timeoutSec" class="input" type="number" min="1" />
-            </div>
-            <div class="form-item">
-              <label>失败重试次数</label>
-              <input v-model.number="form.retryTimes" class="input" type="number" min="0" />
-            </div>
-            <div class="form-item">
-              <label>重试间隔（秒）</label>
-              <input v-model.number="form.retryIntervalSec" class="input" type="number" min="1" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-item">
-              <label>路由策略</label>
-              <select v-model="form.routeStrategy" class="select">
-                <option value="ROUND">轮询</option>
-                <option value="FAILOVER">故障转移（失败自动换实例）</option>
-                <option value="BROADCAST">分片广播</option>
-              </select>
-            </div>
-            <div class="form-item">
-              <label>阻塞处理</label>
-              <select v-model="form.blockStrategy" class="select">
-                <option value="DISCARD">丢弃后续调度</option>
-                <option value="SERIAL">单机串行</option>
-                <option value="COVER">覆盖之前调度</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-item">
-              <label>任务状态</label>
-              <div class="switch-line" style="cursor: pointer" @click="form.status = form.status === 1 ? 0 : 1">
-                <span class="switch" :class="{ off: form.status !== 1 }"></span>
-                {{ form.status === 1 ? '启用（保存后加入调度）' : '暂停（保存后不参与调度）' }}
+        <a-divider orientation="left" plain>触发配置</a-divider>
+        <a-form-item label="触发方式">
+          <a-radio-group v-model:value="form.triggerType" button-style="solid">
+            <a-radio-button value="CRON">CRON</a-radio-button>
+            <a-radio-button value="FIXED_RATE">固定频率</a-radio-button>
+            <a-radio-button value="FIXED_DELAY">固定延迟</a-radio-button>
+          </a-radio-group>
+        </a-form-item>
+        <template v-if="form.triggerType === 'CRON'">
+          <a-form-item label="CRON 表达式（6 位 Quartz）">
+            <a-input
+              v-model:value="form.cronExpr"
+              placeholder="0 30 9 * * ?"
+              :status="cronError ? 'error' : undefined"
+              @blur="checkCron"
+            />
+          </a-form-item>
+          <a-space wrap style="margin-bottom: 12px">
+            <a-tag
+              v-for="c in CRON_CHIPS"
+              :key="c.expr"
+              color="processing"
+              style="cursor: pointer"
+              @click="pickCron(c.expr)"
+            >
+              {{ c.label }}
+            </a-tag>
+          </a-space>
+          <a-alert v-if="cronError" type="error" :message="cronError" show-icon style="margin-bottom: 12px" />
+          <a-alert
+            v-else-if="cronChecked"
+            type="success"
+            message="校验通过，保存时后端会二次校验"
+            show-icon
+            style="margin-bottom: 12px"
+          />
+          <a-alert v-if="cronPreview.length" type="info" style="margin-bottom: 12px">
+            <template #message>
+              未来 {{ cronPreview.length }} 次执行：
+              <div class="mono" style="margin-top: 4px">
+                {{ cronPreview.join(' · ') }}
               </div>
-            </div>
-          </div>
-          <div class="hint">
-            Feign 调用超时按失败处理；Handler 需保证幂等，长任务建议返回「已受理」并异步执行、由任务回报结果。
-          </div>
+            </template>
+          </a-alert>
+        </template>
+        <a-form-item v-else label="间隔（秒）">
+          <a-input-number v-model:value="form.intervalSec" :min="1" style="width: 100%" />
+        </a-form-item>
+
+        <a-divider orientation="left" plain>执行配置</a-divider>
+        <a-row :gutter="12">
+          <a-col :span="8">
+            <a-form-item label="超时时间（秒）">
+              <a-input-number v-model:value="form.timeoutSec" :min="1" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="失败重试次数">
+              <a-input-number v-model:value="form.retryTimes" :min="0" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="重试间隔（秒）">
+              <a-input-number v-model:value="form.retryIntervalSec" :min="1" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="路由策略">
+              <a-select
+                v-model:value="form.routeStrategy"
+                :options="[
+                  { value: 'ROUND', label: '轮询' },
+                  { value: 'FAILOVER', label: '故障转移（失败自动换实例）' },
+                  { value: 'BROADCAST', label: '分片广播' }
+                ]"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="阻塞处理">
+              <a-select
+                v-model:value="form.blockStrategy"
+                :options="[
+                  { value: 'DISCARD', label: '丢弃后续调度' },
+                  { value: 'SERIAL', label: '单机串行' },
+                  { value: 'COVER', label: '覆盖之前调度' }
+                ]"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="任务状态">
+          <a-space>
+            <a-switch v-model:checked="enabled" checked-children="启用" un-checked-children="暂停" />
+            <span class="text-secondary">
+              {{ enabled ? '保存后加入调度' : '保存后不参与调度' }}
+            </span>
+          </a-space>
+        </a-form-item>
+        <div class="hint" style="margin-bottom: 16px">
+          Feign 调用超时按失败处理；Handler 需保证幂等，长任务建议返回「已受理」并异步执行、由任务回报结果。
         </div>
 
-        <div class="section">
-          <div class="section-title">任务参数</div>
-          <table class="kv-table">
-            <thead>
-              <tr>
-                <th style="width: 38%">参数名</th>
-                <th>参数值</th>
-                <th style="width: 64px">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(p, i) in paramRows" :key="i">
-                <td><input v-model="p.key" class="input mono" style="width: 100%" placeholder="key" /></td>
-                <td><input v-model="p.value" class="input mono" style="width: 100%" placeholder="value" /></td>
-                <td><button class="btn-link danger" @click="paramRows.splice(i, 1)">删除</button></td>
-              </tr>
-              <tr v-if="!paramRows.length">
-                <td colspan="3" class="hint" style="text-align: center">暂无参数</td>
-              </tr>
-            </tbody>
-          </table>
-          <button class="btn" style="margin-top: 8px" @click="paramRows.push({ key: '', value: '' })">+ 新增参数</button>
-          <div class="hint">参数以 key-value 维护，由应用侧 Handler 通过 JobContext.params 读取。</div>
+        <a-divider orientation="left" plain>任务参数</a-divider>
+        <a-table
+          row-key="id"
+          size="small"
+          :columns="paramColumns"
+          :data-source="paramRows"
+          :pagination="false"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'key'">
+              <a-input v-model:value="record.key" placeholder="key" />
+            </template>
+            <template v-else-if="column.key === 'value'">
+              <a-input v-model:value="record.value" placeholder="value" />
+            </template>
+            <template v-else>
+              <a-button type="link" size="small" danger @click="paramRows = paramRows.filter((p) => p.id !== record.id)">
+                删除
+              </a-button>
+            </template>
+          </template>
+        </a-table>
+        <a-button type="dashed" block style="margin-top: 8px" @click="addParam">+ 新增参数</a-button>
+        <div class="hint">参数以 key-value 维护，由应用侧 Handler 通过 JobContext.params 读取。</div>
+      </a-form>
+
+      <template #footer>
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <a-popconfirm
+            v-if="drawerMode === 'edit'"
+            title="确认删除该任务？"
+            ok-text="删除"
+            cancel-text="取消"
+            @confirm="removeJob"
+          >
+            <a-button danger type="text">删除任务</a-button>
+          </a-popconfirm>
+          <span v-else />
+          <a-space>
+            <a-button @click="drawerOpen = false">取消</a-button>
+            <a-button type="primary" :loading="saving" @click="save">保存</a-button>
+          </a-space>
         </div>
-      </div>
-      <div class="drawer-foot">
-        <button v-if="drawerMode === 'edit'" class="btn btn-danger-text" @click="removeJob">删除任务</button>
-        <span style="flex: 1"></span>
-        <button class="btn" @click="drawerOpen = false">取消</button>
-        <button class="btn btn-primary" :disabled="saving" @click="save">保存</button>
-      </div>
-    </div>
+      </template>
+    </a-drawer>
   </section>
 </template>
