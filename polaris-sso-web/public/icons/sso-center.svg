@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="统一账号中心">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/><stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#g)"/>
+  <path d="M32 12.5 47 18.5v12.6c0 10.2-6.4 17.6-15 21.4-8.6-3.8-15-11.2-15-21.4V18.5z"
+        fill="none" stroke="#fff" stroke-width="3.6" stroke-linejoin="round"/>
+  <circle cx="32" cy="29" r="4.3" fill="#fff"/>
+  <path d="M32 33.8v8.4" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>
+</svg>

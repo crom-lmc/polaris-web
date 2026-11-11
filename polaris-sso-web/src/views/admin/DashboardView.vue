@@ -44,6 +44,7 @@
 
           <div v-else class="app-grid">
             <div v-for="app in store.appList" :key="app.id" class="app-tile">
+              <img class="app-logo" :src="logoOf(app)" :alt="app.name" />
               <div class="app-name">{{ app.name }}</div>
               <div class="app-code">{{ app.code }}</div>
               <!-- 统一账号中心是平台自身（当前控制台），没有可跳转的目标地址，不显示「进入」 -->
@@ -406,6 +407,11 @@ function isBuiltin(app: ApplicationVO) {
   return app.code === 'sso-center' || !!app.builtIn
 }
 
+/** 应用 logo：优先用中心配置的 icon，缺省回退到内置图标包（/public/icons） */
+function logoOf(app: ApplicationVO) {
+  return app.icon || `/icons/${app.code}.svg`
+}
+
 function randomState(): string {
   const buf = new Uint8Array(12)
   crypto.getRandomValues(buf)
@@ -726,6 +732,15 @@ async function enter(app: ApplicationVO) {
   /* 用品牌蓝的半透明高亮，避免深色下出现刺眼的浅蓝描边 */
   border-color: rgba(47, 84, 235, 0.7);
   box-shadow: 0 4px 16px rgba(47, 84, 235, 0.22);
+}
+
+/* 应用 logo：与浏览器 favicon 同一套图形，保持品牌一致 */
+.app-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: block;
+  margin-bottom: 2px;
 }
 
 /* 把「进入」按钮推到磁贴底部，跨磁贴水平对齐（磁贴高度被网格撑成等高） */
