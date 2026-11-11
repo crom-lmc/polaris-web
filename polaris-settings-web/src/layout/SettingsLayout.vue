@@ -104,7 +104,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { Modal } from 'ant-design-vue'
-import { gotoAuthorize, listBizCategories, logoutSso, type BizCategory } from '@/api/settings'
+import { SSO_AUTHORIZE_URL, listBizCategories, logoutSso, type BizCategory } from '@/api/settings'
 import { getRefreshToken } from '@/utils/token'
 import { useSessionGuard } from '@/composables/useSessionGuard'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
@@ -174,7 +174,8 @@ function onUserMenuClick({ key }: { key: string }) {
           /* 忽略：本地照样退出 */
         }
         store.logout()
-        gotoAuthorize('/')
+        // 回到登录页而不是重新授权，避免账号中心凭残余登录态静默签码、立刻登回来
+        window.location.replace(`${SSO_AUTHORIZE_URL}/login?gl=1`)
       }
     })
   }

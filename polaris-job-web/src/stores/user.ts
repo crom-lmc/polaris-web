@@ -3,6 +3,7 @@ import request from '@/api/request'
 import {
   clearTokens,
   getAccessToken,
+  getRefreshToken,
   setAccessToken,
   setRefreshToken,
   getAccountId,
@@ -109,14 +110,19 @@ export const useUserStore = defineStore('user', {
       this.superAdmin = me.superAdmin
       this.perms = perms
     },
-    logout() {
+    async logout() {
+      try {
+        await request.post('/api/auth/logout', { refreshToken: getRefreshToken() })
+      } catch {
+        // 网络异常也要继续本地退出
+      }
       clearTokens()
       this.accountId = ''
       this.accountName = ''
       this.superAdmin = false
       this.perms = []
-      // 本地清空后重走授权：中心会话还在时静默重登，已登出则落到统一登录页
-      this.gotoAuthorize()
+      // 回到登录页而不是重新授权，避免中心会话静默签码、立刻登回来
+      window.location.replace(`${SSO_ORIGIN}/login?gl=1`)
     }
   }
 })
