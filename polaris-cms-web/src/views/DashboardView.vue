@@ -31,6 +31,9 @@ const cards = [
   { key: 'banners', label: 'Banner', perm: 'banner:view' }
 ]
 
+const visibleCards = computed(() => cards.filter((c) => store.can(c.perm)))
+const statColumns = computed(() => Math.min(3, Math.max(1, visibleCards.value.length)))
+
 /** 分类分布条形图的最大值，用于换算百分比 */
 const maxCategoryCount = computed(() =>
   Math.max(1, ...categories.value.map((c) => c.articleCount || 0))
@@ -60,38 +63,38 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <div class="dash-page">
     <a-spin :spinning="loading">
-      <!-- 统计卡 -->
-      <a-row :gutter="12" align="stretch" class="dash-row">
-        <a-col v-for="c in cards.filter((c) => store.can(c.perm))" :key="c.key" :span="8" style="display: flex">
-          <a-card class="stat-card" :body-style="{ padding: '18px 16px' }">
-            <div class="stat-num">{{ stats ? (stats as any)[c.key] : '-' }}</div>
-            <div class="stat-label">{{ c.label }}</div>
-          </a-card>
-        </a-col>
-      </a-row>
+      <div class="dash-inner">
+        <!-- 统计卡：连续栅格，无间隙 -->
+        <a-card class="stat-card" :body-style="{ padding: 0 }">
+          <div class="stat-grid" :style="{ gridTemplateColumns: `repeat(${statColumns}, 1fr)` }">
+            <div v-for="c in visibleCards" :key="c.key" class="stat-cell">
+              <div class="stat-num">{{ stats ? (stats as any)[c.key] : '-' }}</div>
+              <div class="stat-label">{{ c.label }}</div>
+            </div>
+          </div>
+        </a-card>
 
-      <!-- 快捷操作 + 待审核提醒 -->
-      <a-card size="small" class="quick-card" :body-style="{ padding: '12px 16px' }">
-        <div class="quick-bar">
-          <a-space wrap>
-            <span class="quick-title">快捷操作</span>
-            <a-button v-if="store.can('article:create')" type="primary" size="small" @click="router.push('/articles/new')">
-              新建文章
-            </a-button>
-            <a-button v-if="store.can('media:upload')" size="small" @click="router.push('/media')">上传媒体</a-button>
-            <a-button v-if="store.can('banner:manage')" size="small" @click="router.push('/banners')">管理 Banner</a-button>
-          </a-space>
-          <a v-if="stats && stats.pendingAudit > 0" class="pending-tip" @click="router.push('/articles?status=1')">
-            {{ stats.pendingAudit }} 篇内容待审核，去处理 →
-          </a>
-        </div>
-      </a-card>
+        <!-- 快捷操作 + 待审核提醒 -->
+        <a-card size="small" class="quick-card" :body-style="{ padding: '12px 16px' }">
+          <div class="quick-bar">
+            <a-space wrap>
+              <span class="quick-title">快捷操作</span>
+              <a-button v-if="store.can('article:create')" type="primary" size="small" @click="router.push('/articles/new')">
+                新建文章
+              </a-button>
+              <a-button v-if="store.can('media:upload')" size="small" @click="router.push('/media')">上传媒体</a-button>
+              <a-button v-if="store.can('banner:manage')" size="small" @click="router.push('/banners')">管理 Banner</a-button>
+            </a-space>
+            <a v-if="stats && stats.pendingAudit > 0" class="pending-tip" @click="router.push('/articles?status=1')">
+              {{ stats.pendingAudit }} 篇内容待审核，去处理 →
+            </a>
+          </div>
+        </a-card>
 
-      <!-- 最近内容 + 分类分布 -->
-      <a-row :gutter="12" class="main-row" align="stretch">
-        <a-col :span="14" style="display: flex">
+        <!-- 最近内容 + 分类分布，撑满剩余高度 -->
+        <div class="main-row">
           <a-card
             v-if="store.can('article:view')"
             size="small"
@@ -100,48 +103,75 @@ onMounted(async () => {
             :body-style="{ padding: '0 16px' }"
           >
             <template #extra><a @click="router.push('/articles')">全部 →</a></template>
-            <a-empty v-if="!recent.length" description="暂无内容" style="padding: 64px 0" />
-            <div v-for="a in recent" :key="a.id" class="article-row" @click="router.push(`/articles/${a.id}/edit`)">
-              <a-tag :color="STATUS_COLOR[a.status]" style="margin-right: 8px">{{ STATUS[a.status] }}</a-tag>
-              <span class="article-title" :title="a.title">{{ a.title }}</span>
-              <span class="article-meta">{{ a.categoryName || '未分类' }}</span>
-              <span class="article-time">{{ fmtTime(a.updatedAt || a.createdAt) }}</span>
+            <a-empty v-if="!recent.length" description="暂无内容" class="fill-empty" />
+            <div v-else class="list-fill">
+              <div v-for="a in recent" :key="a.id" class="article-row" @click="router.push(`/articles/${a.id}/edit`)">
+                <a-tag :color="STATUS_COLOR[a.status]" style="margin-right: 8px">{{ STATUS[a.status] }}</a-tag>
+                <span class="article-title" :title="a.title">{{ a.title }}</span>
+                <span class="article-meta">{{ a.categoryName || '未分类' }}</span>
+                <span class="article-time">{{ fmtTime(a.updatedAt || a.createdAt) }}</span>
+              </div>
             </div>
           </a-card>
-        </a-col>
-        <a-col :span="10" style="display: flex">
+
           <a-card size="small" title="分类分布" class="fill-card" :body-style="{ padding: '8px 16px' }">
             <template #extra><a @click="router.push('/categories')">管理 →</a></template>
-            <a-empty v-if="!categories.length" description="暂无分类" style="padding: 64px 0" />
-            <div v-for="c in categories" :key="c.id" class="cat-row">
-              <span class="cat-name" :title="c.name">{{ c.name }}</span>
-              <div class="cat-bar-track">
-                <div class="cat-bar" :style="{ width: ((c.articleCount || 0) / maxCategoryCount) * 100 + '%' }" />
+            <a-empty v-if="!categories.length" description="暂无分类" class="fill-empty" />
+            <div v-else class="list-fill">
+              <div v-for="c in categories" :key="c.id" class="cat-row">
+                <span class="cat-name" :title="c.name">{{ c.name }}</span>
+                <div class="cat-bar-track">
+                  <div class="cat-bar" :style="{ width: ((c.articleCount || 0) / maxCategoryCount) * 100 + '%' }" />
+                </div>
+                <span class="cat-count">{{ c.articleCount || 0 }}</span>
               </div>
-              <span class="cat-count">{{ c.articleCount || 0 }}</span>
             </div>
           </a-card>
-        </a-col>
-      </a-row>
+        </div>
+      </div>
     </a-spin>
   </div>
 </template>
 
 <style scoped>
-.dash-row {
-  margin-bottom: 12px;
+.dash-page,
+.dash-page :deep(.ant-spin-nested-loading),
+.dash-page :deep(.ant-spin-container) {
+  height: 100%;
 }
 
-.stat-card {
-  flex: 1;
-  min-height: 104px;
-  text-align: center;
+.dash-inner {
+  height: 100%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.stat-card :deep(.ant-card-body) {
-  width: 100%;
+/* 统计卡 */
+.stat-card {
+  flex: 0 0 auto;
+}
+
+.stat-grid {
+  display: grid;
+}
+
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 16px;
+  border-right: 1px solid var(--color-border, rgba(128, 128, 128, 0.15));
+  border-bottom: 1px solid var(--color-border, rgba(128, 128, 128, 0.15));
+}
+
+.stat-cell:nth-child(3n) {
+  border-right: none;
+}
+
+.stat-cell:nth-last-child(-n + 3) {
+  border-bottom: none;
 }
 
 .stat-num {
@@ -158,16 +188,7 @@ onMounted(async () => {
 }
 
 .quick-card {
-  margin-bottom: 12px;
-}
-
-.fill-card {
-  flex: 1;
-  width: 100%;
-}
-
-.main-row {
-  min-height: 460px;
+  flex: 0 0 auto;
 }
 
 .quick-bar {
@@ -188,11 +209,53 @@ onMounted(async () => {
   color: #fa8c16;
 }
 
-/* 最近内容 */
-.article-row {
+/* 下两栏：随剩余高度撑满 */
+.main-row {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 14fr 10fr;
+  gap: 12px;
+}
+
+.fill-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.fill-card :deep(.ant-card-head) {
+  flex: 0 0 auto;
+}
+
+.fill-card :deep(.ant-card-body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.list-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fill-empty {
+  flex: 1;
   display: flex;
   align-items: center;
-  height: 45px;
+  justify-content: center;
+}
+
+/* 最近内容 */
+.article-row {
+  flex: 1;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
   border-bottom: 1px solid var(--color-border, rgba(128, 128, 128, 0.15));
   cursor: pointer;
 }
@@ -230,10 +293,11 @@ onMounted(async () => {
 
 /* 分类分布 */
 .cat-row {
+  flex: 1;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 52px;
 }
 
 .cat-name {
