@@ -104,3 +104,15 @@ export function listAlarmReceiverOrgs() {
 export function listAlarmReceiverOrgUsers(orgId: string) {
   return request.get<never, AlarmReceiverUser[]>(`/api/accounts/approvals/orgs/${orgId}/employees`)
 }
+
+export interface AlarmContact {
+  accountId: number
+  username: string
+  nickname: string
+  email: string
+}
+
+/** 根据 accountIds 批量查联系人（昵称/邮箱），用于列表展示名字和编辑回写 */
+export function listAlarmReceivers(ids: string) {
+  return request.get<never, AlarmContact[]>('/api/jobs/alarms/receivers', { params: { ids } })
+}

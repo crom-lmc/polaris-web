@@ -9,7 +9,11 @@ import {
   type AlarmReceiverUser
 } from '@/api/alarm'
 
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{
+  open: boolean
+  /** 已选用户（编辑回写时传入，打开弹窗时恢复选中） */
+  initialUsers?: AlarmReceiverUser[]
+}>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'confirm', users: AlarmReceiverUser[]): void
@@ -126,7 +130,8 @@ watch(
     keyword.value = ''
     selectedOrg.value = null
     users.value = []
-    selected.value = []
+    // 恢复已选（initialUsers 来自编辑回写，或父组件 reset 后为空数组）
+    selected.value = [...(props.initialUsers ?? [])]
     loadTree()
   }
 )

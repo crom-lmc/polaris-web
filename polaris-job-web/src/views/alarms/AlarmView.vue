@@ -6,11 +6,13 @@ import {
   createAlarmRule,
   deleteAlarmRule,
   listAlarmChannels,
+  listAlarmReceivers,
   listAlarmRecords,
   listAlarmRules,
   saveAlarmChannels,
   updateAlarmRule,
   type AlarmChannel,
+  type AlarmContact,
   type AlarmReceiverUser,
   type AlarmRecord,
   type AlarmRule,
@@ -144,17 +146,50 @@ const receiverAccounts = ref<string[]>([])
 const receiverUsers = ref<AlarmReceiverUser[]>([])
 const receiverPickerOpen = ref(false)
 const receiverSelectKey = ref(0)
+/** 全局联系人缓存：accountId → AlarmContact，列表页展示和编辑回写共用 */
+const contactsMap = ref(new Map<string, AlarmContact>())
 
-const receiverOptions = computed(() => {
-  const users = new Map(receiverUsers.value.map((item) => [item.id, item]))
-  return receiverAccounts.value.map((id) => {
-    const account = users.get(id)
-    return {
-      value: id,
-      label: account ? `${account.name}${account.empNo ? `（${account.empNo}）` : ''}` : `账号 ${id}`
-    }
+/** 根据 receiverUsers 生成 select options（只有 picker 选过的才进 options） */
+const receiverOptions = computed(() =>
+  receiverUsers.value.map((u) => ({
+    value: u.id,
+    label: u.name + (u.empNo ? `（${u.empNo}）` : '')
+  }))
+)
+
+/** receiverAccounts 里的名字展示字符串（列表页用） */
+function receiversText(accountIds: string): string {
+  const ids = (accountIds || '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (!ids.length) return '—'
+  const parts = ids.map((id) => {
+    const c = contactsMap.value.get(id)
+    return c ? c.nickname || c.username : id
   })
-})
+  return parts.join('、')
+}
+
+/** 批量查联系人详情，写入 contactsMap；返回可用于 AlarmReceiverUser 格式的数组 */
+async function preloadContacts(ids: string[]): Promise<AlarmReceiverUser[]> {
+  const missing = ids.filter((id) => !contactsMap.value.has(id))
+  if (!missing.length) {
+    return ids
+      .map((id) => contactsMap.value.get(id))
+      .filter((c): c is AlarmContact => !!c)
+      .map((c) => ({ id: String(c.accountId), name: c.nickname || c.username, empNo: '' }))
+  }
+  try {
+    const list = await listAlarmReceivers(missing.join(','))
+    for (const c of list) {
+      contactsMap.value.set(String(c.accountId), c)
+    }
+  } catch (e) {
+    // 后端不可用时静默降级，receiverUsers 保持空数组不影响保存
+  }
+  return ids
+    .map((id) => contactsMap.value.get(id))
+    .filter((c): c is AlarmContact => !!c)
+    .map((c) => ({ id: String(c.accountId), name: c.nickname || c.username, empNo: '' }))
+}
 
 function splitAccountIds(value?: string) {
   return (value || '').split(',').map((item) => item.trim()).filter(Boolean)
@@ -165,6 +200,11 @@ function onReceiverConfirm(users: AlarmReceiverUser[]) {
   for (const item of users) merged.set(item.id, item)
   receiverUsers.value = [...merged.values()]
   receiverAccounts.value = [...new Set([...receiverAccounts.value, ...users.map((item) => item.id)])]
+}
+
+/** 从已选项里移除指定账号 */
+function removeReceiver(id: string) {
+  receiverAccounts.value = receiverAccounts.value.filter((x) => x !== id)
 }
 
 function resetForm() {
@@ -199,10 +239,15 @@ function openEdit(rule: AlarmRule) {
   form.silenceMinutes = rule.silenceMinutes ?? 60
   form.status = rule.status
   channelValues.value = (rule.channels || 'SITE').split(',').filter(Boolean)
-  receiverAccounts.value = splitAccountIds(rule.accountIds)
-  receiverUsers.value = []
+  const ids = splitAccountIds(rule.accountIds)
+  receiverAccounts.value = ids
+  receiverUsers.value = [] // 先空，下面异步补
   receiverSelectKey.value += 1
   drawerOpen.value = true
+  // 异步补联系人详情，让 select 和 picker 能显示名字
+  preloadContacts(ids).then((users) => {
+    receiverUsers.value = users
+  })
 }
 
 async function submitRule() {
@@ -352,7 +397,7 @@ onMounted(async () => {
           <template v-else-if="column.key === 'condition'">{{ conditionLabel(record) }}</template>
           <template v-else-if="column.key === 'channels'">{{ channelsText(record.channels) }}</template>
           <template v-else-if="column.key === 'receivers'">
-            {{ record.accountIds || '—' }}
+            {{ receiversText(record.accountIds) }}
           </template>
           <template v-else-if="column.key === 'silence'">
             {{ record.silenceMinutes }} 分钟
@@ -482,21 +527,19 @@ onMounted(async () => {
 
         <a-form-item label="接收人账号">
           <div class="receiver-input">
-            <a-select
-              :key="receiverSelectKey"
-              v-model:value="receiverAccounts"
-              mode="tags"
-              show-search
-              allow-clear
-              option-filter-prop="label"
-              :options="receiverOptions"
-              :token-separators="[',']"
-              placeholder="输入账号 ID，或从组织选择"
-            />
-            <a-button @click="receiverPickerOpen = true">从组织选择</a-button>
-          </div>
-          <div class="text-secondary" style="margin-top: 4px">
-            多个账号用英文逗号分隔；接收人需在账号中心存在
+            <div class="receiver-tags">
+              <a-tag
+                v-for="id in receiverAccounts"
+                :key="id"
+                closable
+                color="processing"
+                @close="removeReceiver(id)"
+              >
+                {{ (receiverUsers.find((u) => u.id === id)?.name) || contactsMap.get(id)?.nickname || id }}
+              </a-tag>
+              <span v-if="!receiverAccounts.length" class="receiver-empty">未设置，点击右侧按钮从组织选择</span>
+            </div>
+            <a-button type="primary" ghost @click="receiverPickerOpen = true">从组织选择</a-button>
           </div>
         </a-form-item>
 
@@ -518,7 +561,11 @@ onMounted(async () => {
       </template>
     </a-drawer>
 
-    <OrgReceiverPicker v-model:open="receiverPickerOpen" @confirm="onReceiverConfirm" />
+    <OrgReceiverPicker
+      v-model:open="receiverPickerOpen"
+      :initial-users="receiverUsers"
+      @confirm="onReceiverConfirm"
+    />
   </section>
 </template>
 
@@ -546,12 +593,21 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.receiver-input :deep(.ant-select) {
+.receiver-tags {
   flex: 1;
-  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
 }
 
-.receiver-input :deep(.ant-btn) {
-  flex: 0 0 auto;
+.receiver-empty {
+  color: #bfbfbf;
+  font-size: 13px;
 }
 </style>
