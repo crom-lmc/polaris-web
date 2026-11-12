@@ -159,6 +159,10 @@ function splitAccountIds(value?: string) {
   return (value || '').split(',').map((item) => item.trim()).filter(Boolean)
 }
 
+function onReceiverAccountsChange(values: string[]) {
+  receiverAccounts.value = [...new Set(values.flatMap((value) => splitAccountIds(value)))]
+}
+
 function onReceiverConfirm(users: AlarmReceiverUser[]) {
   const merged = new Map(receiverUsers.value.map((item) => [item.id, item]))
   for (const item of users) merged.set(item.id, item)
@@ -220,7 +224,7 @@ async function submitRule() {
     const payload: AlarmRuleSaveRequest = {
       ...form,
       scopeValue: form.scopeType === 'ALL' ? '' : form.scopeValue,
-      accountIds: [...new Set(receiverAccounts.value.map((item) => item.trim()).filter(Boolean))].join(','),
+      accountIds: [...new Set(receiverAccounts.value.flatMap((item) => splitAccountIds(item)))].join(','),
       channels: channelValues.value.join(','),
       threshold: form.triggerCondition === 'CONSECUTIVE_FAIL' ? form.threshold : 1
     }
@@ -488,6 +492,7 @@ onMounted(async () => {
               :options="receiverOptions"
               :token-separators="[',']"
               max-tag-count="responsive"
+              @change="onReceiverAccountsChange"
               placeholder="输入账号 ID，或从组织选择"
             />
             <a-button @click="receiverPickerOpen = true">从组织选择</a-button>
