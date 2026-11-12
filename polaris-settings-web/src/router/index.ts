@@ -10,7 +10,8 @@ const router = createRouter({
       path: '/',
       component: () => import('@/layout/SettingsLayout.vue'),
       children: [
-        { path: '', redirect: '/dicts' },
+        { path: '', redirect: '/dashboard' },
+        { path: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '概览' } },
         { path: 'dicts', component: () => import('@/views/DictView.vue'), meta: { title: '字典配置', perm: 'dict:view' } },
         { path: 'biz-data', redirect: '/biz-data/bank' },
         { path: 'biz-data/:type', component: () => import('@/views/BizDataView.vue'), meta: { title: '主数据', perm: 'biz:view' } },
@@ -24,7 +25,7 @@ const router = createRouter({
         { path: 'no-access', component: () => import('@/views/NoAccessView.vue'), meta: { title: '无权限', public: true } }
       ]
     },
-    { path: '/:pathMatch(.*)*', redirect: '/dicts' }
+    { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
   ]
 })
 

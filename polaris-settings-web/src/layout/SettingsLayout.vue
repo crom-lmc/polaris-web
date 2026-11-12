@@ -40,6 +40,10 @@
         @collapse="(v: boolean) => (collapsed = v)"
       >
         <a-menu mode="inline" :selected-keys="selectedKeys" @click="handleMenuClick">
+          <a-menu-item key="/dashboard">
+            <template #icon><dashboard-outlined /></template>
+            概览
+          </a-menu-item>
           <a-sub-menu v-if="store.can('biz:view')" key="biz">
             <template #icon><database-outlined /></template>
             <template #title>主数据</template>
@@ -94,6 +98,7 @@ import {
   AuditOutlined,
   BellOutlined,
   ControlOutlined,
+  DashboardOutlined,
   DatabaseOutlined,
   DownOutlined,
   LogoutOutlined,
