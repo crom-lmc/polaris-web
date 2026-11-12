@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -143,6 +143,7 @@ async function loadRows() {
     latest.value = map
   } finally {
     loading.value = false
+    nextTick(updateScrollY)
   }
 }
 
@@ -172,7 +173,9 @@ function updateScrollY() {
     (toolbar ? toolbar.offsetHeight + 12 : 44) +
     (header ? header.offsetHeight : 47) +
     (pager ? pager.offsetHeight + 16 : 40)
-  scrollY.value = Math.max(1, body.clientHeight - used)
+  // 低高度屏幕保留可读的表格区域，页面改为纵向滚动，避免表体被压成 0
+  const minTableHeight = window.innerHeight <= 820 ? 240 : 120
+  scrollY.value = Math.max(minTableHeight, body.clientHeight - used)
 }
 
 onMounted(() => {
@@ -533,7 +536,7 @@ async function removeJob() {
         :columns="columns"
         :data-source="rows"
         :pagination="pagination"
-        :scroll="{ y: scrollY }"
+        :scroll="{ x: 960, y: scrollY }"
         @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">

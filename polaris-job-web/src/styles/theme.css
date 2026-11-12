@@ -343,8 +343,67 @@ body {
   }
 }
 
+/* 14 寸笔记本及低高度窗口：允许页面纵向滚动，不再强撑一屏 */
+@media (max-height: 820px) {
+  .content {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .view {
+    gap: 10px;
+  }
+
+  .content.is-fixed {
+    overflow-y: auto;
+  }
+
+  .content.is-fixed .view {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .content.is-fixed .view > .fill-card {
+    flex: 0 0 auto;
+  }
+
+  .fill-card > .ant-card-body {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .stat-card .ant-card-body {
+    padding: 10px 12px !important;
+  }
+
+  .stat-card .ant-statistic-content {
+    font-size: 24px;
+  }
+
+  .stat-foot {
+    margin-top: 2px;
+  }
+
+  .fill-card .ant-table-body {
+    scrollbar-width: thin;
+  }
+
+  .fill-card .ant-table-body::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+}
+
 @media (max-width: 900px) {
   .stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .content {
+    padding: 12px;
+  }
+
+  .right .ant-tag {
+    display: none;
   }
 }

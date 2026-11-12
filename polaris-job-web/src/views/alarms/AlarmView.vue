@@ -308,6 +308,7 @@ onMounted(async () => {
         :columns="ruleColumns"
         :data-source="rules"
         :pagination="rulePagination"
+        :scroll="{ x: 1080 }"
         @change="onRuleTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -357,6 +358,7 @@ onMounted(async () => {
         :columns="recordColumns"
         :data-source="records"
         :pagination="recordPagination"
+        :scroll="{ x: 1000 }"
         @change="onRecordTableChange"
       >
         <template #bodyCell="{ column, record }">

@@ -253,7 +253,7 @@ const timelineItems = computed(() => {
         <a-button @click="detail = null">收起</a-button>
       </template>
 
-      <a-descriptions :column="3" size="small" bordered style="margin-bottom: 16px">
+      <a-descriptions :column="{ xs: 1, sm: 1, md: 2, lg: 3 }" size="small" bordered style="margin-bottom: 16px">
         <a-descriptions-item label="执行 ID">
           <span class="mono">{{ detail.id }}</span>
         </a-descriptions-item>
