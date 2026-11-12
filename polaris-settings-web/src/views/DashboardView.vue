@@ -46,12 +46,14 @@ const changes = [
           <div class="stat-icon" :style="{ color: item.color, background: item.bg }">
             <component :is="item.icon" />
           </div>
-          <div>
+          <div class="stat-text">
             <div class="stat-value">{{ item.value }}</div>
-            <div class="stat-label">{{ item.label }}</div>
+            <div class="stat-sub">
+              <div class="stat-label">{{ item.label }}</div>
+              <div class="stat-note">{{ item.note }}</div>
+            </div>
           </div>
         </div>
-        <div class="stat-note">{{ item.note }}</div>
       </a-card>
     </div>
 
@@ -136,14 +138,13 @@ const changes = [
   padding: 16px 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 .stat-main {
   display: flex;
   align-items: center;
   gap: 14px;
+  width: 100%;
 }
 
 .stat-icon {
@@ -157,6 +158,15 @@ const changes = [
   font-size: 22px;
 }
 
+.stat-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
 .stat-value {
   color: var(--text-base);
   font-size: 30px;
@@ -165,8 +175,14 @@ const changes = [
   font-variant-numeric: tabular-nums;
 }
 
+.stat-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .stat-label {
-  margin-top: 5px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -345,9 +361,13 @@ const changes = [
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 800px) {
   .stat-note {
     display: none;
+  }
+
+  .stat-sub {
+    justify-content: flex-start;
   }
 }
 
