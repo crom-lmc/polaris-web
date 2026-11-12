@@ -93,6 +93,7 @@ body {
   align-items: center;
   gap: 6px;
   padding-left: 24px;
+  height: 32px;
   font-size: 14px;
   font-weight: 600;
   color: var(--header-text);

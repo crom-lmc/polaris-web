@@ -259,6 +259,7 @@ function confirmLogout() {
   gap: 6px;
   /* 与下方菜单项图标列对齐（菜单项左内边距统一覆盖为 24px） */
   padding-left: 24px;
+  height: 32px;
   color: var(--header-text);
   font-weight: 600;
   /* 与侧栏菜单文字字号统一为 14px */

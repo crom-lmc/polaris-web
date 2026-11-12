@@ -216,6 +216,7 @@ function onUserMenuClick({ key }: { key: string }) {
   align-items: center;
   gap: 6px;
   padding-left: 24px;
+  height: 32px;
   color: var(--header-text);
   font-weight: 600;
   font-size: 14px;
