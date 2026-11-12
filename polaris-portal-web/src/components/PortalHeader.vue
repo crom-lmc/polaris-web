@@ -161,6 +161,7 @@ function onMenu({ key }: { key: string }) {
   display: flex;
   align-items: center;
   gap: 24px;
+  line-height: 1;
 }
 
 .brand {

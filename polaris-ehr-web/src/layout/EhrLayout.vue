@@ -195,6 +195,8 @@ function onUserMenuClick({ key }: { key: string }) {
   background: var(--header-bg);
   color: var(--header-text);
   border-bottom: 1px solid var(--header-border);
+  /* 覆盖 Ant Design a-layout-header 默认的 line-height: 64px，让 flex 居中真正生效 */
+  line-height: 1;
 }
 
 .logo {
