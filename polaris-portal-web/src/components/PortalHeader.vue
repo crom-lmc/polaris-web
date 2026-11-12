@@ -227,9 +227,13 @@ function onMenu({ key }: { key: string }) {
 .who {
   font-size: 14px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 0 10px;
+  height: 32px;
+  line-height: 32px;
   border-radius: 8px;
   color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
 }
 
 .who:hover {

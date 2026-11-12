@@ -286,8 +286,10 @@ function onUserMenuClick({ key }: { key: string }) {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 4px 8px;
+  height: 32px;
+  padding: 0 10px;
   border-radius: 6px;
   transition: background 0.2s;
 }
