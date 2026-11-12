@@ -295,6 +295,19 @@ body {
   font-size: 12px;
 }
 
+/* 必填星号不占布局：必填与选填标签文字左边缘对齐 */
+.ant-form-item-label > label {
+  position: relative;
+  padding-left: 10px;
+}
+.ant-form-item-label > label.ant-form-item-required::before {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
 /* ===== 通用文本 ===== */
 .mono {
   font-family: var(--mono);
