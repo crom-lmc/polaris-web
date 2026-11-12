@@ -11,6 +11,7 @@ import {
   saveAlarmChannels,
   updateAlarmRule,
   type AlarmChannel,
+  type AlarmReceiverUser,
   type AlarmRecord,
   type AlarmRule,
   type AlarmRuleSaveRequest
@@ -19,6 +20,7 @@ import { listJobs, type JobInfo } from '@/api/job'
 import { useUserStore } from '@/stores/user'
 import { APP_CODES, appLabel } from '@/utils/apps'
 import { formatDateTime } from '@/utils/format'
+import OrgReceiverPicker from '@/components/OrgReceiverPicker.vue'
 
 const user = useUserStore()
 
@@ -138,6 +140,31 @@ const form = reactive<AlarmRuleSaveRequest>({
 })
 
 const channelValues = ref<string[]>(['SITE'])
+const receiverAccounts = ref<string[]>([])
+const receiverUsers = ref<AlarmReceiverUser[]>([])
+const receiverPickerOpen = ref(false)
+
+const receiverOptions = computed(() => {
+  const users = new Map(receiverUsers.value.map((item) => [item.id, item]))
+  return receiverAccounts.value.map((id) => {
+    const account = users.get(id)
+    return {
+      value: id,
+      label: account ? `${account.name}${account.empNo ? `（${account.empNo}）` : ''}` : `账号 ${id}`
+    }
+  })
+})
+
+function splitAccountIds(value?: string) {
+  return (value || '').split(',').map((item) => item.trim()).filter(Boolean)
+}
+
+function onReceiverConfirm(users: AlarmReceiverUser[]) {
+  const merged = new Map(receiverUsers.value.map((item) => [item.id, item]))
+  for (const item of users) merged.set(item.id, item)
+  receiverUsers.value = [...merged.values()]
+  receiverAccounts.value = [...new Set([...receiverAccounts.value, ...users.map((item) => item.id)])]
+}
 
 function resetForm() {
   form.name = ''
@@ -149,6 +176,8 @@ function resetForm() {
   form.silenceMinutes = 60
   form.status = 1
   channelValues.value = ['SITE']
+  receiverAccounts.value = []
+  receiverUsers.value = []
 }
 
 function openCreate() {
@@ -168,6 +197,8 @@ function openEdit(rule: AlarmRule) {
   form.silenceMinutes = rule.silenceMinutes ?? 60
   form.status = rule.status
   channelValues.value = (rule.channels || 'SITE').split(',').filter(Boolean)
+  receiverAccounts.value = splitAccountIds(rule.accountIds)
+  receiverUsers.value = []
   drawerOpen.value = true
 }
 
@@ -189,6 +220,7 @@ async function submitRule() {
     const payload: AlarmRuleSaveRequest = {
       ...form,
       scopeValue: form.scopeType === 'ALL' ? '' : form.scopeValue,
+      accountIds: [...new Set(receiverAccounts.value.map((item) => item.trim()).filter(Boolean))].join(','),
       channels: channelValues.value.join(','),
       threshold: form.triggerCondition === 'CONSECUTIVE_FAIL' ? form.threshold : 1
     }
@@ -445,9 +477,24 @@ onMounted(async () => {
           </a-checkbox-group>
         </a-form-item>
 
-        <a-form-item label="接收人账号 ID">
-          <a-input v-model:value="form.accountIds" placeholder="多个用英文逗号分隔，如 10001,10002" />
-          <div class="text-secondary" style="margin-top: 4px">接收人需在账号中心存在，否则通知会被消息中心跳过</div>
+        <a-form-item label="接收人账号">
+          <div class="receiver-input">
+            <a-select
+              v-model:value="receiverAccounts"
+              mode="tags"
+              show-search
+              allow-clear
+              option-filter-prop="label"
+              :options="receiverOptions"
+              :token-separators="[',']"
+              max-tag-count="responsive"
+              placeholder="输入账号 ID，或从组织选择"
+            />
+            <a-button @click="receiverPickerOpen = true">从组织选择</a-button>
+          </div>
+          <div class="text-secondary" style="margin-top: 4px">
+            多个账号用英文逗号分隔；接收人需在账号中心存在
+          </div>
         </a-form-item>
 
         <a-form-item label="静默期（分钟）">
@@ -467,6 +514,8 @@ onMounted(async () => {
         </a-space>
       </template>
     </a-drawer>
+
+    <OrgReceiverPicker v-model:open="receiverPickerOpen" @confirm="onReceiverConfirm" />
   </section>
 </template>
 
@@ -486,5 +535,20 @@ onMounted(async () => {
 
 .channel-name {
   font-weight: 500;
+}
+
+.receiver-input {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.receiver-input :deep(.ant-select) {
+  flex: 1;
+  min-width: 0;
+}
+
+.receiver-input :deep(.ant-btn) {
+  flex: 0 0 auto;
 }
 </style>

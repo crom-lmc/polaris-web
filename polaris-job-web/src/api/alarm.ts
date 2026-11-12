@@ -81,3 +81,26 @@ export function deleteAlarmRule(id: string | number) {
 export function listAlarmRecords(params: { page?: number; size?: number }) {
   return request.get<never, AlarmPage<AlarmRecord>>('/api/jobs/alarms/records', { params })
 }
+
+export interface AlarmReceiverOrg {
+  id: string
+  parentId: string | null
+  name: string
+  type: number
+  status: number
+}
+
+export interface AlarmReceiverUser {
+  id: string
+  name: string
+  empNo: string
+}
+
+/** 组织树及直属成员复用账号中心的审批选人接口，仅要求登录态。 */
+export function listAlarmReceiverOrgs() {
+  return request.get<never, AlarmReceiverOrg[]>('/api/accounts/approvals/orgs/tree')
+}
+
+export function listAlarmReceiverOrgUsers(orgId: string) {
+  return request.get<never, AlarmReceiverUser[]>(`/api/accounts/approvals/orgs/${orgId}/employees`)
+}
