@@ -143,6 +143,7 @@ const channelValues = ref<string[]>(['SITE'])
 const receiverAccounts = ref<string[]>([])
 const receiverUsers = ref<AlarmReceiverUser[]>([])
 const receiverPickerOpen = ref(false)
+const receiverSelectKey = ref(0)
 
 const receiverOptions = computed(() => {
   const users = new Map(receiverUsers.value.map((item) => [item.id, item]))
@@ -157,10 +158,6 @@ const receiverOptions = computed(() => {
 
 function splitAccountIds(value?: string) {
   return (value || '').split(',').map((item) => item.trim()).filter(Boolean)
-}
-
-function onReceiverAccountsChange(values: string[]) {
-  receiverAccounts.value = [...new Set(values.flatMap((value) => splitAccountIds(value)))]
 }
 
 function onReceiverConfirm(users: AlarmReceiverUser[]) {
@@ -182,6 +179,7 @@ function resetForm() {
   channelValues.value = ['SITE']
   receiverAccounts.value = []
   receiverUsers.value = []
+  receiverSelectKey.value += 1
 }
 
 function openCreate() {
@@ -203,6 +201,7 @@ function openEdit(rule: AlarmRule) {
   channelValues.value = (rule.channels || 'SITE').split(',').filter(Boolean)
   receiverAccounts.value = splitAccountIds(rule.accountIds)
   receiverUsers.value = []
+  receiverSelectKey.value += 1
   drawerOpen.value = true
 }
 
@@ -484,6 +483,7 @@ onMounted(async () => {
         <a-form-item label="接收人账号">
           <div class="receiver-input">
             <a-select
+              :key="receiverSelectKey"
               v-model:value="receiverAccounts"
               mode="tags"
               show-search
@@ -491,8 +491,6 @@ onMounted(async () => {
               option-filter-prop="label"
               :options="receiverOptions"
               :token-separators="[',']"
-              max-tag-count="responsive"
-              @change="onReceiverAccountsChange"
               placeholder="输入账号 ID，或从组织选择"
             />
             <a-button @click="receiverPickerOpen = true">从组织选择</a-button>
