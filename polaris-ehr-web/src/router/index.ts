@@ -12,7 +12,7 @@ const router = createRouter({
       component: () => import('@/layout/EhrLayout.vue'),
       children: [
         { path: '', redirect: '/orgs' },
-        { path: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '工作台' } },
+        { path: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '概览' } },
         { path: 'orgs', component: () => import('@/views/OrgView.vue'), meta: { title: '组织架构', perm: 'org:view' } },
         { path: 'employees', component: () => import('@/views/EmployeeView.vue'), meta: { title: '人员管理', perm: 'employee:view' } },
         { path: 'recruits', component: () => import('@/views/RecruitView.vue'), meta: { title: '招聘管理', perm: 'recruit:view' } },

@@ -42,7 +42,7 @@
         <a-menu mode="inline" :selected-keys="selectedKeys" @click="handleMenuClick">
           <a-menu-item v-if="store.can('dashboard:view')" key="/dashboard">
             <template #icon><dashboard-outlined /></template>
-            仪表盘
+            概览
           </a-menu-item>
           <a-menu-item v-if="store.can('article:view')" key="/articles">
             <template #icon><file-text-outlined /></template>

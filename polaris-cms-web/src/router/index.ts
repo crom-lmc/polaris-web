@@ -11,7 +11,7 @@ const router = createRouter({
       component: () => import('@/layout/CmsLayout.vue'),
       children: [
         { path: '', redirect: '/dashboard' },
-        { path: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '仪表盘', perm: 'dashboard:view' } },
+        { path: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '概览', perm: 'dashboard:view' } },
         { path: 'articles', component: () => import('@/views/ArticleListView.vue'), meta: { title: '内容管理', perm: 'article:view' } },
         { path: 'articles/new', component: () => import('@/views/ArticleEditView.vue'), meta: { title: '新建文章', perm: 'article:create' } },
         { path: 'articles/:id/edit', component: () => import('@/views/ArticleEditView.vue'), meta: { title: '编辑文章', perm: 'article:view' } },
