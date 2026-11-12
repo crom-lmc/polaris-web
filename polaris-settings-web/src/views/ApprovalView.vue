@@ -573,7 +573,8 @@ const treeData = computed(() => {
     isLeaf: true
   }))
   arr.sort((a, b) => a.title.localeCompare(b.title, 'zh'))
-  return arr
+  // 统一包一层 root「业务类型」，与另外两页（业务场景、消息配置）风格一致
+  return arr.length ? [{ key: 'root', title: '业务类型', children: arr }] : []
 })
 
 /* ---------------- 左树统一样式与展开（三个审批菜单共用同一套 class） ---------------- */

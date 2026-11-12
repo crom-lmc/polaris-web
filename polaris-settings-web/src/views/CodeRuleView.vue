@@ -31,6 +31,7 @@
             :custom-row="onRowClick"
             size="small"
             :pagination="false"
+            :scroll="{ x: 1200 }"
           >
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'index'">{{ index + 1 }}</template>
