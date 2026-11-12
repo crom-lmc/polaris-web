@@ -71,27 +71,22 @@
       </a-col>
     </a-row>
 
-    <!-- 概览数字：放在账号/应用卡下方，卡片与上方保持等高 -->
+    <!-- 概览数字：与配置中心概览同一套视觉语言（色块图标 + 数字 + 说明），比纯数字卡片更有信息量 -->
     <a-row :gutter="16" align="stretch" class="stat-row">
-      <a-col :span="8">
-        <a-card
-          size="small"
-          hoverable
-          :loading="statLoading"
-          class="stat-card"
-          @click="goPendingApprovals"
-        >
-          <a-statistic title="待审批" :value="pendingCount" />
-        </a-card>
-      </a-col>
-      <a-col :span="8">
-        <a-card size="small" hoverable :loading="statLoading" class="stat-card" @click="goMessages(1)">
-          <a-statistic title="待办" :value="todoCount" />
-        </a-card>
-      </a-col>
-      <a-col :span="8">
-        <a-card size="small" hoverable :loading="statLoading" class="stat-card" @click="goMessages(2)">
-          <a-statistic title="未读消息" :value="unreadMsgCount" />
+      <a-col v-for="item in statCards" :key="item.label" :span="8">
+        <a-card size="small" hoverable :loading="statLoading" class="stat-card" @click="item.go()">
+          <div class="stat-main">
+            <div class="stat-icon" :style="{ color: item.color, background: item.bg }">
+              <component :is="item.icon" />
+            </div>
+            <div class="stat-text">
+              <div class="stat-value">{{ item.value }}</div>
+              <div class="stat-sub">
+                <span class="stat-label">{{ item.label }}</span>
+                <span class="stat-note">{{ item.note }}</span>
+              </div>
+            </div>
+          </div>
         </a-card>
       </a-col>
     </a-row>
@@ -223,6 +218,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { AuditOutlined, BellOutlined, CarryOutOutlined } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { oauthAuthorize } from '@/api/oauth'
 import { fetchApprovals } from '@/api/approvals'
@@ -248,6 +244,37 @@ const statLoading = ref(false)
 const pendingCount = ref(0)
 const todoCount = ref(0)
 const unreadMsgCount = ref(0)
+
+/** 三个数字卡：图标/配色沿用配置中心概览，点击进入对应列表 */
+const statCards = computed(() => [
+  {
+    label: '待审批',
+    value: pendingCount.value,
+    note: '等待我处理',
+    icon: AuditOutlined,
+    color: '#2f54eb',
+    bg: '#eef2ff',
+    go: goPendingApprovals
+  },
+  {
+    label: '待办',
+    value: todoCount.value,
+    note: '待处理事项',
+    icon: CarryOutOutlined,
+    color: '#fa8c16',
+    bg: '#fff7e6',
+    go: () => goMessages(1)
+  },
+  {
+    label: '未读消息',
+    value: unreadMsgCount.value,
+    note: '站内未读',
+    icon: BellOutlined,
+    color: '#eb2f96',
+    bg: '#fff0f6',
+    go: () => goMessages(2)
+  }
+])
 
 async function loadStats() {
   statLoading.value = true
@@ -477,15 +504,13 @@ async function enter(app: ApplicationVO) {
 </script>
 
 <style scoped>
-/* 上下两行所有卡片统一高度，保证三张数字卡与下方账号/应用卡完全等高 */
-.dash-row,
-.stat-row {
+/* 上方两张卡统一高度，保证「我的应用」与「当前账号」严格等高 */
+.dash-row {
   --dash-card-height: 180px;
 }
 
-.equal-card,
-.stat-card {
-  /* height:100% 让同行卡片被拉伸到同一高度（我的应用与当前账号严格等高），
+.equal-card {
+  /* height:100% 让同行卡片被拉伸到同一高度，
      min-height 兜底保证不会低于统一基准高度 */
   height: 100%;
   min-height: var(--dash-card-height);
@@ -504,23 +529,70 @@ async function enter(app: ApplicationVO) {
   margin-top: 16px;
 }
 
+.stat-card {
+  height: 100%;
+  cursor: pointer;
+}
+
 .stat-card :deep(.ant-card-body) {
+  min-height: 104px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+}
+
+/* 色块图标 + 数字/说明：与配置中心概览统计卡保持同一视觉语言 */
+.stat-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.stat-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 22px;
+}
+
+.stat-text {
   flex: 1;
-  padding: 20px 24px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  gap: 4px;
 }
 
-.stat-card :deep(.ant-statistic-title) {
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-.stat-card :deep(.ant-statistic-content) {
-  font-size: 34px;
-  line-height: 1.2;
+.stat-value {
+  color: var(--text-base, var(--color-text, inherit));
+  font-size: 30px;
   font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stat-note {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .tip {

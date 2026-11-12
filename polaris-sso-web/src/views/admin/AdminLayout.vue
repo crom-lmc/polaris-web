@@ -250,6 +250,8 @@ function confirmLogout() {
   background: var(--header-bg);
   color: var(--header-text);
   border-bottom: 1px solid var(--header-border);
+  /* 覆盖 Ant Design a-layout-header 默认的 line-height: 64px，让 flex 居中真正生效 */
+  line-height: 1;
 }
 
 .logo {
@@ -371,6 +373,19 @@ function confirmLogout() {
 
 .right .theme-toggle {
   color: var(--header-text);
+  /* 关键：用 flex 精确居中内联 SVG。SVG 默认按文本基线排版，会让图标比用户名高 2~3px */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  line-height: 1;
+}
+
+.right .theme-toggle :deep(svg) {
+  display: block;
 }
 
 .right .who {

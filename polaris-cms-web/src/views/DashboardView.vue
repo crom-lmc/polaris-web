@@ -2,6 +2,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  AuditOutlined,
+  CheckCircleOutlined,
+  EditOutlined,
+  FileTextOutlined,
+  FlagOutlined,
+  PictureOutlined
+} from '@ant-design/icons-vue'
+import {
   fetchDashboard,
   pageArticles,
   listCategories,
@@ -22,13 +30,14 @@ const categories = ref<TaxonomyItem[]>([])
 const STATUS = ['草稿', '待审核', '待发布', '已发布', '驳回', '已下线', '审批中']
 const STATUS_COLOR = ['default', 'orange', 'purple', 'green', 'red', 'default', 'processing']
 
+/* 统计卡：图标/配色/说明沿用配置中心概览的视觉语言 */
 const cards = [
-  { key: 'total', label: '全部内容', perm: 'article:view' },
-  { key: 'published', label: '已发布', perm: 'article:view' },
-  { key: 'pendingAudit', label: '待审核', perm: 'article:view' },
-  { key: 'draft', label: '草稿箱', perm: 'article:view' },
-  { key: 'media', label: '媒体文件', perm: 'media:view' },
-  { key: 'banners', label: 'Banner', perm: 'banner:view' }
+  { key: 'total', label: '全部内容', note: '含各状态内容', perm: 'article:view', icon: FileTextOutlined, color: '#2f54eb', bg: '#eef2ff' },
+  { key: 'published', label: '已发布', note: '对外可见', perm: 'article:view', icon: CheckCircleOutlined, color: '#52c41a', bg: '#f6ffed' },
+  { key: 'pendingAudit', label: '待审核', note: '等待审批', perm: 'article:view', icon: AuditOutlined, color: '#fa8c16', bg: '#fff7e6' },
+  { key: 'draft', label: '草稿箱', note: '尚未提交', perm: 'article:view', icon: EditOutlined, color: '#722ed1', bg: '#f9f0ff' },
+  { key: 'media', label: '媒体文件', note: '图片 / 附件', perm: 'media:view', icon: PictureOutlined, color: '#13c2c2', bg: '#e6fffb' },
+  { key: 'banners', label: 'Banner', note: '首页轮播', perm: 'banner:view', icon: FlagOutlined, color: '#eb2f96', bg: '#fff0f6' }
 ]
 
 const visibleCards = computed(() => cards.filter((c) => store.can(c.perm)))
@@ -66,16 +75,21 @@ onMounted(async () => {
   <div class="dash-page">
     <a-spin :spinning="loading">
       <div class="dash-inner">
-        <!-- 统计卡：独立卡片，横竖都留间距 -->
+        <!-- 统计卡：色块图标 + 数字 + 说明，与配置中心概览保持一致 -->
         <div class="stat-grid" :style="{ gridTemplateColumns: `repeat(${statColumns}, 1fr)` }">
-          <a-card
-            v-for="c in visibleCards"
-            :key="c.key"
-            class="stat-card"
-            :body-style="{ padding: '24px 16px' }"
-          >
-            <div class="stat-num">{{ stats ? (stats as any)[c.key] : '-' }}</div>
-            <div class="stat-label">{{ c.label }}</div>
+          <a-card v-for="c in visibleCards" :key="c.key" class="stat-card">
+            <div class="stat-main">
+              <div class="stat-icon" :style="{ color: c.color, background: c.bg }">
+                <component :is="c.icon" />
+              </div>
+              <div class="stat-text">
+                <div class="stat-value">{{ stats ? (stats as any)[c.key] : '-' }}</div>
+                <div class="stat-sub">
+                  <span class="stat-label">{{ c.label }}</span>
+                  <span class="stat-note">{{ c.note }}</span>
+                </div>
+              </div>
+            </div>
           </a-card>
         </div>
 
@@ -158,24 +172,63 @@ onMounted(async () => {
 }
 
 .stat-card :deep(.ant-card-body) {
+  min-height: 104px;
+  padding: 16px 18px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 108px;
 }
 
-.stat-num {
-  font-size: 34px;
+.stat-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.stat-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 22px;
+}
+
+.stat-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 30px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary, var(--color-text));
 }
 
+.stat-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .stat-label {
-  margin-top: 6px;
   font-size: 13px;
   opacity: 0.7;
+}
+
+.stat-note {
+  font-size: 12px;
+  opacity: 0.55;
+  white-space: nowrap;
 }
 
 .quick-card {

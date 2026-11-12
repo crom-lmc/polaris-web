@@ -11,7 +11,7 @@ const router = createRouter({
       path: '/',
       component: () => import('@/layout/EhrLayout.vue'),
       children: [
-        { path: '', redirect: '/orgs' },
+        { path: '', redirect: '/dashboard' },
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '概览' } },
         { path: 'orgs', component: () => import('@/views/OrgView.vue'), meta: { title: '组织架构', perm: 'org:view' } },
         { path: 'employees', component: () => import('@/views/EmployeeView.vue'), meta: { title: '人员管理', perm: 'employee:view' } },

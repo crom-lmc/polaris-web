@@ -248,6 +248,19 @@ function onMenu({ key }: { key: string }) {
 .theme-toggle {
   color: var(--text-2);
   flex-shrink: 0;
+  /* 关键：用 flex 精确居中内联 SVG。SVG 默认按文本基线排版，会让图标比用户名高 2~3px */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  line-height: 1;
+}
+
+.theme-toggle svg {
+  display: block;
 }
 
 .theme-toggle:hover {
