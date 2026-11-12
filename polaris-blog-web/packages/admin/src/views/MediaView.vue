@@ -17,7 +17,7 @@ import { isNotified } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
-const apiOrigin = (import.meta.env.VITE_API_TARGET as string) || 'http://localhost:80'
+const apiOrigin = (import.meta.env.VITE_API_TARGET as string) || ''
 const list = ref<MediaItem[]>([])
 const total = ref(0)
 const loading = ref(false)
