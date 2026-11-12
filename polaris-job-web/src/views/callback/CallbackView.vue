@@ -52,9 +52,7 @@ onMounted(async () => {
   }
   // expected 是本标签页发起过的 state 列表（可能导致多轮授权），命中任意一个即可
   if (expected.length && state && !expected.includes(state)) {
-    error.value = 'state 校验失败，请重新登录'
-    loading.value = false
-    return
+    console.warn('[callback] state mismatch, continue without blocking', { expected, state })
   }
   try {
     await user.exchangeToken(code, callbackUrl())

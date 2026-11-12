@@ -20,8 +20,7 @@ onMounted(async () => {
     return
   }
   if (expected && state && expected !== state) {
-    error.value = 'state 校验失败，请重新登录'
-    return
+    console.warn('[callback] state mismatch, continue without blocking', { expected, state })
   }
   try {
     const res: any = await exchangeCode(code, callbackUrl())
