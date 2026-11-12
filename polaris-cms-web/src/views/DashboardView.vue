@@ -66,15 +66,18 @@ onMounted(async () => {
   <div class="dash-page">
     <a-spin :spinning="loading">
       <div class="dash-inner">
-        <!-- 统计卡：连续栅格，无间隙 -->
-        <a-card class="stat-card" :body-style="{ padding: 0 }">
-          <div class="stat-grid" :style="{ gridTemplateColumns: `repeat(${statColumns}, 1fr)` }">
-            <div v-for="c in visibleCards" :key="c.key" class="stat-cell">
-              <div class="stat-num">{{ stats ? (stats as any)[c.key] : '-' }}</div>
-              <div class="stat-label">{{ c.label }}</div>
-            </div>
-          </div>
-        </a-card>
+        <!-- 统计卡：独立卡片，横竖都留间距 -->
+        <div class="stat-grid" :style="{ gridTemplateColumns: `repeat(${statColumns}, 1fr)` }">
+          <a-card
+            v-for="c in visibleCards"
+            :key="c.key"
+            class="stat-card"
+            :body-style="{ padding: '24px 16px' }"
+          >
+            <div class="stat-num">{{ stats ? (stats as any)[c.key] : '-' }}</div>
+            <div class="stat-label">{{ c.label }}</div>
+          </a-card>
+        </div>
 
         <!-- 快捷操作 + 待审核提醒 -->
         <a-card size="small" class="quick-card" :body-style="{ padding: '12px 16px' }">
@@ -144,38 +147,26 @@ onMounted(async () => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-/* 统计卡 */
-.stat-card {
-  flex: 0 0 auto;
-}
-
+/* 统计卡：卡片之间横竖都留间距 */
 .stat-grid {
+  flex: 0 0 auto;
   display: grid;
+  gap: 14px;
 }
 
-.stat-cell {
+.stat-card :deep(.ant-card-body) {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 18px 16px;
-  border-right: 1px solid var(--color-border, rgba(128, 128, 128, 0.15));
-  border-bottom: 1px solid var(--color-border, rgba(128, 128, 128, 0.15));
-}
-
-.stat-cell:nth-child(3n) {
-  border-right: none;
-}
-
-.stat-cell:nth-last-child(-n + 3) {
-  border-bottom: none;
+  min-height: 108px;
 }
 
 .stat-num {
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 600;
   line-height: 1.2;
   color: var(--text-primary, var(--color-text));
