@@ -1264,6 +1264,27 @@ export function leavePlan(leaveType: string, startDate: string) {
   })
 }
 
+/** 「本次请假时长」试算：与提交共用后端天数口径（工作日历 / 半天 / 城市政策固定天数） */
+export interface LeavePreview {
+  /** 本次请假时长（天） */
+  days: number
+  /** NATURAL 自然日 / WORKDAY 工作日 */
+  dayMode?: string
+  /** 天数计算告警（如未配置工作日历），无则为空 */
+  warning?: string
+}
+
+export function leavePreview(params: {
+  leaveType: string
+  startDate: string
+  endDate: string
+  startTime?: string
+  endTime?: string
+  dayMode?: string
+}) {
+  return request.get<never, LeavePreview>('/api/ehr/leaves/preview', { params })
+}
+
 /* ---------------- 通知管理（人力中心发布 → 账号中心通知中心展示） ---------------- */
 
 export interface AnnouncementItem {
@@ -1823,10 +1844,12 @@ export interface AttendanceDailyItem {
   remark?: string
 }
 
-/** 打卡流水（AttendancePunch） */
+/** 打卡流水（AttendancePunchVO，员工姓名/工号由后端批量回填） */
 export interface AttendancePunchItem {
   id: string
   employeeId: string
+  employeeName?: string | null
+  employeeNo?: string | null
   punchTime: string
   /** IN / OUT，空=自动判定 */
   punchType?: string | null

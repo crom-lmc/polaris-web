@@ -235,7 +235,7 @@
             :loading="empLoading"
             placeholder="全部员工"
             style="width: 190px"
-            @search="loadEmployeeOptions"
+            @search="onEmployeeSearch"
             @change="reloadDaily"
           />
           <a-select
@@ -277,7 +277,8 @@
               <div class="tbl-empty"><a-empty v-if="!dailyLoading" description="暂无日结果，可先点击生成考勤" /></div>
             </template>
             <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'status'">
+              <template v-if="column.key === 'dayType'">{{ dayTypeText(record.dayType) }}</template>
+              <template v-else-if="column.key === 'status'">
                 <a-tag :color="dailyStatusColor(record.status)">{{ record.statusName || record.status }}</a-tag>
               </template>
               <template v-else-if="column.key === 'shift'">
@@ -304,7 +305,7 @@
             :loading="empLoading"
             placeholder="全部员工"
             style="width: 190px"
-            @search="loadEmployeeOptions"
+            @search="onEmployeeSearch"
             @change="reloadPunches"
           />
           <a-date-picker
@@ -341,7 +342,7 @@
               <div class="tbl-empty"><a-empty v-if="!punchLoading" description="暂无打卡记录" /></div>
             </template>
             <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'employee'">{{ empName(record.employeeId) }}</template>
+              <template v-if="column.key === 'employee'">{{ punchEmployeeText(record) }}</template>
               <template v-else-if="column.key === 'punchTime'">{{ fmtTime(record.punchTime) }}</template>
               <template v-else-if="column.key === 'punchType'">{{ record.punchType || '自动' }}</template>
               <template v-else-if="column.key === 'source'">{{ punchSourceText(record.source) }}</template>
@@ -732,7 +733,7 @@
             :options="empOptions"
             :loading="empLoading"
             placeholder="选择员工"
-            @search="loadEmployeeOptions"
+            @search="onEmployeeSearch"
           />
         </a-form-item>
         <a-form-item label="打卡类型">
@@ -1171,32 +1172,43 @@ interface EmpOption {
 }
 
 const empOptions = ref<EmpOption[]>([])
-const empNameMap = ref<Record<string, string>>({})
 const empLoading = ref(false)
+let empSearchTimer: number | undefined
+
+/** 远程搜索：停止输入 300ms 后再查，避免每次按键都重新拉取并把旧结果和新结果堆在一起 */
+function onEmployeeSearch(keyword: string) {
+  if (empSearchTimer) window.clearTimeout(empSearchTimer)
+  empSearchTimer = window.setTimeout(() => loadEmployeeOptions(keyword), 300)
+}
 
 async function loadEmployeeOptions(keyword?: string) {
   if (!canAttendanceView.value) return
   empLoading.value = true
   try {
     const data = await pageEmployees({ keyword: keyword || undefined, page: 1, size: 50 })
-    const m = { ...empNameMap.value }
-    const merged = new Map(empOptions.value.map((o) => [o.value, o.label]))
-    for (const e of data.list || []) {
-      const label = `${e.name}${e.empNo ? `（${e.empNo}）` : ''}`
-      m[e.id] = label
-      merged.set(e.id, label)
+    /* 搜索时用本次结果替换候选，但保留已选中的员工，避免选中项因不在结果里而回退成 ID */
+    const selected = [dailyFilters.employeeId, punchFilters.employeeId, punchForm.employeeId]
+      .filter(Boolean)
+      .map(String)
+    const merged = new Map<string, string>()
+    for (const o of empOptions.value) {
+      if (selected.includes(o.value)) merged.set(o.value, o.label)
     }
-    empNameMap.value = m
+    for (const e of data.list || []) {
+      merged.set(e.id, `${e.name}${e.empNo ? `（${e.empNo}）` : ''}`)
+    }
     empOptions.value = Array.from(merged, ([value, label]) => ({ value, label }))
   } catch {
-    /* 无 employee:view 权限时静默降级为手输/仅展示ID */
+    /* 无 employee:view 权限时静默降级，列表仍展示后端回填的姓名 */
   } finally {
     empLoading.value = false
   }
 }
 
-function empName(id: string) {
-  return empNameMap.value[id] || id
+/** 打卡记录员工列：统一「姓名（工号）」，员工档案查不到时给可读兜底，不裸露 ID */
+function punchEmployeeText(record: AttendancePunchItem) {
+  if (!record.employeeName) return '未知员工'
+  return record.employeeNo ? `${record.employeeName}（${record.employeeNo}）` : record.employeeName
 }
 
 /* ---------- 通用格式化 ---------- */

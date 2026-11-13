@@ -176,9 +176,13 @@
         <a-form-item label="天数计算方式">
           <a-select v-model:value="applyForm.dayMode" :options="dayModeOptions" :disabled="!!policyOfType" />
         </a-form-item>
-        <a-alert v-if="cityPolicyHint" type="info" show-icon class="mb12" :message="cityPolicyHint" />
+        <a-form-item label="本次请假时长">
+          <div class="duration-box">
+            <span class="duration-value">{{ previewDays === null ? '—' : previewDays }}</span>
+            <span class="duration-unit">天</span>
+          </div>
+        </a-form-item>
         <a-alert v-if="cityPolicyMissing" type="warning" show-icon class="mb12" :message="cityPolicyMissing" />
-        <a-alert v-if="currentRule" type="info" show-icon class="mb12" :message="ruleHint" />
         <a-alert
           v-if="conflicts.length"
           type="warning"
@@ -222,12 +226,6 @@
         <a-form-item label="请假事由" required>
           <a-textarea v-model:value="applyForm.reason" :rows="3" :maxlength="500" show-count />
         </a-form-item>
-        <a-alert
-          type="warning"
-          show-icon
-          message="提交前请确认已关联员工档案"
-          description="账号未关联员工档案时无法提交，请先联系 HR 在「人员管理」建档。"
-        />
       </a-form>
     </a-modal>
 
@@ -312,7 +310,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
@@ -325,6 +323,7 @@ import {
   leaveCityPolicy,
   leaveDelegateOptions as fetchLeaveDelegateOptions,
   leavePlan,
+  leavePreview,
   leaveRules,
   leaveTypeOptions as fetchLeaveTypeOptions,
   listEhrAttachments,
@@ -508,24 +507,15 @@ const dayModeOptions = [
   { value: 'WORKDAY', label: '工作日（跳过周末 / 节假日）' }
 ]
 
-/** 请假类型规则与本人剩余额度：打开弹窗时加载，用于前端提示与必填校验 */
+/** 请假类型规则：打开弹窗时加载，用于必填校验与证明材料提示 */
 const rules = ref<Record<string, LeaveTypeRule>>({})
-const quotas = ref<Record<string, LeaveQuotaItem>>({})
 const conflicts = ref<LeaveItem[]>([])
 const attachmentFiles = ref<any[]>([])
 
 const currentRule = computed(() => rules.value[applyForm.leaveType])
-const quotaItem = computed(() => quotas.value[applyForm.leaveType])
 /** 城市假期政策（婚假 / 产假 / 陪产假）：按所属二级单位城市固定天数与计算方式 */
 const cityPolicy = ref<LeaveCityPolicy | null>(null)
 const policyOfType = computed(() => cityPolicy.value?.policies?.[applyForm.leaveType])
-const cityPolicyHint = computed(() => {
-  const p = policyOfType.value
-  if (!p) return ''
-  const label = leaveTypeOptions.value.find((o) => o.value === applyForm.leaveType)?.label || '该假期'
-  const mode = p.dayMode === 'WORKDAY' ? '工作日（跳过周末 / 法定节假日）' : '自然日（含周末和法定节假日）'
-  return `${cityPolicy.value?.city || '未配置城市'}：${label}固定 ${p.days} 天，按${mode}计算，选择开始日期后自动带出结束日期`
-})
 /** 城市政策类假期但当前城市未配置天数：提交会被后端拒绝，提前提示 */
 const CITY_POLICY_TYPES = ['MARRIAGE', 'MATERNITY', 'PATERNITY']
 const cityPolicyMissing = computed(() => {
@@ -536,16 +526,6 @@ const cityPolicyMissing = computed(() => {
   return city
     ? `城市「${city}」未配置${label}天数，请联系 HR 在埋点配置中维护`
     : '当前员工未配置所属城市，无法申请该类假期，请联系 HR 维护二级单位城市'
-})
-const ruleHint = computed(() => {
-  const r = currentRule.value
-  if (!r) return ''
-  const parts = [`单次 ${r.minDays}~${r.maxDaysPerRequest} 天`]
-  if (r.minNoticeDays > 0) parts.push(`需提前 ${r.minNoticeDays} 天申请`)
-  if (r.allowPastDays > 0) parts.push(`最多补请 ${r.allowPastDays} 天`)
-  if (r.quotaRequired === 1) parts.push(`当前剩余 ${quotaItem.value?.availableDays ?? 0} 天`)
-  if (r.oneTimeOnly === 1) parts.push('该假期只能一次性休完，天数以员工手册为准')
-  return parts.join('；')
 })
 const conflictText = computed(() =>
   conflicts.value
@@ -600,6 +580,50 @@ const days = computed(() => {
   }
   return Number((total / WORK_MINUTES_PER_DAY).toFixed(2))
 })
+
+/** 本次请假时长：走后端试算接口，与提交共用同一套天数口径（工作日历 / 半天 / 城市政策） */
+const previewDays = ref<number | null>(null)
+let previewTimer: ReturnType<typeof setTimeout> | undefined
+let previewSeq = 0
+
+/** 日期 / 时间 / 计算方式变化后防抖试算，只认最后一次请求的结果 */
+function schedulePreview() {
+  if (previewTimer) clearTimeout(previewTimer)
+  const r = applyForm.range
+  if (!r || r.length !== 2) {
+    previewDays.value = null
+    return
+  }
+  previewTimer = setTimeout(() => {
+    const seq = ++previewSeq
+    leavePreview({
+      leaveType: applyForm.leaveType,
+      startDate: r[0],
+      endDate: r[1],
+      startTime: applyForm.startTime,
+      endTime: applyForm.endTime,
+      dayMode: applyForm.dayMode
+    })
+      .then((d) => {
+        if (seq === previewSeq) previewDays.value = d?.days ?? null
+      })
+      .catch(() => {
+        if (seq === previewSeq) previewDays.value = null
+      })
+  }, 250)
+}
+
+watch(
+  () => [
+    applyForm.leaveType,
+    applyForm.range?.[0],
+    applyForm.range?.[1],
+    applyForm.startTime,
+    applyForm.endTime,
+    applyForm.dayMode
+  ],
+  schedulePreview
+)
 
 /** 起止时间校验：结束不能早于开始，且至少半小时 */
 function timeRangeError(): string {
@@ -671,6 +695,7 @@ function openApply() {
   applyForm.attachmentIds = []
   attachmentFiles.value = []
   conflicts.value = []
+  previewDays.value = null
   delegateCtx.value = { required: false, options: [] }
   cityPolicy.value = null
   applyOpen.value = true
@@ -685,13 +710,6 @@ function openApply() {
       const m: Record<string, LeaveTypeRule> = {}
       ;(list || []).forEach((r) => (m[r.leaveType] = r))
       rules.value = m
-    })
-    .catch(() => {})
-  myLeaveQuotas()
-    .then((list) => {
-      const m: Record<string, LeaveQuotaItem> = {}
-      ;(list || []).forEach((q) => (m[q.leaveType] = q))
-      quotas.value = m
     })
     .catch(() => {})
 }
@@ -976,6 +994,26 @@ function openWaive() {
 }
 .row-actions .act.danger:hover {
   background: rgba(255, 77, 79, 0.1);
+}
+
+/* 只读的「本次请假时长」展示框：与输入框同高，跟随主题变量适配深浅模式 */
+.duration-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border-subtle);
+}
+.duration-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+.duration-unit {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .mb12 {
