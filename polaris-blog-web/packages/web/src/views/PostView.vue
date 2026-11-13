@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import type { ArticleDetail } from '@blog/shared'
-import { copyText } from '@blog/shared'
+import { copyText, sanitizeHtml } from '@blog/shared'
 import { fetchArticle, likeArticle } from '@/api/public'
 import { useSiteStore } from '@/stores/site'
 import { useThemeStore } from '@/stores/theme'
@@ -70,7 +70,7 @@ async function load() {
     const utils = await getMdUtils()
     // 优先使用后端渲染结果，缺失时前台兜底渲染 Markdown；统一增强（代码块/公式/任务列表）
     const raw = article.value.contentHtml || utils.renderMarkdown(article.value.contentMd || '')
-    contentHtml.value = utils.withHeadingIds(utils.enhanceHtml(raw))
+    contentHtml.value = sanitizeHtml(utils.withHeadingIds(utils.enhanceHtml(raw)))
     // 目录必须和正文实际生成的 heading id 对齐，否则点击会找不到对应章节
     const generatedToc = utils.extractToc(contentHtml.value)
     const backendToc = article.value.toc || []

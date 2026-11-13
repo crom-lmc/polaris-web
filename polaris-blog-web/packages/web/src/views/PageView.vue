@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { ArticleDetail } from '@blog/shared'
-import { copyText } from '@blog/shared'
+import { copyText, sanitizeHtml } from '@blog/shared'
 import { fetchPage } from '@/api/public'
 import { useThemeStore } from '@/stores/theme'
 import type { MarkdownUtils } from '@blog/shared/markdown'
@@ -38,7 +38,7 @@ async function load() {
     if (!html && page.value.contentMd) {
       html = utils.renderMarkdown(page.value.contentMd)
     }
-    contentHtml.value = utils.enhanceHtml(html)
+    contentHtml.value = sanitizeHtml(utils.enhanceHtml(html))
   } catch {
     page.value = null
     contentHtml.value = ''

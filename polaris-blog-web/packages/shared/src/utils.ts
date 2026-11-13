@@ -1,4 +1,15 @@
 /** 通用工具方法 */
+import DOMPurify from 'dompurify'
+
+/** 后端与前端兜底渲染的 HTML 都经过同一入口清洗，再交给 v-html。 */
+export function sanitizeHtml(html?: string | null): string {
+  return DOMPurify.sanitize(html || '')
+}
+
+/** 搜索摘要只允许后端生成的高亮标签，不允许任何其他 HTML。 */
+export function sanitizeHighlight(html?: string | null): string {
+  return DOMPurify.sanitize(html || '', { ALLOWED_TAGS: ['mark'], ALLOWED_ATTR: [] })
+}
 
 /** 深拷贝（结构化克隆优先，降级 JSON） */
 export function deepClone<T>(val: T): T {

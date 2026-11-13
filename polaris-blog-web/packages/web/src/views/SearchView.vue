@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { ArticleItem } from '@blog/shared'
+import { sanitizeHighlight } from '@blog/shared'
 import { searchArticles } from '@/api/public'
 import { formatCount, formatDate } from '@/utils/format'
 import { useSiteStore } from '@/stores/site'
@@ -153,7 +154,7 @@ useSeo(() => ({ title: keyword.value ? `搜索：${keyword.value}` : '搜索', d
             <RouterLink :to="`/posts/${a.slug}`" class="result-title">{{ a.title }}</RouterLink>
             <!-- 高亮仅渲染后端 highlight 字段（已含 <mark> 且经 XSS 过滤）；缺失则降级纯文本摘要 -->
             <p class="result-summary text-sm muted">
-              <span v-if="a.highlight" v-html="a.highlight" />
+              <span v-if="a.highlight" v-html="sanitizeHighlight(a.highlight)" />
               <template v-else>{{ a.summary }}</template>
             </p>
             <p class="result-meta muted text-xs">

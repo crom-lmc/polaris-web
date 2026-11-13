@@ -12,6 +12,7 @@
     "./mock": "./src/mock/plugin.ts"
   },
   "dependencies": {
+    "dompurify": "^3.4.17",
     "highlight.js": "^11.9.0",
     "katex": "^0.16.9",
     "markdown-it": "^14.1.0"
