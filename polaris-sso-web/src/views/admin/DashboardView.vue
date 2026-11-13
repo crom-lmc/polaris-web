@@ -208,7 +208,7 @@
             发布：{{ formatTime(currentNotice.publishAt) }} · {{ currentNotice.publisherName || '—' }}
           </span>
         </div>
-        <div v-if="currentNotice" class="notice-content" v-html="currentNotice.content" />
+        <div v-if="currentNotice" class="notice-content" v-html="sanitizeHtml(currentNotice.content)" />
       </a-spin>
     </a-modal>
   </div>
@@ -231,6 +231,7 @@ import {
   type EmployeeLookupItem
 } from '@/api/employeeLookup'
 import type { ApplicationVO } from '@/types'
+import { sanitizeHtml } from '@/utils/html'
 
 const route = useRoute()
 const store = useUserStore()
@@ -535,7 +536,7 @@ async function enter(app: ApplicationVO) {
 }
 
 .stat-card :deep(.ant-card-body) {
-  min-height: 104px;
+  min-height: 160px;
   padding: 16px 18px;
   display: flex;
   align-items: center;

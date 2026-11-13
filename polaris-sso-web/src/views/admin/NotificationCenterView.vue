@@ -73,7 +73,7 @@
         <span class="muted">目标：{{ detail.targetType === 0 ? '全员（集团）' : detail.targetOrgNames }}</span>
         <span class="muted">发布：{{ fmtTime(detail.publishAt) }} · {{ detail.publisherName }}</span>
       </div>
-      <div v-if="detail" class="detail-content" v-html="detail.content" />
+      <div v-if="detail" class="detail-content" v-html="sanitizeHtml(detail.content)" />
     </a-modal>
   </div>
 </template>
@@ -82,6 +82,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { type NoticeItem, dictOptions, fetchNoticeDetail, fetchNoticeUnreadCount, pageNotices } from '@/api/announcement'
+import { sanitizeHtml } from '@/utils/html'
 
 const columns = [
   { key: 'title', title: '通知标题', dataIndex: 'title', width: '36%' },
