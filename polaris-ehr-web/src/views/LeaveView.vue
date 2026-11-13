@@ -203,8 +203,8 @@
                 剩余 {{ currentQuota.availableDays }} 天
               </b>
             </span>
-            <span v-if="currentQuota.carryoverRemaining > 0" style="margin-left:8px;color:#fa8c16;font-size:12px">
-              （含结转 {{ currentQuota.carryoverRemaining }} 天，{{ currentQuota.carryoverExpireAt }} 到期）
+            <span v-if="(currentQuota?.carryoverRemaining ?? 0) > 0" style="margin-left:8px;color:#fa8c16;font-size:12px">
+              （含结转 {{ currentQuota?.carryoverRemaining }} 天，{{ currentQuota?.carryoverExpireAt }} 到期）
             </span>
           </template>
         </a-alert>
