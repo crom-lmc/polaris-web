@@ -2,12 +2,10 @@
 import { computed, onMounted } from 'vue'
 import { theme as antdTheme } from 'ant-design-vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
-import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 
 const user = useUserStore()
-const route = useRoute()
 const themeStore = useThemeStore()
 
 const themeConfig = computed(() => ({
@@ -16,7 +14,9 @@ const themeConfig = computed(() => ({
 }))
 
 onMounted(async () => {
-  if (route.path.startsWith('/callback')) return
+  // 首次导航是异步的，挂载时 route.path 可能仍是初始值 "/"；
+  // 这里直接用浏览器地址判断，避免回调页误触发授权跳转打断 code 交换。
+  if (window.location.pathname.startsWith('/callback')) return
   try {
     await user.ensureLogin()
   } catch {
