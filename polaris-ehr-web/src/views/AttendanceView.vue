@@ -81,6 +81,12 @@
                 <div>{{ record.workDate }}</div>
                 <div class="muted cell-sub">{{ record.typeName }}</div>
               </template>
+              <template v-else-if="column.key === 'period'">
+                <div v-if="record.startTime && record.endTime">
+                  {{ record.startTime }} ~ {{ record.endTime }}
+                </div>
+                <div v-else class="muted">—</div>
+              </template>
               <template v-else-if="column.key === 'hours'">
                 <b>{{ record.hours }}</b> 小时
               </template>
@@ -88,7 +94,11 @@
                 <span class="reason-text">{{ record.reason || '—' }}</span>
               </template>
               <template v-else-if="column.key === 'status'">
-                <a-tag :color="statusColor(record.status)">{{ record.statusName }}</a-tag>
+                <a-tag
+                  :color="statusColor(record.status)"
+                  :style="record.status === 0 && record.approvalInstanceId ? 'cursor:pointer' : ''"
+                  @click="record.status === 0 && record.approvalInstanceId && openApprovalDrawer(record.approvalInstanceId)"
+                >{{ record.statusName }}</a-tag>
                 <div v-if="record.approveNote" class="muted cell-sub">{{ record.approveNote }}</div>
               </template>
               <template v-else-if="column.key === 'action'">
@@ -647,33 +657,71 @@
           <a-date-picker
             v-model:value="form.workDate"
             value-format="YYYY-MM-DD"
-            style="width: 100%"
             :disabled-date="disabledFuture"
+            style="width: 100%"
           />
         </a-form-item>
         <a-row :gutter="12">
           <a-col :span="12">
-            <a-form-item label="加班时长（小时）" required>
-              <a-input-number v-model:value="form.hours" :min="0.5" :max="24" :step="0.5" style="width: 100%" />
+            <a-form-item label="开始时间" required>
+              <a-time-picker
+                v-model:value="form.startTime"
+                value-format="HH:mm"
+                format="HH:mm"
+                style="width: 100%"
+                :allow-clear="false"
+                :disabled-hours="disabledHoursStart"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="加班类型" required>
-              <a-select v-model:value="form.type" :options="typeOptions" />
+            <a-form-item label="结束时间" required>
+              <a-time-picker
+                v-model:value="form.endTime"
+                value-format="HH:mm"
+                format="HH:mm"
+                style="width: 100%"
+                :allow-clear="false"
+                :disabled-hours="disabledHoursEnd"
+              />
             </a-form-item>
           </a-col>
         </a-row>
+        <a-alert
+          v-if="form.workDate"
+          :type="previewTip.includes('有效加班不足') || previewTip.includes('无有效加班') || previewTip.includes('无法提交') ? 'warning' : 'info'"
+          show-icon
+          style="margin-bottom: 16px"
+        >
+          <template #message>
+            <div v-if="preview.hours != null && preview.hours > 0" style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:22px;font-weight:700;color:#1677ff">{{ preview.hours }}</span>
+              <span style="color:#666">小时有效加班</span>
+              <a-tag v-if="preview.typeName" :color="preview.type === 'HOLIDAY' ? 'red' : preview.type === 'RESTDAY' ? 'orange' : 'blue'">
+                {{ preview.typeName }}
+              </a-tag>
+              <span v-if="preview.totalMinutes" style="color:#999;font-size:12px">（区间 {{ preview.totalMinutes }} 分钟）</span>
+            </div>
+            <div v-else-if="preview.typeName" style="color:#666">
+              <a-tag :color="preview.type === 'HOLIDAY' ? 'red' : preview.type === 'RESTDAY' ? 'orange' : 'blue'">{{ preview.typeName }}</a-tag>
+              <span style="margin-left:8px">待试算…</span>
+            </div>
+            <div style="color:#555;margin-top:6px;font-size:13px">{{ previewTip }}</div>
+          </template>
+        </a-alert>
         <a-form-item label="加班事由">
           <a-textarea v-model:value="form.reason" :rows="3" :maxlength="200" show-count />
         </a-form-item>
-        <a-alert
-          v-if="overLimitHint"
-          type="info"
-          show-icon
-          message="当月累计加班将超过 8 小时，需直属主管通过后再由人力资源中心终审"
-        />
       </a-form>
     </a-modal>
+
+    <!-- 加班审批详情抽屉 -->
+    <ApprovalDetailDrawer
+      v-model:open="approvalOpen"
+      :instance-id="approvalInstanceId"
+      mode="view"
+      @done="() => reload()"
+    />
 
     <!-- 补卡申请 -->
     <a-modal
@@ -1078,6 +1126,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import ApprovalDetailDrawer from '@/components/ApprovalDetailDrawer.vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
@@ -1114,6 +1163,7 @@ import {
   runAttendanceMock,
   saveWorkCalendar,
   submitOvertime,
+  previewOvertime,
   toggleAttendanceRule,
   unlockAttendanceMonthly,
   updateAnnualLeavePolicy,
@@ -1258,8 +1308,9 @@ const size = ref(20)
 
 const columns = [
   { title: '员工', key: 'employee', width: 150 },
-  { title: '加班日期', key: 'workDate', width: 160 },
-  { title: '时长', key: 'hours', width: 110 },
+  { title: '加班日期', key: 'workDate', width: 140 },
+  { title: '时段', key: 'period', width: 130 },
+  { title: '时长', key: 'hours', width: 100 },
   { title: '事由', key: 'reason' },
   { title: '状态', key: 'status', width: 150 },
   { title: '操作', key: 'action', width: 90 }
@@ -1308,54 +1359,71 @@ const applyOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
   workDate: dayjs().format('YYYY-MM-DD'),
-  hours: 2,
-  type: 'NORMAL',
+  startTime: '',
+  endTime: '',
   reason: ''
-})
-
-const typeOptions = [
-  { value: 'NORMAL', label: '工作日加班' },
-  { value: 'HOLIDAY', label: '节假日加班' },
-  { value: 'RESTDAY', label: '休息日加班' }
-]
-
-const overLimitHint = computed(() => {
-  if (form.type === 'HOLIDAY') return true
-  const sameMonth = rows.value
-    .filter((r) => r.status === 1 && r.mine && r.workDate?.slice(0, 7) === form.workDate?.slice(0, 7))
-    .reduce((s, r) => s + Number(r.hours || 0), 0)
-  return sameMonth + Number(form.hours || 0) > 8
 })
 
 function disabledFuture(d: Dayjs) {
   return d.isAfter(dayjs(), 'day')
 }
+function disabledHoursStart() { return [] }
+function disabledHoursEnd() {
+  const sh = Number(form.startTime?.split(':')[0] || 0)
+  return Array.from({ length: sh + 1 }, (_, i) => i)
+}
+
+/** 后端返回的试算结果（实时更新） */
+const preview = ref<{ type?: string; typeName?: string; totalMinutes?: number; hours?: number; punchExists?: boolean; tip?: string }>({})
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+
+// 任一字段变化 → 300ms 防抖后调后端试算
+watch(
+  () => [form.workDate, form.startTime, form.endTime],
+  () => {
+    if (!applyOpen.value) return
+    if (previewTimer) clearTimeout(previewTimer)
+    previewTimer = setTimeout(async () => {
+      if (!form.workDate || !form.startTime || !form.endTime) { preview.value = {}; return }
+      try {
+        preview.value = await previewOvertime({
+          workDate: form.workDate,
+          startTime: form.startTime,
+          endTime: form.endTime
+        })
+      } catch {
+        preview.value = { tip: '试算失败，请稍后重试' }
+      }
+    }, 300)
+  },
+  { flush: 'post' }
+)
+
+const previewTip = computed(() => preview.value.tip || '')
 
 function openApply() {
   Object.assign(form, {
     workDate: dayjs().format('YYYY-MM-DD'),
-    hours: 2,
-    type: 'NORMAL',
+    startTime: '',
+    endTime: '',
     reason: ''
   })
+  preview.value = {}
   applyOpen.value = true
 }
 
 async function submitApply() {
-  if (!form.workDate) {
-    message.warning('请选择加班日期')
-    return
-  }
-  if (!form.hours || form.hours <= 0) {
-    message.warning('请填写加班时长')
-    return
-  }
+  if (!form.workDate) { message.warning('请选择加班日期'); return }
+  if (!form.startTime || !form.endTime) { message.warning('请选择开始与结束时间'); return }
+  const [sh, sm] = form.startTime.split(':').map(Number)
+  const [eh, em] = form.endTime.split(':').map(Number)
+  if (eh * 60 + em <= sh * 60 + sm) { message.warning('结束时间必须晚于开始时间'); return }
   saving.value = true
   try {
     await submitOvertime({
       workDate: form.workDate,
-      hours: Number(form.hours),
-      type: form.type,
+      startTime: form.startTime,
+      endTime: form.endTime,
       reason: form.reason
     })
     message.success('加班审批已提交，请在审批中心跟进')
@@ -1368,6 +1436,14 @@ async function submitApply() {
   } finally {
     saving.value = false
   }
+}
+
+/** 加班审批详情抽屉 */
+const approvalOpen = ref(false)
+const approvalInstanceId = ref<string | null>(null)
+function openApprovalDrawer(id: string) {
+  approvalInstanceId.value = id
+  approvalOpen.value = true
 }
 
 async function doCancel(record: OvertimeItem) {

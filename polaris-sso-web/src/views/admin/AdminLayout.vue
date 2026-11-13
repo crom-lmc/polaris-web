@@ -171,13 +171,8 @@ watch(
 )
 
 async function refreshUnread() {
-  const [noticeRes, pendingRes] = await Promise.all([
-    fetchUnreadNoticeCount().catch(() => null),
-    fetchApprovals('pending').catch(() => null)
-  ])
-  const noticeUnread = noticeRes ? Number(noticeRes.data) || 0 : 0
-  const pendingCount = pendingRes?.data?.length || 0
-  unreadCount.value = noticeUnread + pendingCount
+  const noticeRes = await fetchUnreadNoticeCount().catch(() => null)
+  unreadCount.value = noticeRes ? Number(noticeRes.data) || 0 : 0
 }
 
 function goMessages() {

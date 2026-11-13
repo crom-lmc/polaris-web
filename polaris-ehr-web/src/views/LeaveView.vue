@@ -69,7 +69,7 @@
             <template v-else-if="column.key === 'range'">
               <div>{{ leaveRangeText(record) }}</div>
               <div class="muted cell-sub">
-                {{ record.days }} 天
+                {{ daysLabel(record.days) }}
                 <span v-if="record.dayMode === 'WORKDAY'">· 工作日</span>
                 <span v-if="record.returnDate">· {{ record.returnDate }} 返岗</span>
               </div>
@@ -180,8 +180,51 @@
           <div class="duration-box">
             <span class="duration-value">{{ previewDays === null ? '—' : previewDays }}</span>
             <span class="duration-unit">天</span>
+            <span v-if="previewDays !== null" class="duration-sub muted">
+              （≈ {{ +(previewDays * 8).toFixed(2) }} 小时）
+            </span>
           </div>
         </a-form-item>
+
+        <!-- 额度类假期余额提示 -->
+        <a-alert
+          v-if="currentQuota"
+          :type="currentQuota.availableDays < (previewDays || 0) ? 'error' : 'info'"
+          show-icon
+          class="mb12"
+        >
+          <template #message>
+            <span style="font-weight:600">{{ currentQuota.leaveTypeName }}余额</span>
+            <span style="margin-left:8px">
+              共 {{ currentQuota.totalDays }} 天 ·
+              已用 {{ currentQuota.usedDays || 0 }} 天 ·
+              冻结 {{ currentQuota.frozenDays || 0 }} 天
+              <b :style="{ color: currentQuota.availableDays < (previewDays || 0) ? '#ff4d4f' : '#1677ff', marginLeft: 6 }">
+                剩余 {{ currentQuota.availableDays }} 天
+              </b>
+            </span>
+            <span v-if="currentQuota.carryoverRemaining > 0" style="margin-left:8px;color:#fa8c16;font-size:12px">
+              （含结转 {{ currentQuota.carryoverRemaining }} 天，{{ currentQuota.carryoverExpireAt }} 到期）
+            </span>
+          </template>
+        </a-alert>
+        <a-alert
+          v-else-if="currentRule && currentRule.quotaRequired === 1 && leaveQuotaLoaded && !currentQuota"
+          type="error"
+          show-icon
+          class="mb12"
+          :message="`你还没有 ${currentRule.leaveType} 额度，请先联系 HR 初始化年度额度`"
+        />
+
+        <!-- 城市政策类假期（婚假/陪产假/产假）提示 -->
+        <a-alert
+          v-if="policyHint"
+          type="info"
+          show-icon
+          class="mb12"
+          :message="policyHint"
+        />
+
         <a-alert v-if="cityPolicyMissing" type="warning" show-icon class="mb12" :message="cityPolicyMissing" />
         <a-alert
           v-if="conflicts.length"
@@ -274,7 +317,7 @@
           <a-descriptions-item label="请假日期" :span="2">
             {{ leaveRangeText(detailRecord) }}
           </a-descriptions-item>
-          <a-descriptions-item label="天数">{{ detailRecord.days }} 天</a-descriptions-item>
+          <a-descriptions-item label="天数">{{ daysLabel(detailRecord.days) }}</a-descriptions-item>
           <a-descriptions-item label="状态">
             <a-tag :color="statusColor(detailRecord.status)">{{ detailRecord.statusName }}</a-tag>
           </a-descriptions-item>
@@ -471,6 +514,14 @@ function leaveRangeText(record: LeaveItem) {
   return `${record.startDate} ${start} ~ ${record.endDate} ${end}`
 }
 
+/** 天数展示：同时显小时数（1 天 = 8 小时），例如 0.125 天（1 小时） */
+function daysLabel(d: number | null | undefined) {
+  if (d === null || d === undefined || Number.isNaN(d)) return '—'
+  const hours = +(d * 8).toFixed(2)
+  const hoursText = Number.isInteger(hours) ? `${hours}` : `${hours}`
+  return `${d} 天（${hoursText} 小时）`
+}
+
 /* ---------- 申请 ---------- */
 const applyOpen = ref(false)
 const saving = ref(false)
@@ -512,7 +563,33 @@ const rules = ref<Record<string, LeaveTypeRule>>({})
 const conflicts = ref<LeaveItem[]>([])
 const attachmentFiles = ref<any[]>([])
 
+/** 额度余额：所有类型 → LeaveQuotaItem，打开弹窗时一次性加载 */
+const quotas = ref<Record<string, LeaveQuotaItem>>({})
+const leaveQuotaLoaded = ref(false)
 const currentRule = computed(() => rules.value[applyForm.leaveType])
+const currentQuota = computed(() => {
+  if (!currentRule.value || currentRule.value.quotaRequired !== 1) return null
+  return quotas.value[applyForm.leaveType] || null
+})
+/** 城市政策类假期（婚假 / 产假 / 陪产假）+ 一次性休完 提示 */
+const policyHint = computed(() => {
+  const hints: string[] = []
+  const policy = policyOfType.value
+  if (policy) {
+    const label = leaveTypeOptions.value.find((o) => o.value === applyForm.leaveType)?.label || '该假期'
+    const city = cityPolicy.value?.city
+    const dayModeLabel = policy.dayMode === 'WORKDAY' ? '工作日' : '自然日（含周末/法定节假日）'
+    if (city) {
+      hints.push(`${city}根据当地规定，${label}为 ${policy.days} 天（按${dayModeLabel}计算）`)
+    } else {
+      hints.push(`${label}法定 ${policy.days} 天（按${dayModeLabel}计算）`)
+    }
+  }
+  if (currentRule.value?.oneTimeOnly === 1) {
+    hints.push('该假期需一次性休完')
+  }
+  return hints.join('；')
+})
 /** 城市假期政策（婚假 / 产假 / 陪产假）：按所属二级单位城市固定天数与计算方式 */
 const cityPolicy = ref<LeaveCityPolicy | null>(null)
 const policyOfType = computed(() => cityPolicy.value?.policies?.[applyForm.leaveType])
@@ -712,6 +789,17 @@ function openApply() {
       rules.value = m
     })
     .catch(() => {})
+  // 加载所有类型额度余额，弹窗内实时展示
+  leaveQuotaLoaded.value = false
+  quotas.value = {}
+  myLeaveQuotas()
+    .then((list) => {
+      const m: Record<string, LeaveQuotaItem> = {}
+      ;(list || []).forEach((q) => (m[q.leaveType] = q))
+      quotas.value = m
+    })
+    .catch(() => {})
+    .finally(() => (leaveQuotaLoaded.value = true))
 }
 
 /** 证明附件上传：支持多选，逐个直传后端并收集附件ID */
@@ -752,13 +840,25 @@ async function submitApply() {
     message.warning(timeError)
     return
   }
-  if (days.value <= 0) {
-    message.warning('所选时段请假天数为 0，请调整时间或日期')
+  if (days.value < 0.125) {
+    message.warning('请假时长不足 1 小时（0.125 天），请调整时间或日期')
     return
   }
   if (currentRule.value && days.value < currentRule.value.minDays) {
     message.warning(`该类型最少请 ${currentRule.value.minDays} 天`)
     return
+  }
+  // 额度校验：额度类假期余额不足直接拦截
+  if (currentRule.value && currentRule.value.quotaRequired === 1) {
+    const q = currentQuota.value
+    if (!q) {
+      message.warning('该假期类型还没有额度，请先联系 HR 初始化年度额度')
+      return
+    }
+    if (q.availableDays < days.value) {
+      message.warning(`余额不足：该假期剩余 ${q.availableDays} 天，本次申请 ${days.value} 天`)
+      return
+    }
   }
   if (currentRule.value && currentRule.value.attachmentRequired === 1 && !applyForm.attachmentIds.length) {
     message.warning('该请假类型必须上传证明材料')

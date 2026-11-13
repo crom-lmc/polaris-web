@@ -1427,8 +1427,12 @@ export interface OvertimeItem {
   employeeId: string
   employeeName?: string
   workDate: string
+  /** 加班时段 HH:mm ~ HH:mm */
+  startTime?: string
+  endTime?: string
+  /** 有效加班小时数（扣除工作时段重叠后） */
   hours: number
-  /** NORMAL / HOLIDAY / RESTDAY */
+  /** NORMAL / HOLIDAY / RESTDAY（由工作日历自动判定） */
   type: string
   typeName?: string
   reason?: string
@@ -1438,6 +1442,8 @@ export interface OvertimeItem {
   approveNote?: string
   createdAt?: string
   mine?: boolean
+  /** 审批中心在途实例 ID（仅 status=0 时有值） */
+  approvalInstanceId?: string | null
 }
 
 export interface OvertimePage {
@@ -1447,8 +1453,10 @@ export interface OvertimePage {
 
 export interface OvertimeBody {
   workDate: string
-  hours: number
-  type: string
+  /** HH:mm，不允许跨天 */
+  startTime: string
+  /** HH:mm，严格晚于 startTime */
+  endTime: string
   reason?: string
 }
 
@@ -1462,6 +1470,19 @@ export const listOvertimes = (params: {
 
 export const submitOvertime = (body: OvertimeBody) =>
   request.post<never, OvertimeItem>('/api/ehr/attendance/overtimes', body)
+
+export interface OvertimePreview {
+  type?: string
+  typeName?: string
+  totalMinutes?: number
+  overtimeMinutes?: number
+  hours?: number
+  punchExists?: boolean
+  tip?: string
+}
+
+export const previewOvertime = (body: OvertimeBody) =>
+  request.post<never, OvertimePreview>('/api/ehr/attendance/overtimes/preview', body)
 
 export const cancelOvertime = (id: string) =>
   request.post<never, void>(`/api/ehr/attendance/overtimes/${id}/cancel`)
