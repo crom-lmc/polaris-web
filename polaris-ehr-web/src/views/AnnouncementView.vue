@@ -215,13 +215,14 @@
         <span class="muted">阅读：{{ viewItem.readCount }} / {{ viewItem.targetCount }}</span>
         <span class="muted">发布：{{ viewItem.publishAt || '—' }} · {{ viewItem.publisherName }}</span>
       </div>
-      <div v-if="viewItem" class="view-content" v-html="viewItem.content" />
+      <div v-if="viewItem" class="view-content" v-html="DOMPurify.sanitize(viewItem.content || '')" />
     </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import DOMPurify from 'dompurify'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
