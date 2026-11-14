@@ -40,6 +40,10 @@
         @collapse="(v: boolean) => (collapsed = v)"
       >
         <a-menu mode="inline" :selected-keys="selectedKeys" @click="handleMenuClick">
+          <a-menu-item key="/dashboard">
+            <template #icon><dashboard-outlined /></template>
+            概览
+          </a-menu-item>
           <a-sub-menu v-if="store.can('biz:view')" key="biz">
             <template #icon><database-outlined /></template>
             <template #title>主数据</template>
@@ -49,18 +53,33 @@
           </a-sub-menu>
           <a-menu-item v-if="store.can('dict:view')" key="/dicts">
             <template #icon><control-outlined /></template>
-            字典管理
+            字典配置
           </a-menu-item>
-          <a-sub-menu v-if="store.can('approval:view')" key="approval">
+          <a-sub-menu
+            v-if="store.can('approval:view') || store.can('approval:template') || store.can('approval:scene') || store.can('approval:bizpoint')"
+            key="approval"
+          >
             <template #icon><audit-outlined /></template>
             <template #title>审批配置</template>
-            <a-menu-item key="/approvals">审批模板</a-menu-item>
-            <a-menu-item key="/approval-scenes">业务场景</a-menu-item>
-            <a-menu-item key="/biz-points">业务点配置</a-menu-item>
+            <a-menu-item v-if="store.can('approval:template')" key="/approvals">审批模板</a-menu-item>
+            <a-menu-item v-if="store.can('approval:scene')" key="/approval-scenes">业务场景</a-menu-item>
+            <a-menu-item v-if="store.can('approval:bizpoint')" key="/biz-points">业务点配置</a-menu-item>
           </a-sub-menu>
+          <a-menu-item v-if="store.can('security:view')" key="/security">
+            <template #icon><safety-outlined /></template>
+            安全配置
+          </a-menu-item>
           <a-menu-item v-if="store.can('notice:view')" key="/notices">
             <template #icon><bell-outlined /></template>
             消息配置
+          </a-menu-item>
+          <a-menu-item v-if="store.can('embed:view')" key="/embed-points">
+            <template #icon><api-outlined /></template>
+            埋点配置
+          </a-menu-item>
+          <a-menu-item v-if="store.can('code:view')" key="/code-rules">
+            <template #icon><number-outlined /></template>
+            单号配置
           </a-menu-item>
         </a-menu>
       </a-layout-sider>
@@ -75,18 +94,22 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
+  ApiOutlined,
   AuditOutlined,
   BellOutlined,
   ControlOutlined,
+  DashboardOutlined,
   DatabaseOutlined,
   DownOutlined,
   LogoutOutlined,
-  MenuOutlined
+  MenuOutlined,
+  NumberOutlined,
+  SafetyOutlined
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { Modal } from 'ant-design-vue'
-import { gotoAuthorize, listBizCategories, logoutSso, type BizCategory } from '@/api/settings'
+import { SSO_AUTHORIZE_URL, listBizCategories, logoutSso, type BizCategory } from '@/api/settings'
 import { getRefreshToken } from '@/utils/token'
 import { useSessionGuard } from '@/composables/useSessionGuard'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
@@ -156,7 +179,8 @@ function onUserMenuClick({ key }: { key: string }) {
           /* 忽略：本地照样退出 */
         }
         store.logout()
-        gotoAuthorize('/')
+        // 回到登录页而不是重新授权，避免账号中心凭残余登录态静默签码、立刻登回来
+        window.location.replace(`${SSO_AUTHORIZE_URL}/login?gl=1`)
       }
     })
   }
