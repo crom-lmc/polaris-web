@@ -45,7 +45,7 @@
             <template #title>人力中心</template>
             <a-menu-item key="/dashboard">
               <template #icon><appstore-outlined /></template>
-              工作台
+              概览
             </a-menu-item>
             <a-menu-item v-if="store.can('org:view')" key="/orgs">
               <template #icon><apartment-outlined /></template>
