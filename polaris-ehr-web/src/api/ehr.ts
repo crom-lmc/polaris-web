@@ -933,8 +933,6 @@ export interface ResignApplyItem {
   hrApprovedAt?: string
   createdAt?: string
   mine: boolean
-  /** 已废弃：审批动作统一收口到审批中心，恒 false */
-  actionable: boolean
   /** 审批中心实例 ID：交接全部确认后发起审批才有值 */
   approvalInstanceId?: string | null
   approvalBizType?: string | null
@@ -1046,8 +1044,6 @@ export interface LeaveItem {
   approvedAt?: string
   createdAt?: string
   mine: boolean
-  /** 已废弃：审批动作统一收口到审批中心，恒 false */
-  actionable: boolean
   /** 审批中心实例 ID；有值即显示「请假审批中」并可点开详情 */
   approvalInstanceId?: string | null
   approvalBizType?: string | null
