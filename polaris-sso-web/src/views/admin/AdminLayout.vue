@@ -7,17 +7,37 @@
         <span class="logo-text">统一账号中心</span>
       </div>
       <div class="right">
-        <!-- 待办提醒入口：进消息中心（左侧业务类型树 + 右侧待办/消息列表）。
-             不用 a-badge：antd-vue 4.2 + Vue 3.5 下 Badge 更新会触发 _isTeleport 报错，这里手写角标。 -->
-        <span
-          v-if="store.can('messages:view')"
-          class="notice-entry"
-          :title="unreadCount ? `${unreadCount} 条未读` : '待办提醒'"
-          @click="goMessages"
+        <a-popover
+          v-model:open="noticeOpen"
+          trigger="click"
+          placement="bottomRight"
+          :overlay-style="{ width: '380px' }"
         >
-          <bell-outlined class="notice-bell" />
-          <span v-if="unreadCount" class="notice-count">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
-        </span>
+          <template #content>
+            <div class="notice-pop">
+              <div class="notice-head">
+                <span class="notice-head-title">未读消息</span>
+                <a-button type="link" size="small" :disabled="!unreadCount" @click="readAll">全部已读</a-button>
+              </div>
+              <a-spin :spinning="noticeLoading">
+                <div v-if="notices.length" class="notice-list">
+                  <div v-for="m in notices" :key="m.id" class="notice-item" @click="openNotice(m)">
+                    <div class="notice-title">
+                      <a-tag v-if="m.kind === 1" color="blue" class="notice-tag">待办</a-tag>
+                      <span class="notice-title-text">{{ m.title }}</span>
+                    </div>
+                    <div v-if="m.content" class="notice-content">{{ m.content }}</div>
+                    <div class="notice-time">{{ m.createdAt }}</div>
+                  </div>
+                </div>
+                <a-empty v-else :image-style="{ height: '48px' }" description="暂无未读消息" />
+              </a-spin>
+            </div>
+          </template>
+          <a-badge :count="unreadCount" :offset="[-2, 2]" size="small">
+            <bell-outlined class="notice-bell" :title="unreadCount ? `${unreadCount} 条未读` : '消息'" />
+          </a-badge>
+        </a-popover>
         <a-button
           type="text"
           class="theme-toggle"
@@ -59,47 +79,48 @@
         :trigger="null"
         @collapse="(v: boolean) => (collapsed = v)"
       >
-        <a-menu mode="inline" :selected-keys="selectedKeys" @click="handleMenuClick">
-          <a-menu-item key="dashboard">
-            <template #icon><dashboard-outlined /></template>
-            概览
-          </a-menu-item>
-          <!-- 审批中心是基本权限：所有角色默认授予 approval:todo -->
-          <a-menu-item v-if="store.can('approval:todo')" key="approvals">
-            <template #icon><carry-out-outlined /></template>
-            审批中心
-          </a-menu-item>
-          <!-- 待办提醒/消息中心：员工基本功能，权限码 messages 默认授予 EMPLOYEE_SELF -->
-          <a-menu-item v-if="store.can('messages')" key="messages">
-            <template #icon><bell-outlined /></template>
-            待办提醒
-          </a-menu-item>
-          <!-- 通知中心：人力中心发布的内部通知，员工基本功能，权限码 notice 默认授予 EMPLOYEE_SELF -->
-          <a-menu-item v-if="store.can('notice')" key="notices">
-            <template #icon><notification-outlined /></template>
-            通知中心
-          </a-menu-item>
-          <!-- 菜单按权限码显隐：没有该权限的人看不到入口，后端同样会 403，双保险 -->
-          <a-menu-item v-if="store.can('account:list')" key="accounts">
+        <a-menu mode="inline" :selected-keys="selectedKeys" :open-keys="openKeys" @click="handleMenuClick" @openChange="handleOpenChange">
+          <!-- SSO 统一账号中心 -->
+          <a-submenu key="grp-sso">
             <template #icon><team-outlined /></template>
-            账户管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('role:list')" key="roles">
-            <template #icon><safety-certificate-outlined /></template>
-            角色管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('permission:list')" key="permissions">
-            <template #icon><key-outlined /></template>
-            权限管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('app:list')" key="apps">
-            <template #icon><appstore-outlined /></template>
-            应用管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('account:log:view')" key="logs">
-            <template #icon><audit-outlined /></template>
-            登录日志
-          </a-menu-item>
+            <template #title>统一账号中心</template>
+            <a-menu-item key="dashboard">
+              <template #icon><dashboard-outlined /></template>
+              概览
+            </a-menu-item>
+            <a-menu-item key="approvals">
+              <template #icon><carry-out-outlined /></template>
+              审批中心
+            </a-menu-item>
+            <a-menu-item key="messages">
+              <template #icon><message-outlined /></template>
+              待办提醒
+            </a-menu-item>
+            <a-menu-item key="notices">
+              <template #icon><notification-outlined /></template>
+              通知中心
+            </a-menu-item>
+            <a-menu-item v-if="store.can('account:list')" key="accounts">
+              <template #icon><user-outlined /></template>
+              账户管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('role:list')" key="roles">
+              <template #icon><safety-certificate-outlined /></template>
+              角色管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('permission:list')" key="permissions">
+              <template #icon><key-outlined /></template>
+              权限管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('app:list')" key="apps">
+              <template #icon><appstore-outlined /></template>
+              应用管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('account:log:view')" key="logs">
+              <template #icon><audit-outlined /></template>
+              登录日志
+            </a-menu-item>
+          </a-submenu>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">
@@ -123,6 +144,7 @@ import {
   LockOutlined,
   LogoutOutlined,
   MenuOutlined,
+  MessageOutlined,
   NotificationOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
@@ -132,8 +154,13 @@ import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { Modal } from 'ant-design-vue'
 import { logout } from '@/api/auth'
-import { fetchApprovals } from '@/api/approvals'
-import { fetchUnreadNoticeCount } from '@/api/notice'
+import {
+  fetchMyNotices,
+  fetchUnreadNoticeCount,
+  markAllNoticesRead,
+  markNoticesRead,
+  type NoticeMessage
+} from '@/api/notice'
 import { getRefreshToken } from '@/utils/token'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
 
@@ -145,6 +172,13 @@ const theme = useThemeStore()
 // 侧栏可折叠：由顶栏汉堡图标点击切换（底部原生触发器已置 null 隐藏）
 const collapsed = ref(false)
 
+// 菜单分组展开：默认展开 SSO 组
+const openKeys = ref<string[]>(['grp-sso'])
+
+function handleOpenChange(keys: string[]) {
+  openKeys.value = keys
+}
+
 function toggleCollapse() {
   collapsed.value = !collapsed.value
 }
@@ -152,9 +186,12 @@ function toggleCollapse() {
 /* ---------------- 右上角消息 ---------------- */
 
 const unreadCount = ref(0)
+const notices = ref<NoticeMessage[]>([])
+const noticeOpen = ref(false)
+const noticeLoading = ref(false)
 let noticeTimer: number | undefined
 
-// 角标 = 待办数 + 未读消息数，60s 轮询；两路互不拖累，一路失败用另一路
+// 未读数轮询：审批被通过/驳回时由 settings 落消息，这里只负责把数字刷新出来
 onMounted(() => {
   refreshUnread()
   noticeTimer = window.setInterval(refreshUnread, 60000)
@@ -164,25 +201,54 @@ onUnmounted(() => {
   if (noticeTimer) window.clearInterval(noticeTimer)
 })
 
-// 在消息中心读过之后返回，角标要立刻跟着变，不等下一次轮询
-watch(
-  () => route.fullPath,
-  () => refreshUnread()
-)
+// 打开面板时才拉未读列表，避免每次进后台都多打一次接口
+watch(noticeOpen, (open) => {
+  if (open) loadNotices()
+})
 
 async function refreshUnread() {
-  const [noticeRes, pendingRes] = await Promise.all([
-    fetchUnreadNoticeCount().catch(() => null),
-    fetchApprovals('pending').catch(() => null)
-  ])
-  const noticeUnread = noticeRes ? Number(noticeRes.data) || 0 : 0
-  const pendingCount = pendingRes?.data?.length || 0
-  unreadCount.value = noticeUnread + pendingCount
+  try {
+    const res = await fetchUnreadNoticeCount()
+    unreadCount.value = res.data ?? 0
+  } catch {
+    /* 消息接口异常不影响主界面使用 */
+  }
 }
 
-function goMessages() {
-  if (route.name !== 'messages') {
-    router.push('/messages')
+async function loadNotices() {
+  noticeLoading.value = true
+  try {
+    const res = await fetchMyNotices({ unreadOnly: true, limit: 20 })
+    notices.value = res.data ?? []
+  } catch {
+    notices.value = []
+  } finally {
+    noticeLoading.value = false
+  }
+}
+
+/** 点开即已读；有路由则跳过去（如审批中心） */
+async function openNotice(m: NoticeMessage) {
+  try {
+    await markNoticesRead([m.id])
+  } catch {
+    /* 已读失败不影响跳转，下次打开仍会显示 */
+  }
+  notices.value = notices.value.filter((x) => x.id !== m.id)
+  unreadCount.value = Math.max(0, unreadCount.value - 1)
+  noticeOpen.value = false
+  if (m.link && m.link !== route.path) {
+    router.push(m.link)
+  }
+}
+
+async function readAll() {
+  try {
+    await markAllNoticesRead()
+    notices.value = []
+    unreadCount.value = 0
+  } catch {
+    /* 失败时保持原样，用户可重试 */
   }
 }
 
@@ -190,15 +256,13 @@ const selectedKeys = computed(() => [route.name as string])
 
 async function handleLogout() {
   try {
-    // 带上 refreshToken：一并拉黑，避免退出后旧 refresh 还能换新 access
     await logout(getRefreshToken())
   } catch {
-    // 网络异常也要让本地退出，否则用户会卡在"看起来已登录"的状态
+    // 网络异常也要让本地退出
   } finally {
     store.clear()
-    // 走全局登出：带 gl=1，让 /login 连本地令牌一起清掉并强制显示登录框，
-    // 避免中心会话（SSO_SID）万一没被销毁时凭 cookie 静默重登回控制台
-    router.replace('/login?gl=1')
+    // 硬跳转：绕过 Vue Router 内部状态残留，确保登录页干净挂载
+    window.location.replace('/login?gl=1')
   }
 }
 
@@ -259,7 +323,6 @@ function confirmLogout() {
   gap: 6px;
   /* 与下方菜单项图标列对齐（菜单项左内边距统一覆盖为 24px） */
   padding-left: 24px;
-  height: 32px;
   color: var(--header-text);
   font-weight: 600;
   /* 与侧栏菜单文字字号统一为 14px */
@@ -305,44 +368,80 @@ function confirmLogout() {
   padding-right: 16px;
 }
 
-.notice-entry {
-  position: relative;
+/* 右上角消息铃铛 */
+.notice-bell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
+  font-size: 17px;
+  color: var(--header-text);
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
-.notice-entry:hover {
+.notice-bell:hover {
   background: var(--header-hover);
 }
 
-.notice-count {
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  font-size: 10px;
-  line-height: 15px;
-  text-align: center;
-  color: #fff;
-  background: #ff4d4f;
-  border-radius: 8px;
+.notice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--header-border);
+}
+
+.notice-head-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.notice-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.notice-item {
+  padding: 10px 4px;
+  border-bottom: 1px dashed var(--header-border);
+  cursor: pointer;
+}
+
+.notice-item:hover {
+  background: var(--header-hover);
+}
+
+.notice-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.notice-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.notice-bell {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  color: var(--header-text);
+.notice-tag {
+  margin-right: 2px;
+}
+
+.notice-content {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted, #8c8c8c);
+}
+
+.notice-time {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted, #8c8c8c);
 }
 
 /* 让菜单项（含图标列）与顶部 logo 左缩进严格对齐；折叠态（图标列）不应用，避免图标被顶歪 */

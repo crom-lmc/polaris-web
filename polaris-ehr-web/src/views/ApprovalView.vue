@@ -3,13 +3,13 @@
     <!-- 与统一账号中心审批中心同一套版式：下划线 tabs + 右上角工具按钮，不套面板边框/说明条 -->
     <div class="head ft-head">
       <a-tabs v-model:activeKey="tab" class="tabs" @change="onTabChange">
-        <a-tab-pane v-for="t in visibleTabs" :key="t.key">
+        <a-tab-pane v-for="t in TABS" :key="t.key">
           <template #tab>
             <span class="tab">
               {{ t.label }}
               <a-badge
-                v-if="t.key === 'todo' && todoCount > 0"
-                :count="todoCount"
+                v-if="t.key === 'todo' && approvalRows.length"
+                :count="approvalRows.length"
                 :overflow-count="99"
                 class="badge"
               />
@@ -49,10 +49,7 @@
     <section v-if="isApprovalTab" class="ft-scroll ft-bottom">
         <a-table
           class="ft-table approval-table"
-          :class="{
-            'approval-table-approved': tab === 'approved',
-            'tbl-empty-mode': !approvalLoading && !approvalRows.length
-          }"
+          :class="{ 'approval-table-approved': tab === 'approved' }"
           :columns="approvalTableColumns"
           :data-source="approvalRows"
           :loading="approvalLoading"
@@ -61,10 +58,8 @@
           :custom-row="approvalRowProps"
           :pagination="approvalPagination"
           @change="onApprovalTableChange"
+          :locale="{ emptyText: '暂无审批单' }"
         >
-          <template #emptyText>
-            <div class="tbl-empty"><a-empty v-if="!approvalLoading" description="暂无审批单" /></div>
-          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'approvalType'">
               <a-tag color="blue">{{ record.bizName || approvalBizName(record.bizType) }}</a-tag>
@@ -132,7 +127,6 @@
     <!-- 待我交接 -->
     <section v-else-if="tab === 'handover'" class="ft-scroll ft-bottom">
         <a-table class="ft-table"
-          :class="{ 'tbl-empty-mode': !handoverLoading && !handoverTodo.length }"
           :columns="handoverColumns"
           :data-source="handoverTodo"
           :loading="handoverLoading"
@@ -140,10 +134,8 @@
           size="middle"
           :pagination="handoverPagination"
           @change="onHandoverTableChange"
+          :locale="{ emptyText: '没有人指定你为交接人' }"
         >
-          <template #emptyText>
-            <div class="tbl-empty"><a-empty v-if="!handoverLoading" description="没有人指定你为交接人" /></div>
-          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'employee'">
               <div>{{ record.employeeName }}</div>
@@ -204,18 +196,15 @@
     <!-- 我的 / 全部申请 -->
     <section v-else class="ft-scroll ft-bottom">
         <a-table class="ft-table"
-          :class="{ 'tbl-empty-mode': !mineLoading && !mineRows.length }"
           :columns="mineColumns"
           :data-source="mineRows"
           :loading="mineLoading"
           row-key="id"
           size="middle"
           :pagination="minePagination"
+          :locale="{ emptyText: '暂无申请' }"
           @change="onMineTableChange"
         >
-          <template #emptyText>
-            <div class="tbl-empty"><a-empty v-if="!mineLoading" description="暂无申请" /></div>
-          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'employee'">
               <div>{{ record.employeeName }}</div>
@@ -331,7 +320,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { ExportOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import HandoverList from '@/components/HandoverList.vue'
@@ -373,33 +362,12 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'mine', label: '离职 / 减员申请' }
 ]
 
-/** 页签 -> 基本权限码：审批是基本权限，所有角色默认拥有，缺少该码时隐藏页签 */
-const TAB_PERM: Record<TabKey, string> = {
-  todo: 'approval:todo',
-  approved: 'approval:done',
-  started: 'approval:started',
-  cc: 'approval:cc',
-  delegated: 'approval:delegated',
-  handover: 'approval:handover',
-  mine: 'approval:resign'
-}
-const visibleTabs = computed(() => TABS.filter((t) => store.can(TAB_PERM[t.key])))
-
-/** 审批权由任务分派决定；默认进「待我审批」，无权限时落到第一个可见页签 */
+/** 审批权限由审批中心的任务分派决定，不再看本地权限点；所有人默认进「待我审批」 */
 const tab = ref<TabKey>('todo')
-watch(
-  visibleTabs,
-  (list) => {
-    if (list.length && !list.some((t) => t.key === tab.value)) tab.value = list[0].key
-  },
-  { immediate: true }
-)
 
 /* ---------------- 审批中心实例（五视图） ---------------- */
 const approvalRows = ref<ApprovalInstance[]>([])
 const approvalLoading = ref(false)
-/** 「待我审批」角标单独维护：五个页签共用 approvalRows，切页签时不能把它替换成别的列表条数 */
-const todoCount = ref(0)
 
 const isApprovalTab = computed(() => APPROVAL_TABS.includes(tab.value))
 
@@ -449,15 +417,12 @@ function fmtTime(s?: string) {
 async function loadApprovals() {
   const scope = SCOPE_BY_TAB[tab.value]
   if (!scope) return
-  const isTodo = tab.value === 'todo'
   approvalLoading.value = true
   // 切换页签时先清空：五视图共用 approvalRows，不清空会在异步返回前短暂残留上一页签
-  // （如「我发起的」）的数据，导致列表先显示旧内容。
+  // （如「我发起的」）的数据，导致「待我审批」角标闪一下旧数字、列表先显示旧内容。
   approvalRows.value = []
   try {
     approvalRows.value = (await fetchApprovals(scope)) || []
-    // 待办角标只在「待我审批」加载时更新，其它页签的条数不覆盖它
-    if (isTodo) todoCount.value = approvalRows.value.length
   } catch (e: any) {
     message.error(e?.message || '加载审批单失败')
     approvalRows.value = []
@@ -552,7 +517,8 @@ const mineScope = computed(() => (canApprove.value || store.can('employee:resign
 const statusOptions = [
   { value: 0, label: '待交接 / 审批中' },
   { value: 1, label: '已通过' },
-  { value: 2, label: '已驳回' }
+  { value: 2, label: '已驳回' },
+  { value: 3, label: '已撤销' }
 ]
 
 /** 审批中心 / 待交接接口返回全量，做前端分页；分页条由 ft-bottom 贴到容器底部 */
@@ -561,7 +527,6 @@ const approvalSize = ref(10)
 const approvalPagination = computed(() => ({
   current: approvalPage.value,
   pageSize: approvalSize.value,
-  total: approvalRows.value.length,
   showSizeChanger: true,
   showTotal: (t: number) => `共 ${t} 条`
 }))
@@ -574,7 +539,6 @@ const handoverSize = ref(10)
 const handoverPagination = computed(() => ({
   current: handoverPage.value,
   pageSize: handoverSize.value,
-  total: handoverTodo.value.length,
   showSizeChanger: true,
   showTotal: (t: number) => `共 ${t} 条`
 }))

@@ -1,6 +1,6 @@
 <template>
   <a-layout class="page-container bp-root">
-    <a-layout-sider width="300" class="approval-nav-sider" :theme="theme.mode === 'dark' ? 'dark' : 'light'">
+    <a-layout-sider width="260" class="approval-nav-sider" :theme="theme.mode === 'dark' ? 'dark' : 'light'">
       <a-tree
         class="approval-nav-tree"
         :tree-data="treeData"
@@ -11,10 +11,7 @@
         @expand="onExpand"
       >
         <template #title="node">
-          <span class="approval-nav-node">
-            <span :class="['approval-nav-name', navTitleClass(String(node.key))]">{{ node.title }}</span>
-            <span v-if="navCount(node)" class="approval-nav-count">{{ navCount(node) }}</span>
-          </span>
+          <span :class="navTitleClass(String(node.key))">{{ node.title }}</span>
         </template>
       </a-tree>
       <a-empty v-if="!treeData.length" :image-style="{ height: '40px' }" description="暂无业务类型" />
@@ -32,7 +29,7 @@
           allow-clear
           class="bp-search"
         />
-        <a-button v-if="store.can('biz:manage')" type="primary" :disabled="!bizTypeOptions.length" @click="openCreate">
+        <a-button type="primary" :disabled="!bizTypeOptions.length" @click="openCreate">
           新增业务点
         </a-button>
       </div>
@@ -69,7 +66,7 @@
             <span class="muted">{{ record.remark || '—' }}</span>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button v-if="store.can('biz:manage')" type="link" size="small" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
             <!-- 被引用的业务点不能删：按钮置灰并说明被谁引用；disabled 按钮不触发鼠标事件，
                  所以 tooltip 挂在外层 span 上 -->
             <a-tooltip v-if="refHits(record).length">
@@ -86,7 +83,7 @@
               </span>
             </a-tooltip>
             <a-popconfirm v-else title="删除该业务点？" @confirm="remove(record)">
-              <a-button v-if="store.can('biz:manage')" type="link" size="small" danger>删除</a-button>
+              <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
           </template>
         </template>
@@ -148,8 +145,6 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '@/stores/user'
-const store = useUserStore()
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import {
@@ -258,9 +253,8 @@ const treeData = computed<TreeNode[]>(() => {
   const children: TreeNode[] = appGroups.value.map((g) => ({
     key: `app:${g.appCode}`,
     title: g.appName,
-    count: g.items.length,
     children: g.items.map((i) => ({ key: `biz:${i.bizType}`, title: i.bizName, isLeaf: true }))
-  }) as TreeNode & { count: number })
+  }))
   return children.length ? [{ key: 'root', title: '业务类型', children }] : []
 })
 
@@ -273,9 +267,6 @@ const navTitleClass = (key: string) =>
     : key.startsWith('app:')
       ? 'approval-nav-title-app'
       : 'approval-nav-title-leaf'
-
-/** 树节点右侧数量（节点数据里带 count；根节点不展示） */
-const navCount = (node: any) => (typeof node?.count === 'number' ? node.count : 0)
 
 /**
  * 默认全展开：树数据异步加载，default-expand-all 只认首次渲染会失效；

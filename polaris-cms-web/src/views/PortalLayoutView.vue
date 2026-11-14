@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useUserStore } from '@/stores/user'
-const store = useUserStore()
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
@@ -250,16 +248,15 @@ onBeforeRouteLeave(async () => {
                   <template #icon><export-outlined /></template>
                 </a-button>
               </a-tooltip>
-              <a-button v-if="store.can('portal:config')" size="small" type="text" :disabled="i === 0" title="上移" @click="move(i, -1)">↑</a-button>
+              <a-button size="small" type="text" :disabled="i === 0" title="上移" @click="move(i, -1)">↑</a-button>
               <a-button
-                v-if="store.can('portal:config')"
                 size="small"
                 type="text"
                 :disabled="i === list.length - 1"
                 title="下移"
                 @click="move(i, 1)"
               >↓</a-button>
-              <a-switch size="small" :checked="m.enabled === 1" :disabled="!store.can('portal:config')" @change="toggle(m)" />
+              <a-switch size="small" :checked="m.enabled === 1" @change="toggle(m)" />
             </div>
           </div>
           <a-empty v-if="!loading && list.length === 0" description="暂无模块" />
@@ -268,7 +265,7 @@ onBeforeRouteLeave(async () => {
 
       <div class="side-foot">
         <a-button block :disabled="!dirty" @click="reset">放弃修改</a-button>
-        <a-button v-if="store.can('portal:config')" block type="primary" :loading="saving" :disabled="!dirty" @click="save">
+        <a-button block type="primary" :loading="saving" :disabled="!dirty" @click="save">
           保存布局
         </a-button>
       </div>

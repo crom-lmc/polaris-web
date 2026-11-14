@@ -11,8 +11,7 @@
       <a-button @click="load">刷新</a-button>
       <a-button v-if="store.can('role:create')" type="primary" @click="openCreate">新建角色</a-button>
       <span class="hint">
-        角色是全局的：一个角色可以同时勾选多个应用的权限点（如人事专员可同时拥有 EHR 与其他系统的权限）。
-        改完授权后，用户需重新登录或刷新令牌才生效。
+        角色可跨应用授权权限点；改完授权后，用户需重新登录或刷新令牌才生效。
       </span>
     </div>
 
@@ -106,13 +105,6 @@
 
     <!-- 权限授权 -->
     <a-drawer v-model:open="assignOpen" :title="`「${assignTarget?.name || ''}」的权限`" width="520">
-      <a-alert
-        type="info"
-        show-icon
-        style="margin-bottom: 12px"
-        :message="`「${assignTarget?.name || ''}」可勾选任意应用的权限点，保存后持有该角色的账户重新登录即生效。`"
-      />
-
       <div class="assign-tools">
         <a-space>
           <a-button size="small" @click="checkAll">全选</a-button>
@@ -160,9 +152,8 @@ import {
   fetchRolePage,
   updateRole
 } from '@/api/rbac'
-import { fetchApplications } from '@/api/apps'
 import { useUserStore } from '@/stores/user'
-import type { ApplicationVO, PermissionVO, RoleVO } from '@/types'
+import type { PermissionVO, RoleVO } from '@/types'
 import { message } from 'ant-design-vue'
 import { confirmAction } from '@/utils/confirm'
 import RoleUserTransferModal from './components/RoleUserTransferModal.vue'
@@ -218,7 +209,6 @@ const assignLoading = ref(false)
 const assignSaving = ref(false)
 const assignTarget = ref<RoleVO | null>(null)
 const permissionTree = ref<PermissionVO[]>([])
-const apps = ref<ApplicationVO[]>([])
 const treeData = ref<any[]>([])
 /** 勾选键：真实权限点是雪花ID字符串，业务应用的虚拟分组节点是 'app:' 前缀 */
 const checkedKeys = ref<string[]>([])
@@ -228,19 +218,7 @@ const allLeafIds = ref<string[]>([])
 
 onMounted(async () => {
   await load()
-  await loadApps()
 })
-
-/** 授权抽屉用它把 appCode 显示成应用名；没有应用查看权限时退回显示 code */
-async function loadApps() {
-  if (!store.can('app:list')) return
-  try {
-    const res = await fetchApplications()
-    apps.value = res.data || []
-  } catch {
-    // 忽略：只影响分组标题的显示
-  }
-}
 
 async function load() {
   loading.value = true
@@ -343,10 +321,9 @@ async function remove(record: RoleVO) {
 // ---------------- 权限授权 ----------------
 
 /**
- * 全量权限树只拉一次：角色可跨应用授权，不再按应用分别缓存。
- * 虚拟分组节点 key 为 'app:' 前缀，只用于展示，不落库。
+ * 角色不再绑定应用，一次性加载全量权限树并缓存，
+ * 授权抽屉里可以跨应用勾选任意应用的权限点。
  */
-const ALL_APPS = 'ALL'
 const permCache = new Map<string, PermissionVO[]>()
 
 function nodeOf(n: PermissionVO, leafOut: string[]): any {
@@ -359,31 +336,6 @@ function nodeOf(n: PermissionVO, leafOut: string[]): any {
     title: `${n.name}（${n.code}）`,
     children: hasChildren ? n.children!.map((c) => nodeOf(c, leafOut)) : undefined
   }
-}
-
-/** 全量权限树按应用包一层分组节点（key=app:xxx 为虚拟节点，不落库），一个角色可跨应用勾选 */
-function buildAssignTree(list: PermissionVO[]) {
-  const groups = new Map<string, PermissionVO[]>()
-  list.forEach((n) => {
-    const app = n.appCode || 'sso'
-    if (!groups.has(app)) groups.set(app, [])
-    groups.get(app)!.push(n)
-  })
-  const leaves: string[] = []
-  const data = [...groups.keys()]
-    .sort((a, b) => (a === 'sso' ? -1 : b === 'sso' ? 1 : a.localeCompare(b)))
-    .map((app) => ({
-      key: `app:${app}`,
-      title: `${appLabel(app)}（${app}）`,
-      children: groups.get(app)!.map((n) => nodeOf(n, leaves))
-    }))
-  return { data, leaves }
-}
-
-function appLabel(code: string) {
-  // 平台权限域（sso）与内置应用 sso-center 统一显示为「统一账号中心」，避免两个平台条目
-  if (code === 'sso' || code === 'sso-center') return '统一账号中心'
-  return apps.value.find((a) => a.code === code)?.name || code
 }
 
 function collectMenus(nodes: PermissionVO[], out: string[] = []): string[] {
@@ -413,30 +365,62 @@ const checkedLeafCount = computed(
   () => checkedKeys.value.filter((k) => !isVirtual(k)).length
 )
 
+/** 应用编码 → 中文名 */
+const appLabels: Record<string, string> = {
+  sso: '统一账号中心',
+  cms: '内容中心',
+  ehr: '人力中心',
+  blog: '博客后台',
+  settings: '配置中心',
+  job: '调度中心'
+}
+
 async function openAssign(record: RoleVO) {
   assignTarget.value = record
   assignOpen.value = true
   assignLoading.value = true
   try {
-    // 角色是全局的：加载全部应用的权限树，按应用分组展示，可直接跨应用勾选
-    let tree = permCache.get(ALL_APPS)
+    // 一次加载全量权限树：不再按角色所属应用过滤，允许跨应用勾选
+    let tree = permCache.get('all')
     if (!tree) {
       const res = await fetchPermissionTree()
       tree = res.data || []
-      permCache.set(ALL_APPS, tree)
+      permCache.set('all', tree)
     }
     permissionTree.value = tree
 
-    const { data, leaves } = buildAssignTree(tree)
-    treeData.value = data
-    allLeafIds.value = leaves
+    // 按 appCode 分组，每组上面加虚拟"应用"节点
+    const groups = new Map<string, PermissionVO[]>()
+    for (const n of tree) {
+      const app = n.appCode || 'other'
+      if (!groups.has(app)) groups.set(app, [])
+      groups.get(app)!.push(n)
+    }
+
+    const leafIds: string[] = []
+    const appOrder = ['sso', 'cms', 'ehr', 'blog', 'settings', 'job']
+    const sortedApps = [...groups.keys()].sort((a, b) => {
+      const ia = appOrder.indexOf(a)
+      const ib = appOrder.indexOf(b)
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+    })
+
+    treeData.value = sortedApps.map((app) => ({
+      key: `app:${app}`,
+      title: `${appLabels[app] || app}（${app}）`,
+      children: groups.get(app)!.map((n) => nodeOf(n, leafIds))
+    }))
+    allLeafIds.value = leafIds
     parentMap.value = new Map()
     buildParentMap(tree)
 
     // 只回填叶子节点：级联模式下给父节点会出现「勾父自动勾全部子」的错误状态
-    const leafSet = new Set(leaves)
+    const leafSet = new Set(leafIds)
     checkedKeys.value = (record.permissionIds || []).filter((id) => leafSet.has(id))
-    expandedKeys.value = expandAll.value ? data.map((n) => n.key) : []
+    // 展开应用节点 + 菜单节点
+    expandedKeys.value = expandAll.value
+      ? [...sortedApps.map((a) => `app:${a}`), ...collectMenus(tree)]
+      : sortedApps.map((a) => `app:${a}`)
   } catch (e: any) {
     message.error(e?.message || '加载权限树失败')
   } finally {
@@ -455,9 +439,13 @@ function clearAll() {
 /** 展开/收起直接改 expandedKeys：只翻标记位的话，当前树的展开状态不会跟着变 */
 function toggleExpand() {
   expandAll.value = !expandAll.value
-  expandedKeys.value = expandAll.value
-    ? [...treeData.value.map((n) => n.key), ...collectMenus(permissionTree.value)]
-    : []
+  if (expandAll.value) {
+    // 展开应用节点 + 所有菜单节点
+    const appKeys = treeData.value.map((n: any) => n.key)
+    expandedKeys.value = [...appKeys, ...collectMenus(permissionTree.value)]
+  } else {
+    expandedKeys.value = []
+  }
 }
 
 /** 勾选的按钮 + 其所有祖先菜单，才是最终要保存的权限集合；虚拟应用节点不落库 */
@@ -509,12 +497,6 @@ async function saveAssign() {
 
 .mono {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-}
-
-.form-tip {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--muted);
 }
 
 .muted {

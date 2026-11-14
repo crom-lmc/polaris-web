@@ -31,7 +31,7 @@ export interface NoticePage {
   total: number
 }
 
-// 注意：本项目的 request 拦截器保留 axios 响应结构，数据本体在 .data 上
+/** 风格与 apps.ts 保持一致：TS 泛型声明 { data: X }，运行时拦截器解包后 .data 即数据本体 */
 export function pageNotices(params: { page?: number; size?: number; category?: string; keyword?: string; unreadOnly?: boolean }) {
   return request.get<never, { data: NoticePage }>('/api/ehr/announcements', { params })
 }

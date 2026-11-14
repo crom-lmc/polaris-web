@@ -84,7 +84,6 @@
       </div>
       <div class="panel-body table-body ft-scroll ft-bottom">
         <a-table class="ft-table"
-          :class="{ 'tbl-empty-mode': !loading && !rows.length }"
           table-layout="fixed"
           :columns="columns"
           :data-source="rows"
@@ -92,11 +91,9 @@
           row-key="id"
           size="middle"
           :pagination="pagination"
+          :locale="{ emptyText: '还没有提交过转正申请' }"
           @change="onTableChange"
         >
-          <template #emptyText>
-            <div class="tbl-empty"><a-empty v-if="!loading" description="还没有提交过转正申请" /></div>
-          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'subject'">
               <b>{{ record.employeeName }}</b>
@@ -330,7 +327,6 @@ const pagination = computed(() => ({
 
 const columns = computed(() => {
   const cols: any[] = [
-    { title: '申请编号', dataIndex: 'applyNo', key: 'applyNo', width: 170 },
     { title: '申请转正日期', key: 'regularizeDate', width: 170 },
     { title: '被办理人', key: 'subject', width: 160 },
     { title: '申请理由', key: 'summary', ellipsis: true },

@@ -164,7 +164,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { fetchAllEnabledApplications } from '@/api/apps'
+import { fetchEnabledApplications } from '@/api/apps'
 import { fetchApprovals } from '@/api/approvals'
 import {
   fetchMyNotices,
@@ -231,7 +231,7 @@ const appOptions = computed(() => [
 
 async function loadAllApps() {
   try {
-    allApps.value = (await fetchAllEnabledApplications()).data || []
+    allApps.value = (await fetchEnabledApplications()).data || []
   } catch {
     allApps.value = []
   }
@@ -388,7 +388,7 @@ async function load() {
           appCode: m.groupApp || bizTypeApp(inst?.bizType) || bizTypeApp(m.bizType),
           // 消息自带发起人（审批结果消息是实际审批人），待办再回退到审批单申请人
           applicantName: m.applicantName || inst?.applicantName,
-          bizNo: m.bizNo || inst?.apprNo
+          bizNo: m.bizNo || inst?.bizNo
         }
       })
     const items: MsgItem[] = noticeItems
@@ -405,11 +405,11 @@ async function load() {
         id: `approval-${inst.id}`,
         kind: 1,
         title: inst.title,
-        content: [inst.applicantName, inst.apprNo ? `单号 ${inst.apprNo}` : ''].filter(Boolean).join(' · '),
+        content: [inst.applicantName, inst.bizNo ? `单号 ${inst.bizNo}` : ''].filter(Boolean).join(' · '),
         bizType: inst.bizType,
         bizId: String(inst.id),
         instId: String(inst.id),
-        bizNo: inst.apprNo,
+        bizNo: inst.bizNo,
         // 无站内记录的审批单待办：模块统一归「审批中心」，与消息配置里的审批规则模块一致
         todoType: '审批中心',
         appCode: bizTypeApp(inst.bizType),

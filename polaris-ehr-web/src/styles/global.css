@@ -25,13 +25,6 @@ body,
   --muted: #8a9099;
   --code-bg: #f2f3f5;
   --border-subtle: #eef0f4;
-  /* 卡片 / 表单控件底色（富文本编辑器等自定义组件复用） */
-  --card-bg: #ffffff;
-  --card-border: #d9d9d9;
-  --toolbar-bg: #fafafa;
-  /* 组织树选中行与普通节点同色（不铺蓝底），悬浮用中性灰 */
-  --brand: #2f54eb;
-  --tree-hover-bg: rgba(0, 0, 0, 0.04);
 }
 
 :root[data-theme='dark'] {
@@ -48,29 +41,12 @@ body,
   --muted: #9aa6b2;
   --code-bg: rgba(255, 255, 255, 0.12);
   --border-subtle: rgba(255, 255, 255, 0.12);
-  /* 卡片 / 表单控件底色（富文本编辑器等自定义组件复用） */
-  --card-bg: #161a22;
-  --card-border: rgba(255, 255, 255, 0.12);
-  --toolbar-bg: #1b1e26;
-  /* 组织树选中行与普通节点同色（不铺蓝底），悬浮用中性灰 */
-  --brand: #2f54eb;
-  --tree-hover-bg: rgba(255, 255, 255, 0.06);
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: var(--bg-page);
   color: var(--text-base);
-}
-
-/* 组织树：选中行不再单独铺蓝底，与其它节点行同色（选中态不靠底色区分）
-   悬浮仍保留中性灰反馈；:root 抬高优先级压过 antd 运行时注入的默认选中底色 */
-:root .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
-  background: transparent;
-}
-
-:root .ant-tree .ant-tree-node-content-wrapper:hover {
-  background: var(--tree-hover-bg);
 }
 
 .page-container {
@@ -271,31 +247,6 @@ body {
   display: flex;
   flex-direction: column;
 }
-/* 空态：撑满表头之下、分页条之上的剩余高度并居中（与统一账号中心「待我审批」一致）。
-   只在无数据时加 .tbl-empty-mode，有数据时不改动表格布局，避免拉伸行高。 */
-.tbl-empty-mode .ant-table-container {
-  flex: 1 0 auto;
-  display: flex;
-  flex-direction: column;
-}
-.tbl-empty-mode .ant-table-content {
-  flex: 1 0 auto;
-}
-.tbl-empty-mode .ant-table-content > table {
-  height: 100%;
-}
-.tbl-empty-mode .ant-table-placeholder > td {
-  height: 100%;
-  padding: 0;
-  border-bottom: none;
-}
-.tbl-empty {
-  height: 100%;
-  min-height: 220px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .ft-scroll.ft-bottom .ant-table-wrapper .ant-table-pagination {
   position: sticky;
   bottom: 0;
@@ -317,17 +268,4 @@ body {
   z-index: 3;
   background: var(--panel-bg, var(--header-bg)) !important;
   border-left: 1px solid var(--panel-border, var(--header-border));
-}
-/* 必填星号改为绝对定位，不参与标签文字排版：必填与选填标签左边缘保持对齐。
-   统一给 label 预留 10px 左侧空间，星号落在该空间内，文字起点不变。 */
-.ant-form-item-label > label {
-  position: relative;
-  padding-left: 10px;
-}
-.ant-form-item-label > label.ant-form-item-required::before {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  margin: 0;
-  transform: translateY(-50%);
 }

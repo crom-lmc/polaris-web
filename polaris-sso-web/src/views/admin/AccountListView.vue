@@ -40,9 +40,10 @@
           >
             <template #title="data">
               <span class="node-title">
-                <a-tag :color="typeColor(metaOf(data).type)" class="node-tag">
+                <a-tag v-if="!String(data.key).startsWith('app_')" :color="typeColor(metaOf(data).type)" class="node-tag">
                   {{ metaOf(data).typeName || typeLabel(metaOf(data).type) }}
                 </a-tag>
+                <a-tag v-else color="purple" class="node-tag">应用</a-tag>
                 <span class="node-name" :class="{ 'is-off': metaOf(data).status === 2 }">
                   {{ metaOf(data).name }}
                 </span>
@@ -100,6 +101,13 @@
           <span v-if="!(record.roles || []).length" class="muted">未分配</span>
         </template>
 
+        <template v-else-if="column.key === 'dataScope'">
+          <a-tag v-if="record.dataScopeOrgCode" color="geekblue">
+            {{ record.dataScopeOrgCode }}
+          </a-tag>
+          <span v-else class="muted">未配置</span>
+        </template>
+
         <template v-else-if="column.key === 'status'">
           <a-tag :color="statusMeta[record.status]?.color">
             {{ statusMeta[record.status]?.text || record.status }}
@@ -113,10 +121,6 @@
         <template v-else-if="column.key === 'action'">
           <!-- 收紧到 EHR 模块纯链接的紧凑度：link 按钮自带横向 padding，叠加默认 8px space 会显得很散 -->
           <a-space :size="4" class="row-actions">
-            <a-button v-if="store.can('account:edit')" type="link" size="small" @click="openEdit(record)">
-              编辑
-            </a-button>
-
             <!-- 角色授权：决定这个账号在业务系统里能做什么（独立入口，不用进编辑弹窗） -->
             <a-button
               v-if="store.can('account:edit')"
@@ -125,6 +129,16 @@
               @click="openRoles(record)"
             >
               角色
+            </a-button>
+
+            <!-- 数据权限：决定这个账号能看哪些组织的数据 -->
+            <a-button
+              v-if="store.can('account:edit')"
+              type="link"
+              size="small"
+              @click="openDataScope(record)"
+            >
+              数据权限
             </a-button>
 
             <!-- 应用授权：决定这个账号能进哪些业务系统 -->
@@ -176,15 +190,6 @@
               @click="openResetPwd(record)"
             >
               重置密码
-            </a-button>
-            <a-button
-              v-if="store.can('system:session:manage')"
-              type="link"
-              size="small"
-              danger
-              @click="askForceLogout(record)"
-            >
-              强制下线
             </a-button>
           </a-space>
         </template>
@@ -295,6 +300,56 @@
       </a-form>
     </a-modal>
 
+    <!-- 数据权限：复选框级联勾选组织树，自动勾所有后代 -->
+    <a-modal
+      centered
+      v-model:open="scopeOpen"
+      :title="`「${scopeTarget?.username || ''}」的数据权限`"
+      :confirm-loading="submitting"
+      width="480"
+      @ok="submitDataScope"
+    >
+      <a-alert
+        type="info"
+        show-icon
+        style="margin-bottom: 12px"
+        message="勾选组织节点作为数据权限根——自动包含所有下级组织。可勾多个节点。最下方会自动展示勾选结果对应的组织编码。"
+      />
+      <div class="scope-select-row">
+        <span class="scope-label">当前：</span>
+        <a-tag v-if="scopeTarget?.dataScopeOrgCode" color="geekblue">{{ scopeTarget.dataScopeOrgCode }}</a-tag>
+        <span v-else class="muted">未配置</span>
+      </div>
+      <div class="scope-tree-wrap">
+        <a-tree
+          ref="scopeTreeRef"
+          checkable
+          :tree-data="orgTreeData"
+          v-model:checkedKeys="scopeCheckedKeys"
+          v-model:expandedKeys="scopeExpandedKeys"
+          block-node
+        >
+          <template #title="data">
+            <span>
+              <a-tag v-if="!String(data.key).startsWith('app_')" :color="TYPE_META[metaOf(data).type]?.color || 'default'" style="margin-right:4px">
+                {{ metaOf(data).typeName || typeLabel(metaOf(data).type) }}
+              </a-tag>
+              <a-tag v-else color="purple" style="margin-right:4px">应用</a-tag>
+              {{ metaOf(data).name }}
+              <span class="muted" v-if="data.raw?.code">（{{ data.raw.code }}）</span>
+            </span>
+          </template>
+        </a-tree>
+      </div>
+      <div class="scope-result-row" v-if="scopeFinalCode">
+        <span class="scope-label">保存为：</span>
+        <a-tag color="geekblue">{{ scopeFinalCode }}</a-tag>
+      </div>
+      <div class="scope-footer">
+        <a-button size="small" @click="clearDataScope">清除数据权限</a-button>
+      </div>
+    </a-modal>
+
     <!-- 可访问应用 -->
     <a-drawer
       v-model:open="appsOpen"
@@ -323,7 +378,7 @@
       <template #footer>
         <a-space>
           <a-button @click="appsOpen = false">取消</a-button>
-          <a-button v-if="store.can('account:app:assign')" type="primary" :loading="appsSaving" @click="saveApps">保存</a-button>
+          <a-button type="primary" :loading="appsSaving" @click="saveApps">保存</a-button>
         </a-space>
       </template>
     </a-drawer>
@@ -338,10 +393,10 @@ import {
   disableAccount,
   enableAccount,
   fetchAccountAppIds,
-  forceLogoutAccount,
   fetchAccounts,
   grantAccountApps,
   resetAccountPassword,
+  setAccountDataScope,
   unlockAccount,
   updateAccount
 } from '@/api/accounts'
@@ -367,9 +422,10 @@ const columns = [
   { title: '账户', key: 'username', width: 180 },
   { title: '邮箱', dataIndex: 'email', key: 'email' },
   { title: '角色', key: 'roles', width: 200 },
+  { title: '数据权限', key: 'dataScope', width: 140 },
   { title: '状态', key: 'status', width: 100 },
   { title: '最近登录', key: 'lastLoginAt', width: 170 },
-  { title: '操作', key: 'action', width: 300 }
+  { title: '操作', key: 'action', width: 360 }
 ]
 
 const records = ref<AccountVO[]>([])
@@ -380,8 +436,6 @@ const total = ref(0)
 const current = ref(1)
 const pageSize = ref(10)
 const roles = ref<RoleVO[]>([])
-/** 角色分组标题用的应用名（只有已启用的应用才有角色） */
-const appOptions = ref<ApplicationVO[]>([])
 
 const pagination = computed(() => ({
   current: current.value,
@@ -471,6 +525,7 @@ interface OrgTreeNode {
   key: string
   title: string
   children?: OrgTreeNode[]
+  disableCheckbox?: boolean
 }
 
 /** 后端下发的是扁平节点（id/parentId），a-tree 只认 key/title/children，这里组树 */
@@ -494,14 +549,31 @@ const orgTreeData = computed<OrgTreeNode[]>(() => {
       children: x.children?.length ? clean(x.children) : undefined
     }))
   const tree = clean(roots)
-  if (!kw) return tree
+
+  // 加一层虚拟应用节点作为根，key 以 'app_' 前缀区分，且不可勾选（要全部权限直接勾最顶级组织）
+  const wrapped: OrgTreeNode = {
+    key: 'app_root',
+    title: '统一账号中心',
+    children: tree,
+    disableCheckbox: true
+  }
+  const wrapClean = (node: OrgTreeNode): OrgTreeNode => ({
+    key: node.key,
+    title: node.title,
+    children: node.children?.length ? node.children.map(wrapClean) : undefined,
+    disableCheckbox: node.disableCheckbox
+  })
+
+  const final = wrapClean(wrapped)
+
+  if (!kw) return [final]
   // 搜索时保留命中节点及其祖先，否则子组织会变成孤立的根节点
   const keep = (node: OrgTreeNode): boolean => {
     const kids = (node.children || []).filter(keep)
     node.children = kids.length ? kids : undefined
-    return node.title.toLowerCase().includes(kw) || kids.length > 0
+    return (node.title.toLowerCase().includes(kw) || kids.length > 0 || node.key.startsWith('app_'))
   }
-  return tree.filter(keep)
+  return [final].filter(keep)
 })
 
 const selectedKeys = computed(() => (selectedOrgId.value ? [selectedOrgId.value] : []))
@@ -509,9 +581,11 @@ const selectedOrgName = computed(
   () => orgNodes.value.find((n) => n.id === selectedOrgId.value)?.name || ''
 )
 
+const APP_ROOT_KEY = 'app_root'
+
 watch(orgKeyword, () => {
   // 搜索结果只保留命中节点及祖先，全部展开才看得见；清空后仍回到默认「全部展开」
-  expandedKeys.value = orgNodes.value.map((n) => n.id)
+  expandedKeys.value = [APP_ROOT_KEY, ...orgNodes.value.map((n) => n.id)]
 })
 
 async function loadOrgTree() {
@@ -520,7 +594,7 @@ async function loadOrgTree() {
     const res = await fetchApprovalOrgTree()
     orgNodes.value = res.data || []
     // 默认全部展开，与 EHR 组织架构页一致；树面板自己有滚动条，不挤右侧表格
-    expandedKeys.value = orgNodes.value.map((n) => n.id)
+    expandedKeys.value = [APP_ROOT_KEY, ...orgNodes.value.map((n) => n.id)]
   } catch {
     // 组织服务不可用时树为空，但账号列表仍可正常使用（不按组织过滤）
     orgNodes.value = []
@@ -530,7 +604,7 @@ async function loadOrgTree() {
 }
 
 function expandAllOrgs() {
-  expandedKeys.value = orgNodes.value.map((n) => n.id)
+  expandedKeys.value = [APP_ROOT_KEY, ...orgNodes.value.map((n) => n.id)]
 }
 
 function collapseAllOrgs() {
@@ -538,7 +612,13 @@ function collapseAllOrgs() {
 }
 
 function onOrgSelect(keys: (string | number)[]) {
-  selectedOrgId.value = keys.length ? String(keys[0]) : ''
+  const id = keys.length ? String(keys[0]) : ''
+  // 跳过虚拟应用根节点：选它等于不按组织过滤
+  if (id.startsWith('app_')) {
+    selectedOrgId.value = ''
+  } else {
+    selectedOrgId.value = id
+  }
   current.value = 1
   load()
 }
@@ -564,21 +644,12 @@ async function loadRoles() {
   } catch {
     roles.value = []
   }
-  try {
-    const res = await fetchEnabledApplications()
-    appOptions.value = res.data || []
-  } catch {
-    appOptions.value = []
-  }
 }
 
-/** 角色是全局的，不再按应用分组：账户可以直接选到跨应用的组合角色 */
-const roleSelectOptions = computed(() => [
-  {
-    label: '全部角色',
-    options: roles.value.map((r) => ({ label: `${r.name}（${r.code}）`, value: r.id }))
-  }
-])
+/** 角色不再绑定应用，下拉里统一平铺，按名称即可辨识 */
+const roleSelectOptions = computed(() =>
+  roles.value.map((r) => ({ label: `${r.name}（${r.code}）`, value: r.id }))
+)
 
 async function load() {
   loading.value = true
@@ -758,26 +829,6 @@ async function unlock(record: AccountVO) {
   }
 }
 
-function askForceLogout(record: AccountVO) {
-  confirmAction({
-    title: '强制下线',
-    content: `将作废「${record.nickname || record.username}」全部在线会话，该账号需重新登录，确认吗？`,
-    okText: '强制下线',
-    okType: 'danger',
-    onOk: () => doForceLogout(record)
-  })
-}
-
-async function doForceLogout(record: AccountVO) {
-  try {
-    const res = await forceLogoutAccount(record.id)
-    const count = res.data || 0
-    message.success(count ? `已下线 ${count} 个会话` : '该账号当前没有在线会话')
-  } catch (e: any) {
-    message.error(e?.message || '强制下线失败')
-  }
-}
-
 // ---------------- 可访问应用 ----------------
 
 async function openApps(record: AccountVO) {
@@ -810,6 +861,92 @@ async function saveApps() {
     message.error(e?.message || '保存失败')
   } finally {
     appsSaving.value = false
+  }
+}
+
+// ---------------- 数据权限 ----------------
+const scopeOpen = ref(false)
+const scopeTarget = ref<AccountVO | null>(null)
+const scopeCheckedKeys = ref<(string | number)[]>([])
+const scopeExpandedKeys = ref<string[]>([])
+const scopeTreeRef = ref<any>(null)
+
+/** 只保留"根"级：被勾但自身没有任何祖先也被勾的节点 → 传给后端 scopeCode */
+const scopeFinalCode = computed(() => {
+  const checked = new Set(scopeCheckedKeys.value.map(String))
+  if (!checked.size) return ''
+  // 为每个 checked 节点找到它的祖先链，若祖先在 checked 里 → 跳过该节点
+  const roots: string[] = []
+  for (const node of orgNodes.value) {
+    if (!checked.has(node.id)) continue
+    const ancestors = orgAncestors(node.id)
+    const hasAncestorChecked = ancestors.some((a) => checked.has(a))
+    if (!hasAncestorChecked && node.code) roots.push(node.code)
+  }
+  return roots.join(',')
+})
+
+/** 给定节点 id，返回它所有祖先的 id 列表（不含自己） */
+function orgAncestors(nodeId: string): string[] {
+  const idToNode = new Map(orgNodes.value.map((n) => [n.id, n]))
+  const result: string[] = []
+  let cur = idToNode.get(nodeId)
+  while (cur?.parentId) {
+    result.push(cur.parentId)
+    cur = idToNode.get(cur.parentId)
+  }
+  return result
+}
+
+function openDataScope(record: AccountVO) {
+  scopeTarget.value = record
+  // 先计算回显的 checked keys，在打开弹窗之前就设好
+  const curCode = record.dataScopeOrgCode || ''
+  const codes = curCode.split(',').map((s) => s.trim()).filter(Boolean)
+  const checked: string[] = []
+  for (const c of codes) {
+    const node = orgNodes.value.find((n) => n.code === c)
+    if (node) checked.push(node.id)
+  }
+  // 先设值，再打开弹窗——a-tree 挂载时 checked-keys 就有值，初始化即勾选
+  scopeCheckedKeys.value = checked
+  scopeExpandedKeys.value = [APP_ROOT_KEY, ...orgNodes.value.map((n) => n.id)]
+  scopeOpen.value = true
+}
+
+function onScopeNodeCheck(checkedKeys: any) {
+  // Ant Design Vue 4.x checkable tree: 回调第一个参数是 { checked: string[], halfChecked: string[] }
+  // 兼容老版本直接传 string[] 的情况
+  if (Array.isArray(checkedKeys)) {
+    scopeCheckedKeys.value = checkedKeys.map(String)
+  } else if (checkedKeys && Array.isArray(checkedKeys.checked)) {
+    scopeCheckedKeys.value = checkedKeys.checked.map(String)
+  } else {
+    scopeCheckedKeys.value = []
+  }
+}
+
+function onScopeNodeExpand(keys: (string | number)[]) {
+  scopeExpandedKeys.value = keys.map(String)
+}
+
+function clearDataScope() {
+  scopeCheckedKeys.value = []
+}
+
+async function submitDataScope() {
+  if (!scopeTarget.value) return
+  submitting.value = true
+  try {
+    const code = scopeFinalCode.value || null
+    await setAccountDataScope(scopeTarget.value.id, code)
+    message.success(code ? `数据权限已设为 ${code}` : '数据权限已清除')
+    scopeOpen.value = false
+    await load()
+  } catch (e: any) {
+    message.error(e?.message || '保存失败')
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -986,5 +1123,31 @@ async function saveApps() {
  */
 .row-actions :deep(.ant-btn-link) {
   padding: 0 4px;
+}
+
+/* 数据权限弹窗 */
+.scope-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.scope-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+.scope-tree-wrap {
+  width: 100%;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--header-bg);
+  box-sizing: border-box;
+}
+.scope-footer {
+  margin-top: 12px;
+  text-align: left;
 }
 </style>

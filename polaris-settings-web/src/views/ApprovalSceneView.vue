@@ -1,6 +1,6 @@
 <template>
   <a-layout class="page-container as-root">
-    <a-layout-sider width="300" class="approval-nav-sider" :theme="theme.mode === 'dark' ? 'dark' : 'light'">
+    <a-layout-sider width="260" class="approval-nav-sider" :theme="theme.mode === 'dark' ? 'dark' : 'light'">
       <a-tree
         class="approval-nav-tree"
         :tree-data="treeData"
@@ -11,10 +11,7 @@
         @expand="onExpand"
       >
         <template #title="node">
-          <span class="approval-nav-node">
-            <span :class="['approval-nav-name', navTitleClass(String(node.key))]">{{ node.title }}</span>
-            <span v-if="navCount(node)" class="approval-nav-count">{{ navCount(node) }}</span>
-          </span>
+          <span :class="navTitleClass(String(node.key))">{{ node.title }}</span>
         </template>
       </a-tree>
       <a-empty v-if="!treeData.length" :image-style="{ height: '40px' }" description="暂无业务类型" />
@@ -33,7 +30,7 @@
           class="as-search"
           @change="() => {}"
         />
-        <a-button v-if="store.can('approval:manage')" type="primary" @click="openScene()">注册场景</a-button>
+        <a-button type="primary" @click="openScene()">注册场景</a-button>
       </div>
 
       <a-table
@@ -147,8 +144,6 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '@/stores/user'
-const store = useUserStore()
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import {
@@ -199,7 +194,7 @@ const treeData = computed<TreeNode[]>(() => {
       .filter((s) => s.appCode === code)
       .map<TreeNode>((s) => ({ key: `scene:${s.bizType}`, title: s.bizName || s.bizType, isLeaf: true }))
     children.sort((a, b) => a.title.localeCompare(b.title, 'zh'))
-    return { key: `app:${code}`, title: name, count: children.length, children } as TreeNode & { count: number }
+    return { key: `app:${code}`, title: `${name}（${children.length}）`, children }
   })
   appNodes.sort((a, b) => a.title.localeCompare(b.title, 'zh'))
 
@@ -215,9 +210,6 @@ const navTitleClass = (key: string) =>
     : key.startsWith('scene:')
       ? 'approval-nav-title-leaf'
       : 'approval-nav-title-app'
-
-/** 树节点右侧数量（节点数据里带 count；根节点不展示） */
-const navCount = (node: any) => (typeof node?.count === 'number' ? node.count : 0)
 
 /**
  * 默认全展开：树数据是异步拉回来的，default-expand-all 只认首次渲染会失效，

@@ -39,39 +39,43 @@
         :trigger="null"
         @collapse="(v: boolean) => (collapsed = v)"
       >
-        <a-menu mode="inline" :selected-keys="selectedKeys" @click="handleMenuClick">
-          <a-menu-item v-if="store.can('dashboard:view')" key="/dashboard">
-            <template #icon><dashboard-outlined /></template>
-            概览
-          </a-menu-item>
-          <a-menu-item v-if="store.can('article:view')" key="/articles">
-            <template #icon><file-text-outlined /></template>
-            内容管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('category:view')" key="/categories">
-            <template #icon><folder-outlined /></template>
-            分类管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('tag:view')" key="/tags">
-            <template #icon><tags-outlined /></template>
-            标签管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('media:view')" key="/media">
-            <template #icon><picture-outlined /></template>
-            媒体库
-          </a-menu-item>
-          <a-menu-item v-if="store.can('banner:view')" key="/banners">
-            <template #icon><flag-outlined /></template>
-            Banner 管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('link:view')" key="/links">
-            <template #icon><link-outlined /></template>
-            友情链接
-          </a-menu-item>
-          <a-menu-item v-if="store.can('portal:view')" key="/portal">
-            <template #icon><global-outlined /></template>
-            门户设置
-          </a-menu-item>
+        <a-menu mode="inline" :selected-keys="selectedKeys" :open-keys="openKeys" @click="handleMenuClick" @openChange="handleOpenChange">
+          <a-submenu key="grp-cms">
+            <template #icon><appstore-outlined /></template>
+            <template #title>内容中心</template>
+            <a-menu-item v-if="store.can('dashboard:view')" key="/dashboard">
+              <template #icon><dashboard-outlined /></template>
+              仪表盘
+            </a-menu-item>
+            <a-menu-item v-if="store.can('article:view')" key="/articles">
+              <template #icon><file-text-outlined /></template>
+              内容管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('category:view')" key="/categories">
+              <template #icon><folder-outlined /></template>
+              分类管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('tag:view')" key="/tags">
+              <template #icon><tags-outlined /></template>
+              标签管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('media:view')" key="/media">
+              <template #icon><picture-outlined /></template>
+              媒体库
+            </a-menu-item>
+            <a-menu-item v-if="store.can('banner:view')" key="/banners">
+              <template #icon><flag-outlined /></template>
+              Banner 管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('link:view')" key="/links">
+              <template #icon><link-outlined /></template>
+              友情链接
+            </a-menu-item>
+            <a-menu-item v-if="store.can('portal:view')" key="/portal">
+              <template #icon><global-outlined /></template>
+              门户设置
+            </a-menu-item>
+          </a-submenu>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">
@@ -85,6 +89,7 @@
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
+  AppstoreOutlined,
   DashboardOutlined,
   DownOutlined,
   FileTextOutlined,
@@ -100,7 +105,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { Modal } from 'ant-design-vue'
-import { SSO_AUTHORIZE_URL, logoutSso } from '@/api/cms'
+import { gotoAuthorize, logoutSso } from '@/api/cms'
 import { getRefreshToken } from '@/utils/token'
 import { useSessionGuard } from '@/composables/useSessionGuard'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
@@ -120,6 +125,11 @@ function toggleCollapse() {
 }
 
 const selectedKeys = computed(() => [route.path])
+
+const openKeys = ref<string[]>(['grp-cms'])
+function handleOpenChange(keys: string[]) {
+  openKeys.value = keys
+}
 
 function handleMenuClick({ key }: { key: string }) {
   router.push(key as string)
@@ -142,8 +152,7 @@ function onUserMenuClick({ key }: { key: string }) {
           /* 忽略：本地照样退出 */
         }
         store.logout()
-        // 回到登录页而不是重新授权，避免账号中心凭残余登录态静默签码、立刻登回来
-        window.location.replace(`${SSO_AUTHORIZE_URL}/login?gl=1`)
+        gotoAuthorize('/')
       }
     })
   }
@@ -170,8 +179,6 @@ function onUserMenuClick({ key }: { key: string }) {
   background: var(--header-bg);
   color: var(--header-text);
   border-bottom: 1px solid var(--header-border);
-  /* 覆盖 Ant Design a-layout-header 默认的 line-height: 64px，让 flex 居中真正生效 */
-  line-height: 1;
 }
 
 .logo {
@@ -179,7 +186,6 @@ function onUserMenuClick({ key }: { key: string }) {
   align-items: center;
   gap: 6px;
   padding-left: 24px;
-  height: 32px;
   color: var(--header-text);
   font-weight: 600;
   font-size: 14px;

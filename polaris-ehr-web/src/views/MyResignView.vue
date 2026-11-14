@@ -87,7 +87,6 @@
       </div>
       <div class="panel-body table-body ft-scroll ft-bottom">
         <a-table class="ft-table resign-table"
-          :class="{ 'tbl-empty-mode': !loading && !rows.length }"
           table-layout="fixed"
           :columns="columns"
           :data-source="rows"
@@ -95,11 +94,9 @@
           row-key="id"
           size="middle"
           :pagination="pagination"
+          :locale="{ emptyText: '还没有提交过离职申请' }"
           @change="onTableChange"
         >
-          <template #emptyText>
-            <div class="tbl-empty"><a-empty v-if="!loading" description="还没有提交过离职申请" /></div>
-          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'subject'">
               <b>{{ record.employeeName }}</b>
@@ -399,10 +396,7 @@ const showSubject = computed(() =>
 const columns = computed(() => {
   // table-layout:fixed 下列宽才是硬约束；「离职原因」不设 width，吸收剩余空间并省略长文本，
   // 避免 auto 布局把它撑宽后反过来把操作列压到只剩几十像素（按钮会被挤成竖排）。
-  const cols: any[] = [
-    { title: '申请编号', dataIndex: 'applyNo', key: 'applyNo', width: 170 },
-    { title: '拟离职日期', key: 'resignDate', width: 160 }
-  ]
+  const cols: any[] = [{ title: '拟离职日期', key: 'resignDate', width: 160 }]
   if (showSubject.value) {
     cols.push({ title: '被办理人', key: 'subject', width: 150 })
   }

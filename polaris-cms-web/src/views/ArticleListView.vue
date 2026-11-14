@@ -263,13 +263,13 @@ const toggleFlag = (r: ArticleItem, flag: 'pin' | 'recommend') =>
               @click="router.push(`/articles/${record.id}/edit`)">编辑</a-button>
             <a-button v-if="store.can('article:view') && record.status !== -1" type="link" size="small"
               @click="router.push(`/articles/${record.id}/edit`)">查看</a-button>
-            <template v-if="(record.status === 0 || record.status === 4) && store.can('article:edit')">
+            <template v-if="record.status === 0 || record.status === 4">
               <a-button type="link" size="small" @click="askSubmit(record)">提审</a-button>
             </template>
             <template v-if="record.status === 2 && store.can('article:publish')">
               <a-button type="link" size="small" @click="askPublish(record)">发布</a-button>
             </template>
-            <template v-if="record.status === 6 && store.can('article:edit')">
+            <template v-if="record.status === 6">
               <a-button type="link" size="small" danger @click="askWithdraw(record)">撤回审批</a-button>
             </template>
             <template v-if="record.status === 1 && store.can('article:audit')">

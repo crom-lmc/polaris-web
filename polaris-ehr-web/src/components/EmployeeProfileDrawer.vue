@@ -6,18 +6,6 @@
     destroy-on-close
     @close="emit('update:open', false)"
   >
-    <!-- 仅「待关闭账号」显示：从消息中心待办跳进来时，直接在抽屉右上角完成关闭 -->
-    <template #extra>
-      <a-popconfirm
-        v-if="profile?.employee?.status === 55"
-        title="关闭后档案置为「已离职」并停用统一账号，确定关闭账号？"
-        ok-text="关闭账号"
-        cancel-text="取消"
-        @confirm="doCloseAccount"
-      >
-        <a-button danger size="small">关闭账号</a-button>
-      </a-popconfirm>
-    </template>
     <a-spin :spinning="loading">
       <!-- 基本信息（卡片） -->
       <div class="info-card">
@@ -183,18 +171,6 @@
               </template>
             </template>
           </a-table>
-        </a-tab-pane>
-
-        <!-- 合同（P1-1） -->
-        <a-tab-pane v-if="canContractView" key="contracts" :tab="`合同（${contractTabCount}）`">
-          <!-- 查看档案抽屉一律只读：合同的新增/续签/终止只在「变更员工信息」弹窗里操作 -->
-          <EmployeeContractPanel :employee-id="employeeId" :can-manage="canContractManage && !!canEdit" @count="contractTabCount = $event" />
-        </a-tab-pane>
-
-        <!-- 档案附件（P1-1） -->
-        <a-tab-pane v-if="canAttachmentView" key="attachments" :tab="`档案附件（${attachmentTabCount}）`">
-          <!-- 查看档案抽屉一律只读：附件上传/删除只在「变更员工信息」弹窗里操作 -->
-          <EmployeeAttachmentPanel :employee-id="employeeId" :can-manage="canContractManage && !!canEdit" @count="attachmentTabCount = $event" />
         </a-tab-pane>
 
         <!-- 家庭成员 -->
@@ -411,7 +387,6 @@ import {
   deleteFamily,
   deleteWork,
   bizOptions,
-  closeAccountEmployee,
   employeeProfile,
   updateBank,
   updateEducation,
@@ -425,9 +400,6 @@ import {
   type WorkItem
 } from '@/api/ehr'
 import { statusColor, statusLabel } from '@/constants/employeeStatus'
-import EmployeeContractPanel from './EmployeeContractPanel.vue'
-import EmployeeAttachmentPanel from './EmployeeAttachmentPanel.vue'
-import { useUserStore } from '@/stores/user'
 
 const props = defineProps<{
   open: boolean
@@ -435,23 +407,11 @@ const props = defineProps<{
   canEdit?: boolean
 }>()
 
-const store = useUserStore()
-const canContractView = computed(() => store.can('contract:view'))
-const canContractManage = computed(() => store.can('contract:manage'))
-const canAttachmentView = computed(() => store.can('contract:view') || store.can('employee:view'))
-
-const emit = defineEmits<{
-  (e: 'update:open', v: boolean): void
-  /** 关闭账号成功：父页面刷新列表，保持状态一致 */
-  (e: 'closed'): void
-}>()
+const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const loading = ref(false)
 const profile = ref<EmployeeProfile | null>(null)
 const activeTab = ref('banks')
-/** 合同 / 档案附件页签角标条数（由子面板加载后回传） */
-const contractTabCount = ref(0)
-const attachmentTabCount = ref(0)
 
 async function load() {
   if (!props.employeeId) return
@@ -465,26 +425,11 @@ async function load() {
   }
 }
 
-/** 关闭账号：仅「待关闭账号」(55) 可见；成功后档案变「已离职」，服务端会统一置读群发待办 */
-async function doCloseAccount() {
-  if (!props.employeeId) return
-  try {
-    await closeAccountEmployee(props.employeeId)
-    message.success('账号已关闭，员工状态已更新为已离职')
-    await load()
-    emit('closed')
-  } catch (e: any) {
-    message.error(e?.message || '关闭账号失败')
-  }
-}
-
 watch(
   () => [props.open, props.employeeId],
   ([o]) => {
     if (o) {
       activeTab.value = 'banks'
-      contractTabCount.value = 0
-      attachmentTabCount.value = 0
       load()
     }
   }

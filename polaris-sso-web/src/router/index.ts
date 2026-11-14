@@ -41,22 +41,23 @@ const router = createRouter({
           path: 'approvals',
           name: 'approvals',
           component: () => import('@/views/admin/ApprovalListView.vue'),
-          // 审批中心是基本权限：所有角色默认授予 approval:todo，缺少该码才会被拦截
-          meta: { title: '审批中心', perm: 'approval:todo' }
+          // 审批中心不挂权限码：能不能审某张单由「任务分派给谁」决定，
+          // 待办列表永远只查 approver_id = 当前登录人，再加一层菜单权限只会挡住普通员工
+          meta: { title: '审批中心' }
         },
         {
           path: 'messages',
           name: 'messages',
           component: () => import('@/views/admin/NoticeCenterView.vue'),
-          // 待办/消息是员工基本能力：权限码 messages:view，默认授权给 EMPLOYEE_SELF
-          meta: { title: '待办提醒', perm: 'messages:view' }
+          // 待办/消息是员工基本能力：不挂权限码，和审批中心一致
+          meta: { title: '待办提醒' }
         },
         {
           path: 'notices',
           name: 'notices',
           component: () => import('@/views/admin/NotificationCenterView.vue'),
-          // 通知中心：展示人力中心发布的内部通知，权限码 notice:view，默认授权给 EMPLOYEE_SELF
-          meta: { title: '通知中心', perm: 'notice:view' }
+          // 通知中心：展示人力中心发布的内部通知，所有员工可见
+          meta: { title: '通知中心' }
         },
         {
           path: 'accounts',

@@ -30,9 +30,6 @@ body,
   --color-border-tertiary: #eef0f4;
   --color-text-primary: #1f2329;
   --color-text-secondary: #8a9099;
-  /* 左侧导航树：与人员管理组织树一致，选中不铺底、悬浮中性灰 */
-  --brand: #2f54eb;
-  --tree-hover-bg: rgba(0, 0, 0, 0.04);
 }
 
 :root[data-theme='dark'] {
@@ -54,23 +51,12 @@ body,
   --color-border-tertiary: rgba(255, 255, 255, 0.08);
   --color-text-primary: rgba(255, 255, 255, 0.85);
   --color-text-secondary: #9aa6b2;
-  /* 左侧导航树：与人员管理组织树一致，选中不铺底、悬浮中性灰 */
-  --brand: #2f54eb;
-  --tree-hover-bg: rgba(255, 255, 255, 0.06);
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: var(--bg-page);
   color: var(--text-base);
-}
-
-/* 根级兜底：整页布局是 100vh + overflow:hidden，文档本身永远不该出现横向滚动条。
-   一旦出现，说明有挂到 body 的浮层（下拉/弹窗/tooltip 这类 teleport 容器）超出视口宽度，
-   不在这里拦住就会在窗口底部露出一条横跨全宽的滚动条。 */
-html,
-body {
-  overflow-x: hidden;
 }
 
 .page-container {
@@ -164,72 +150,31 @@ body {
   vertical-align: bottom;
 }
 
-/* ===== 审批配置左侧导航树：审批模板 / 业务场景 / 业务点配置 / 消息配置 =====
-   四页树的层级和数据各不相同（结构由各页自己决定，这里一律不动），只统一视觉，
-   并与人力中心「人员管理 / 组织架构」的组织树保持一致：13px 字号、32px 行高、
-   树底与右侧列表同底、选中不铺底、悬浮中性灰、名称左对齐 + 数量右对齐（浅灰小字）。 */
+/* ===== 审批配置左侧导航树：审批模板 / 业务场景 / 业务点配置 =====
+   三页树的层级和数据各不相同（结构由各页自己决定，这里一律不动），只统一视觉：
+   控件用 a-tree 原生三角箭头（不加图标、不加连接线）、侧栏留白与滚动、
+   行高、层级字重一致；展开由各页受控 expandedKeys 默认全展开。 */
 .approval-nav-sider {
   border-right: 1px solid var(--color-border-tertiary, #eef0f4);
   padding: 12px 8px;
-  background: var(--color-background-primary, #fff);
+  background: transparent;
   overflow-y: auto;
-  /* 名称超长走省略号，不允许横向滚动条 */
-  overflow-x: hidden;
-}
-
-/* a-layout-sider 的 theme=dark 会注入 #001529 藏青底，和右侧列表底色不一致；
-   强制与页面/列表同底（cssinjs 注入在全局样式之后，需 :root 提权覆盖） */
-:root .approval-nav-sider.ant-layout-sider,
-:root[data-theme='dark'] .approval-nav-sider.ant-layout-sider {
-  background: var(--color-background-primary, #fff);
 }
 
 .approval-nav-tree.ant-tree {
   background: transparent;
-  font-size: 13px;
+  font-size: 14px;
 }
 
-:root .approval-nav-tree.ant-tree .ant-tree-treenode {
+.approval-nav-tree.ant-tree .ant-tree-treenode {
   width: 100%;
   padding-bottom: 2px;
 }
 
-:root .approval-nav-tree.ant-tree .ant-tree-node-content-wrapper {
-  min-height: 32px;
-  line-height: 32px;
+.approval-nav-tree.ant-tree .ant-tree-node-content-wrapper {
+  min-height: 30px;
+  line-height: 30px;
   color: var(--color-text-primary, #1f2329);
-}
-
-/* 选中行不铺底色，与人员管理组织树一致（选中态不靠底色区分）；悬浮保留中性灰 */
-:root .approval-nav-tree.ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
-  background: transparent;
-}
-
-:root .approval-nav-tree.ant-tree .ant-tree-node-content-wrapper:hover {
-  background: var(--tree-hover-bg);
-}
-
-/* 节点标题：名称占满剩余宽度并截断，数量贴右显示（与组织树的「xxx人」一致） */
-.approval-nav-node {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  min-width: 0;
-}
-
-.approval-nav-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.approval-nav-count {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--muted, #8a9099);
 }
 
 .approval-nav-title-root {
@@ -311,17 +256,4 @@ body {
   z-index: 3;
   background: var(--panel-bg, var(--header-bg)) !important;
   border-left: 1px solid var(--panel-border, var(--header-border));
-}
-
-/* 必填星号不占布局：必填与选填标签文字左边缘对齐 */
-.ant-form-item-label > label {
-  position: relative;
-  padding-left: 10px;
-}
-.ant-form-item-label > label.ant-form-item-required::before {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  margin: 0;
-  transform: translateY(-50%);
 }

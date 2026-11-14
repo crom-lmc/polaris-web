@@ -39,51 +39,55 @@
         :trigger="null"
         @collapse="(v: boolean) => (collapsed = v)"
       >
-        <a-menu mode="inline" :selected-keys="selectedKeys" @click="handleMenuClick">
-          <a-menu-item key="/dashboard">
-            <template #icon><appstore-outlined /></template>
-            概览
-          </a-menu-item>
-          <a-menu-item v-if="store.can('org:view')" key="/orgs">
-            <template #icon><apartment-outlined /></template>
-            组织架构
-          </a-menu-item>
-          <a-menu-item v-if="store.can('employee:view')" key="/employees">
+        <a-menu mode="inline" :selected-keys="selectedKeys" :open-keys="openKeys" @click="handleMenuClick" @openChange="handleOpenChange">
+          <a-submenu key="grp-ehr">
             <template #icon><team-outlined /></template>
-            人员管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('recruit:view')" key="/recruits">
-            <template #icon><solution-outlined /></template>
-            招聘管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('leave:view')" key="/leaves">
-            <template #icon><calendar-outlined /></template>
-            请假管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('overtime:view')" key="/attendance">
-            <template #icon><clock-circle-outlined /></template>
-            考勤管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('resign:apply')" key="/my-resign">
-            <template #icon><export-outlined /></template>
-            离职申请
-          </a-menu-item>
-          <a-menu-item v-if="store.can('regularize:apply')" key="/my-regularize">
-            <template #icon><rise-outlined /></template>
-            转正申请
-          </a-menu-item>
-          <a-menu-item v-if="canSeeApproval" key="/approvals">
-            <template #icon><audit-outlined /></template>
-            审批中心
-          </a-menu-item>
-          <a-menu-item v-if="store.can('announcement')" key="/announcements">
-            <template #icon><notification-outlined /></template>
-            通知管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
-            <template #icon><file-search-outlined /></template>
-            审计日志
-          </a-menu-item>
+            <template #title>人力中心</template>
+            <a-menu-item key="/dashboard">
+              <template #icon><appstore-outlined /></template>
+              工作台
+            </a-menu-item>
+            <a-menu-item v-if="store.can('org:view')" key="/orgs">
+              <template #icon><apartment-outlined /></template>
+              组织架构
+            </a-menu-item>
+            <a-menu-item v-if="store.can('employee:view')" key="/employees">
+              <template #icon><team-outlined /></template>
+              人员管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('leave:view')" key="/leaves">
+              <template #icon><calendar-outlined /></template>
+              请假管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('resign:apply')" key="/my-resign">
+              <template #icon><export-outlined /></template>
+              离职申请
+            </a-menu-item>
+            <a-menu-item v-if="store.can('regularize:apply')" key="/my-regularize">
+              <template #icon><rise-outlined /></template>
+              转正申请
+            </a-menu-item>
+            <a-menu-item v-if="canSeeApproval" key="/approvals">
+              <template #icon><audit-outlined /></template>
+              审批中心
+            </a-menu-item>
+            <a-menu-item v-if="store.can('recruit:view')" key="/recruit">
+              <template #icon><user-add-outlined /></template>
+              招聘管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('announcement:view')" key="/announcements">
+              <template #icon><notification-outlined /></template>
+              通知管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('attendance:view')" key="/attendance">
+              <template #icon><clock-circle-outlined /></template>
+              考勤管理
+            </a-menu-item>
+            <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
+              <template #icon><file-search-outlined /></template>
+              审计日志
+            </a-menu-item>
+          </a-submenu>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">
@@ -109,13 +113,13 @@ import {
   MenuOutlined,
   NotificationOutlined,
   RiseOutlined,
-  SolutionOutlined,
-  TeamOutlined
+  TeamOutlined,
+  UserAddOutlined
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { Modal } from 'ant-design-vue'
-import { SSO_AUTHORIZE_URL, logoutSso } from '@/api/ehr'
+import { gotoAuthorize, logoutSso } from '@/api/ehr'
 import { getRefreshToken } from '@/utils/token'
 import { useSessionGuard } from '@/composables/useSessionGuard'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
@@ -136,10 +140,16 @@ function toggleCollapse() {
 
 const selectedKeys = computed(() => [route.path])
 
-/** 审批中心是基本权限：所有角色默认授予 approval:todo */
+// 菜单分组默认展开
+const openKeys = ref<string[]>(['grp-ehr'])
+
+function handleOpenChange(keys: string[]) {
+  openKeys.value = keys
+}
+
+/** 审批中心对两类人可见：有审批权的负责人、能提交离职申请的普通员工 */
 const canSeeApproval = computed(
   () =>
-    store.can('approval:todo') ||
     store.can('approval:view') ||
     store.can('approval:approve') ||
     store.can('leave:approve') ||
@@ -167,8 +177,7 @@ function onUserMenuClick({ key }: { key: string }) {
           /* 忽略：本地照样退出 */
         }
         store.logout()
-        // 回到登录页而不是重新授权，避免账号中心凭残余登录态静默签码、立刻登回来
-        window.location.replace(`${SSO_AUTHORIZE_URL}/login?gl=1`)
+        gotoAuthorize('/')
       }
     })
   }
@@ -195,8 +204,6 @@ function onUserMenuClick({ key }: { key: string }) {
   background: var(--header-bg);
   color: var(--header-text);
   border-bottom: 1px solid var(--header-border);
-  /* 覆盖 Ant Design a-layout-header 默认的 line-height: 64px，让 flex 居中真正生效 */
-  line-height: 1;
 }
 
 .logo {
@@ -204,7 +211,6 @@ function onUserMenuClick({ key }: { key: string }) {
   align-items: center;
   gap: 6px;
   padding-left: 24px;
-  height: 32px;
   color: var(--header-text);
   font-weight: 600;
   font-size: 14px;

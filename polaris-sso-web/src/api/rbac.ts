@@ -12,8 +12,6 @@ import type { PermissionVO, RoleVO } from '@/types'
 
 export interface RolePayload {
   code?: string
-  /** 归属应用；sso 为平台，业务应用填其 code（如 ehr） */
-  appCode?: string
   name?: string
   remark?: string
   permissionIds?: string[]
@@ -45,14 +43,14 @@ export interface PermissionImportItem {
 
 // ---------------- 角色 ----------------
 
-/** 全量角色（下拉、授权用），每条带 permissionIds / accountCount；传 app 只取该应用的角色 */
+/** 全量角色（下拉、授权用），每条带 permissionIds / accountCount */
 export function fetchRoles(appCode?: string) {
   return request.get<never, { data: RoleVO[] }>('/api/roles/all', {
     params: appCode ? { appCode } : undefined
   })
 }
 
-/** 分页角色列表；appCode 为空表示全部应用 */
+/** 分页角色列表；appCode 为空表示不过滤 */
 export function fetchRolePage(params: {
   page?: number
   size?: number

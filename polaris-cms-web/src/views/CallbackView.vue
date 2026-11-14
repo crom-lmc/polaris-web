@@ -26,9 +26,8 @@ onMounted(async () => {
     return
   }
   if (expected && state && expected !== state) {
-    // state 校验失败通常是：用户刷新了回调页、或同一浏览器进程里前一次登录已消费过 state
-    // OAuth spec 里 state 只是 CSRF 防护，不是硬性安全边界——这里不阻断登录，记一条警告即可
-    console.warn('[callback] state mismatch, continue without blocking', { expected, state })
+    error.value = 'state 校验失败，请重新登录'
+    return
   }
   try {
     const res: any = await exchangeCode(code, callbackUrl())

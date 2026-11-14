@@ -20,7 +20,7 @@
         <div class="panel-body table-body ft-scroll ft-bottom">
           <a-table class="ft-table"
             :columns="itemColumns"
-            :data-source="items"
+            :data-source="pagedItems"
             :loading="itemLoading"
             row-key="id"
             size="small"
@@ -141,9 +141,14 @@ const items = ref<BizItem[]>([])
 const itemLoading = ref(false)
 const includeDisabled = ref(false)
 
-/** 主数据项接口返回全量，做前端分页；分页条由 ft-bottom 贴到容器底部 */
+/** 主数据项接口返回全量，做前端分页；分页条由 ft-bottom 贴到容器底部。
+ *  注意：不要手动设 total —— 设了 a-table 会误认为是后端分页，不截取当前页数据 */
 const page = ref(1)
 const pageSize = ref(10)
+const pagedItems = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return items.value.slice(start, start + pageSize.value)
+})
 const pagination = computed(() => ({
   current: page.value,
   pageSize: pageSize.value,

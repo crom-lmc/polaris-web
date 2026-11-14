@@ -1007,6 +1007,7 @@ const stages = [
   { key: 'RESUME', label: '简历筛选', dot: 'dot-resume' },
   { key: 'INTERVIEW', label: '面试中', dot: 'dot-interview' },
   { key: 'OFFER', label: 'Offer 中', dot: 'dot-offer' },
+  { key: 'HIRED', label: '已入职', dot: 'dot-hired' },
   { key: 'REJECTED', label: '已淘汰', dot: 'dot-rejected' }
 ]
 
@@ -1014,6 +1015,11 @@ const grouped = computed<Record<string, RecruitCandidate[]>>(() => {
   const m: Record<string, RecruitCandidate[]> = {}
   for (const s of stages) m[s.key] = []
   for (const c of candidateRows.value) {
+    // 已入职的候选人（有 employeeId）归到 HIRED 列，不再留在 OFFER 列
+    if (c.employeeId) {
+      m.HIRED.push(c)
+      continue
+    }
     if (!m[c.stage]) m[c.stage] = []
     m[c.stage].push(c)
   }
@@ -2138,7 +2144,7 @@ onMounted(async () => {
 }
 .board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
   gap: 12px;
   min-height: 100%;
 }
@@ -2180,6 +2186,9 @@ onMounted(async () => {
 }
 .dot-offer {
   background: #52c41a;
+}
+.dot-hired {
+  background: #13c2c2;
 }
 .dot-rejected {
   background: #bfbfbf;

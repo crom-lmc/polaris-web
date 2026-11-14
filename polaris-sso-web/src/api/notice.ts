@@ -15,6 +15,8 @@ export interface NoticeMessage {
   bizId?: string
   /** 业务编码：调用方自定义的标识，如审批单号 */
   bizNo?: string
+  /** 审批实例 ID（审批流消息用） */
+  instId?: string
   /** 发起人：待办为申请人，审批结果消息为实际通过/驳回的人 */
   applicantName?: string
   /** 点击后跳转的前端路由 */
@@ -27,16 +29,14 @@ export interface NoticeMessage {
   createdAt?: string
 }
 
-// 注意：本项目的 request 拦截器保留 axios 响应结构，数据本体在 .data 上
+/** 风格与 apps.ts 保持一致：TS 泛型声明 { data: X }，运行时拦截器解包后 .data 即数据本体 */
 export function fetchMyNotices(params?: { kind?: number; unreadOnly?: boolean; limit?: number }) {
   return request.get<never, { data: NoticeMessage[] }>('/api/settings/notices/my', { params })
 }
 
 /** kind 不传=全部未读；1=待办未读 2=消息未读 */
 export function fetchUnreadNoticeCount(kind?: number) {
-  return request.get<never, { data: number }>('/api/settings/notices/my/unread-count', {
-    params: kind == null ? undefined : { kind }
-  })
+  return request.get<never, { data: number }>('/api/settings/notices/my/unread-count', { params: kind != null ? { kind } : {} })
 }
 
 export function markNoticesRead(ids: string[]) {
