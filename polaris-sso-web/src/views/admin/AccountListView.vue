@@ -688,18 +688,6 @@ function roleIdsOfRoles(codes: string[]): string[] {
     .filter((id): id is string => typeof id === 'string')
 }
 
-function openEdit(record: AccountVO) {
-  editing.value = record
-  Object.assign(editForm, {
-    username: record.username,
-    nickname: record.nickname || '',
-    email: record.email || '',
-    phone: record.phone || '',
-    roleIds: roleIdsOfRoles(record.roles || [])
-  })
-  editOpen.value = true
-}
-
 async function submitEdit() {
   try {
     await editFormRef.value?.validate()
@@ -912,22 +900,6 @@ function openDataScope(record: AccountVO) {
   scopeCheckedKeys.value = checked
   scopeExpandedKeys.value = [APP_ROOT_KEY, ...orgNodes.value.map((n) => n.id)]
   scopeOpen.value = true
-}
-
-function onScopeNodeCheck(checkedKeys: any) {
-  // Ant Design Vue 4.x checkable tree: 回调第一个参数是 { checked: string[], halfChecked: string[] }
-  // 兼容老版本直接传 string[] 的情况
-  if (Array.isArray(checkedKeys)) {
-    scopeCheckedKeys.value = checkedKeys.map(String)
-  } else if (checkedKeys && Array.isArray(checkedKeys.checked)) {
-    scopeCheckedKeys.value = checkedKeys.checked.map(String)
-  } else {
-    scopeCheckedKeys.value = []
-  }
-}
-
-function onScopeNodeExpand(keys: (string | number)[]) {
-  scopeExpandedKeys.value = keys.map(String)
 }
 
 function clearDataScope() {

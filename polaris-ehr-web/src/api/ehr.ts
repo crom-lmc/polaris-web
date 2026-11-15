@@ -307,6 +307,9 @@ export interface EmployeeItem {
   accountDisabled?: boolean
   /** true=本次保存走了审批（信息变更已提交、尚未生效） */
   pendingApproval?: boolean
+  /** 当前在途入职/离职审批单，用于打开审批详情 */
+  approvalInstanceId?: string | null
+  approvalBizType?: string | null
 }
 
 export interface PageData<T> {
