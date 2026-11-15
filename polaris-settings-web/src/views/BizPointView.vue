@@ -234,25 +234,24 @@ const appNameOf = (code: string) => {
 }
 const multiApp = computed(() => new Set([...bizIndex.value.values()].map((v) => v.appCode)).size > 1)
 
-/** 二级分组：bizIndex 按 appCode 归并，应用按业务类型数量倒序（主应用在前），组内按名称排 */
+/** 二级分组：以应用列表为基准，没有业务类型的应用也保留；再兜底业务数据里出现的应用 */
 const appGroups = computed<AppGroup[]>(() => {
   const map = new Map<string, AppGroup>()
+  for (const a of apps.value) map.set(a.code, { appCode: a.code, appName: a.name, items: [] })
   for (const [bizType, v] of bizIndex.value.entries()) {
     const code = v.appCode || 'other'
     if (!map.has(code)) map.set(code, { appCode: code, appName: appNameOf(code), items: [] })
     map.get(code)!.items.push({ bizType, bizName: v.bizName })
   }
   for (const g of map.values()) g.items.sort((a, b) => a.bizName.localeCompare(b.bizName, 'zh'))
-  return [...map.values()].sort(
-    (a, b) => b.items.length - a.items.length || a.appName.localeCompare(b.appName, 'zh')
-  )
+  return [...map.values()].sort((a, b) => a.appName.localeCompare(b.appName, 'zh'))
 })
 
 /** 三级树：1 业务类型（全部） → 2 所属应用 → 3 具体审批场景（业务类型） */
 const treeData = computed<TreeNode[]>(() => {
   const children: TreeNode[] = appGroups.value.map((g) => ({
     key: `app:${g.appCode}`,
-    title: g.appName,
+    title: `${g.appName}（${g.items.length}）`,
     children: g.items.map((i) => ({ key: `biz:${i.bizType}`, title: i.bizName, isLeaf: true }))
   }))
   return children.length ? [{ key: 'root', title: '业务类型', children }] : []

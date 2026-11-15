@@ -43,9 +43,9 @@
           <a-submenu key="grp-cms">
             <template #icon><appstore-outlined /></template>
             <template #title>内容中心</template>
-            <a-menu-item v-if="store.can('dashboard:view')" key="/dashboard">
+            <a-menu-item key="/dashboard">
               <template #icon><dashboard-outlined /></template>
-              仪表盘
+              概览
             </a-menu-item>
             <a-menu-item v-if="store.can('article:view')" key="/articles">
               <template #icon><file-text-outlined /></template>
@@ -225,6 +225,7 @@ function onUserMenuClick({ key }: { key: string }) {
   display: flex;
   align-items: center;
   gap: 8px;
+  line-height: normal;
   padding-right: 16px;
 }
 
@@ -248,7 +249,7 @@ function onUserMenuClick({ key }: { key: string }) {
 
 .right .theme-toggle {
   color: var(--header-text);
-  /* 关键：用 flex 精确居中内联 SVG。SVG 默认按文本基线排版，会让图标比用户名高 2~3px */
+  /* SVG 默认按文本基线排版，用 flex 让图标在 32px 按钮内精确居中 */
   display: inline-flex;
   align-items: center;
   justify-content: center;

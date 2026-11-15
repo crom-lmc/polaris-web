@@ -134,7 +134,7 @@ const changes = [
 }
 
 .stat-card :deep(.ant-card-body) {
-  min-height: 106px;
+  min-height: 180px;
   padding: 16px 18px;
   display: flex;
   align-items: center;

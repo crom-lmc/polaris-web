@@ -10,7 +10,8 @@ import {
 } from '@/api/cms'
 
 /** 门户前端地址（iframe 预览目标，origin 需与 SSO 里 portal 应用注册的 baseUrl 一致） */
-const PORTAL_ORIGIN = import.meta.env.VITE_PORTAL_ORIGIN || 'http://localhost:5178'
+const PORTAL_ORIGIN = import.meta.env.VITE_PORTAL_ORIGIN ||
+  (import.meta.env.DEV ? 'http://localhost:5178' : 'https://polaris-portal.laimengchao.site')
 
 const MODULE_DESC: Record<string, string> = {
   banner: '顶部大图轮播，取自 CMS Banner 模块',

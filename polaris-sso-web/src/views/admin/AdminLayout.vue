@@ -154,7 +154,13 @@ import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { Modal } from 'ant-design-vue'
 import { logout } from '@/api/auth'
-import { fetchUnreadNoticeCount } from '@/api/notice'
+import {
+  fetchMyNotices,
+  fetchUnreadNoticeCount,
+  markAllNoticesRead,
+  markNoticesRead,
+  type NoticeMessage
+} from '@/api/notice'
 import { getRefreshToken } from '@/utils/token'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
 
@@ -201,8 +207,12 @@ watch(noticeOpen, (open) => {
 })
 
 async function refreshUnread() {
-  const noticeRes = await fetchUnreadNoticeCount().catch(() => null)
-  unreadCount.value = noticeRes ? Number(noticeRes.data) || 0 : 0
+  try {
+    const res = await fetchUnreadNoticeCount()
+    unreadCount.value = res.data ?? 0
+  } catch {
+    /* 消息接口异常不影响主界面使用 */
+  }
 }
 
 async function loadNotices() {
@@ -304,7 +314,7 @@ function confirmLogout() {
   background: var(--header-bg);
   color: var(--header-text);
   border-bottom: 1px solid var(--header-border);
-  /* 覆盖 Ant Design a-layout-header 默认的 line-height: 64px，让 flex 居中真正生效 */
+  /* 覆盖 Ant Design 默认 64px 行高，让顶栏 Flex 垂直居中生效 */
   line-height: 1;
 }
 
@@ -356,6 +366,7 @@ function confirmLogout() {
   display: flex;
   align-items: center;
   gap: 8px;
+  line-height: normal;
   /* header 已清零内边距，这里给右侧控件留出呼吸空间，避免贴边 */
   padding-right: 16px;
 }
@@ -462,7 +473,7 @@ function confirmLogout() {
 
 .right .theme-toggle {
   color: var(--header-text);
-  /* 关键：用 flex 精确居中内联 SVG。SVG 默认按文本基线排版，会让图标比用户名高 2~3px */
+  /* SVG 默认按文本基线排版，用 flex 让图标在 32px 按钮内精确居中 */
   display: inline-flex;
   align-items: center;
   justify-content: center;

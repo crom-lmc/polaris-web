@@ -16,8 +16,9 @@
           >
             <template #title="node">
               <span class="approval-nav-node">
-                <span :class="['approval-nav-name', navTitleClass(String(node.key))]">{{ node.title }}</span>
-                <span v-if="navCount(node)" class="approval-nav-count">{{ navCount(node) }}</span>
+                <span :class="['approval-nav-name', navTitleClass(String(node.key))]">
+                  {{ node.title }}<template v-if="String(node.key).startsWith('app:')">（{{ navCount(node) }}）</template>
+                </span>
               </span>
             </template>
           </a-tree>
