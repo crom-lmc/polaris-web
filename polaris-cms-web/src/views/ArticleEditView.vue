@@ -18,13 +18,11 @@ import {
   type VersionItem
 } from '@/api/cms'
 import { useUserStore } from '@/stores/user'
-import { useThemeStore } from '@/stores/theme'
 import { confirmAction } from '@/utils/confirm'
 
 const route = useRoute()
 const router = useRouter()
 const store = useUserStore()
-const themeStore = useThemeStore()
 
 const id = route.params.id as string | undefined
 const saving = ref(false)
@@ -184,7 +182,7 @@ function fmt(s?: string) {
           <a-button v-if="id && store.can('article:version')" @click="openVersions">
             版本（{{ form.title ? '' : '' }}历史）
           </a-button>
-          <a-button v-if="store.can(id ? 'article:edit' : 'article:create')" type="primary" :loading="saving" @click="save">保存</a-button>
+          <a-button type="primary" :loading="saving" @click="save">保存</a-button>
           <a-button @click="router.push('/articles')">返回列表</a-button>
         </a-space>
       </template>
@@ -214,13 +212,7 @@ function fmt(s?: string) {
         </a-form-item>
 
         <a-form-item label="正文（Markdown / 富文本混排，自动做 XSS 清洗）">
-          <MdEditor
-            v-model="form.content"
-            :toolbars="toolbars"
-            :theme="themeStore.mode"
-            style="height: 420px"
-            @on-upload-img="onUploadImg"
-          />
+          <MdEditor v-model="form.content" :toolbars="toolbars" style="height: 420px" @on-upload-img="onUploadImg" />
         </a-form-item>
 
         <a-collapse>

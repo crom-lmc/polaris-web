@@ -5,7 +5,6 @@
         <a-radio-group v-model:value="scope" button-style="solid" @change="onScopeChange">
           <a-radio-button value="mine">我的请假</a-radio-button>
           <a-radio-button v-if="canApprove" value="all">审批列表</a-radio-button>
-          <a-radio-button v-if="canViewTeam" value="team">团队请假</a-radio-button>
         </a-radio-group>
         <a-select
           v-model:value="statusFilter"
@@ -28,28 +27,15 @@
       </div>
     </div>
 
-    <a-alert
-      v-if="carryoverNotice"
-      type="warning"
-      show-icon
-      class="carryover-banner"
-      :message="`你还有 ${carryoverRemaining} 天上年结转年假未休完，将于 ${annualQuota?.carryoverExpireAt || ''} 到期作废，请及时休假或签署自动放弃`"
-    >
-      <template #action>
-        <a-button size="small" danger @click="openWaive">自动放弃</a-button>
-      </template>
-    </a-alert>
-
     <section class="panel ft-grow">
       <div class="panel-head">
-        <span>{{ scope === 'mine' ? '我的请假记录' : scope === 'team' ? '团队请假记录' : '全部请假记录' }}</span>
+        <span>{{ scope === 'mine' ? '我的请假记录' : '全部请假记录' }}</span>
         <span class="muted">
-          {{ scope === 'team' ? '按组织范围展示待审批 / 已通过记录' : scope === 'mine' ? '共 ' + total + ' 条' : '审批动作在「审批中心」处理，这里可查看全部单据与流程' }}
+          {{ scope === 'mine' ? '共 ' + total + ' 条' : '审批动作在「审批中心」处理，这里可查看全部单据与流程' }}
         </span>
       </div>
       <div class="panel-body table-body ft-scroll ft-bottom">
         <a-table class="ft-table"
-          :class="{ 'tbl-empty-mode': !loading && !rows.length }"
           table-layout="fixed"
           :columns="columns"
           :data-source="rows"
@@ -59,9 +45,6 @@
           :pagination="pagination"
           @change="onTableChange"
         >
-          <template #emptyText>
-            <div class="tbl-empty"><a-empty v-if="!loading" description="暂无请假申请" /></div>
-          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'type'">
               <a-tag color="blue">{{ record.leaveTypeName }}</a-tag>
@@ -87,7 +70,6 @@
             </template>
             <template v-else-if="column.key === 'action'">
               <div class="row-actions">
-                <a class="act" @click="openDetail(record)">详情</a>
                 <a
                   v-if="runningBriefForRow(record)"
                   class="act"
@@ -107,11 +89,10 @@
                 >
                   <a class="act danger">撤销</a>
                 </a-popconfirm>
-                <a
-                  v-if="record.status === 1 && record.mine && canApply"
-                  class="act"
-                  @click="openEarlyReturn(record)"
-                >销假</a>
+                <span
+                  v-if="!runningBriefForRow(record) && !rejectedBriefForRow(record) && !(record.status === 0 && record.mine)"
+                  class="muted"
+                >—</span>
               </div>
             </template>
           </template>
@@ -132,7 +113,7 @@
     >
       <a-form layout="vertical">
         <a-form-item label="请假类型" required>
-          <a-select v-model:value="applyForm.leaveType" :options="leaveTypeOptions" @change="onLeaveTypeChange" />
+          <a-select v-model:value="applyForm.leaveType" :options="leaveTypeOptions" />
         </a-form-item>
         <a-form-item label="请假日期" required>
           <a-range-picker
@@ -266,6 +247,7 @@
             placeholder="请选择审批转办人"
           />
         </a-form-item>
+        <a-alert v-if="days" type="info" show-icon :message="`共 ${days} 天（按自然日计算）`" class="mb12" />
         <a-form-item label="请假事由" required>
           <a-textarea v-model:value="applyForm.reason" :rows="3" :maxlength="500" show-count />
         </a-form-item>
@@ -369,17 +351,8 @@ import {
   leavePreview,
   leaveRules,
   leaveTypeOptions as fetchLeaveTypeOptions,
-  listEhrAttachments,
-  myLeaveQuotas,
   pageLeaves,
-  teamLeaves,
-  uploadEhrAttachment,
-  waiveAnnualCarryover,
-  type LeaveCityPolicy,
-  type LeaveDelegateOptions,
   type LeaveItem,
-  type LeaveQuotaItem,
-  type LeaveTypeRule,
   type TypeOption
 } from '@/api/ehr'
 import { useUserStore } from '@/stores/user'
@@ -396,9 +369,8 @@ import {
 const store = useUserStore()
 const canApply = computed(() => store.can('leave:apply'))
 const canApprove = computed(() => store.can('leave:approve') || store.can('approval:approve'))
-const canViewTeam = computed(() => store.can('leave:view:team'))
 
-const scope = ref<'mine' | 'all' | 'team'>('mine')
+const scope = ref<'mine' | 'all'>('mine')
 const statusFilter = ref<number | undefined>(undefined)
 const rows = ref<LeaveItem[]>([])
 
@@ -432,8 +404,7 @@ const statusFilterOptions = [
   { value: 0, label: '待审批' },
   { value: 1, label: '已通过' },
   { value: 2, label: '已驳回' },
-  { value: 3, label: '已撤销' },
-  { value: 4, label: '已销假' }
+  { value: 3, label: '已撤销' }
 ]
 
 const pagination = computed(() => ({
@@ -457,13 +428,6 @@ const columns = [
 async function load() {
   loading.value = true
   try {
-    if (scope.value === 'team') {
-      const list = await teamLeaves({})
-      rows.value = list || []
-      total.value = rows.value.length
-      approvalBriefs.value = []
-      return
-    }
     const data = await pageLeaves({
       scope: scope.value,
       status: statusFilter.value,
@@ -486,7 +450,7 @@ function reload() {
 }
 
 function onScopeChange() {
-  // 审批列表默认只看待审批，避免历史单据淹没待办；团队视图展示待审批 + 已通过
+  // 审批列表默认只看待审批，避免历史单据淹没待办
   statusFilter.value = scope.value === 'all' ? 0 : undefined
   reload()
 }
@@ -498,20 +462,7 @@ function onTableChange(p: any) {
 }
 
 function statusColor(status: number) {
-  return status === 0 ? 'orange' : status === 1 ? 'green' : status === 2 ? 'red' : status === 4 ? 'purple' : 'default'
-}
-
-function periodText(p?: string | null) {
-  if (p === 'AM') return '上午'
-  if (p === 'PM') return '下午'
-  return ''
-}
-
-/** 请假时段展示：优先精确到半小时的时间，旧数据回退到上午/下午 */
-function leaveRangeText(record: LeaveItem) {
-  const start = record.startTime || periodText(record.startPeriod)
-  const end = record.endTime || periodText(record.endPeriod)
-  return `${record.startDate} ${start} ~ ${record.endDate} ${end}`
+  return status === 0 ? 'orange' : status === 1 ? 'green' : status === 2 ? 'red' : 'default'
 }
 
 /** 天数展示：同时显小时数（1 天 = 8 小时），例如 0.125 天（1 小时） */
@@ -525,25 +476,10 @@ function daysLabel(d: number | null | undefined) {
 /* ---------- 申请 ---------- */
 const applyOpen = ref(false)
 const saving = ref(false)
-const applyForm = reactive<{
-  leaveType: string
-  range: string[] | undefined
-  startTime: string
-  endTime: string
-  dayMode: string
-  reason: string
-  delegateAccountId?: string
-  attachmentId?: string
-  attachmentIds: string[]
-}>({
+const applyForm = reactive<{ leaveType: string; range: string[] | undefined; reason: string }>({
   leaveType: 'ANNUAL',
   range: undefined,
-  startTime: '09:00',
-  endTime: '18:00',
-  dayMode: 'WORKDAY',
-  reason: '',
-  attachmentId: undefined,
-  attachmentIds: []
+  reason: ''
 })
 
 /** 工作时长口径与默认考勤规则一致：09:00-12:00、13:00-18:00，全天 480 分钟 */
@@ -637,25 +573,7 @@ const leaveTypeOptions = ref<TypeOption[]>([])
 const days = computed(() => {
   const r = applyForm.range
   if (!r || r.length !== 2) return 0
-  const start = dayjs(`${r[0]} ${applyForm.startTime}`)
-  const end = dayjs(`${r[1]} ${applyForm.endTime}`)
-  if (!start.isValid() || !end.isValid() || !start.isBefore(end)) return 0
-  let total = 0
-  let cur = start.startOf('day')
-  while (!cur.isAfter(end, 'day')) {
-    const isWorkday = cur.day() !== 0 && cur.day() !== 6
-    if (applyForm.dayMode !== 'WORKDAY' || isWorkday) {
-      const fromMin = cur.isSame(start, 'day') ? start.hour() * 60 + start.minute() : 0
-      const toMin = cur.isSame(end, 'day') ? end.hour() * 60 + end.minute() : 24 * 60
-      for (const [ws, we] of WORK_WINDOWS) {
-        const from = Math.max(ws, fromMin)
-        const to = Math.min(we, toMin)
-        if (to > from) total += to - from
-      }
-    }
-    cur = cur.add(1, 'day')
-  }
-  return Number((total / WORK_MINUTES_PER_DAY).toFixed(2))
+  return dayjs(r[1]).diff(dayjs(r[0]), 'day') + 1
 })
 
 /** 本次请假时长：走后端试算接口，与提交共用同一套天数口径（工作日历 / 半天 / 城市政策） */
@@ -763,9 +681,6 @@ function onLeaveTypeChange() {
 function openApply() {
   applyForm.leaveType = 'ANNUAL'
   applyForm.range = undefined
-  applyForm.startTime = '09:00'
-  applyForm.endTime = '18:00'
-  applyForm.dayMode = 'WORKDAY'
   applyForm.reason = ''
   applyForm.delegateAccountId = undefined
   applyForm.attachmentId = undefined
@@ -878,13 +793,7 @@ async function submitApply() {
       leaveType: applyForm.leaveType,
       startDate: applyForm.range[0],
       endDate: applyForm.range[1],
-      startTime: applyForm.startTime,
-      endTime: applyForm.endTime,
-      dayMode: applyForm.dayMode,
-      reason: applyForm.reason.trim(),
-      attachmentId: applyForm.attachmentIds[0],
-      attachmentIds: [...applyForm.attachmentIds],
-      delegateAccountId: applyForm.delegateAccountId
+      reason: applyForm.reason.trim()
     })
     message.success('已提交，等待审批')
     applyOpen.value = false
@@ -893,85 +802,6 @@ async function submitApply() {
     message.error(e?.message || '提交失败')
   } finally {
     saving.value = false
-  }
-}
-
-/* ---------- 销假 ---------- */
-const earlyOpen = ref(false)
-const earlySaving = ref(false)
-const earlyTarget = ref<LeaveItem | null>(null)
-const earlyForm = reactive({ returnDate: '', note: '' })
-
-function openEarlyReturn(record: LeaveItem) {
-  earlyTarget.value = record
-  earlyForm.returnDate = dayjs().format('YYYY-MM-DD')
-  earlyForm.note = ''
-  earlyOpen.value = true
-}
-
-async function submitEarlyReturn() {
-  if (!earlyTarget.value) return
-  if (!earlyForm.returnDate) {
-    message.warning('请选择实际返岗日期')
-    return
-  }
-  earlySaving.value = true
-  try {
-    await earlyReturnLeave(earlyTarget.value.id, {
-      returnDate: earlyForm.returnDate,
-      note: earlyForm.note.trim()
-    })
-    message.success('销假成功，多请的额度已退回')
-    earlyOpen.value = false
-    reload()
-  } catch (e: any) {
-    message.error(e?.message || '销假失败')
-    // 失败多为单据状态已变化（例如已在别处销假），刷新列表同步真实状态
-    reload()
-  } finally {
-    earlySaving.value = false
-  }
-}
-
-/* ---------- 详情 / 证明材料 ---------- */
-const detailOpen = ref(false)
-const detailLoading = ref(false)
-const detailRecord = ref<LeaveItem | null>(null)
-const detailAttachments = ref<{ attachmentId: string; fileName?: string }[]>([])
-
-async function openDetail(record: LeaveItem) {
-  detailRecord.value = record
-  detailAttachments.value = []
-  detailOpen.value = true
-  detailLoading.value = true
-  try {
-    const list = await listEhrAttachments('LEAVE', record.id)
-    detailAttachments.value = (list || []).map((a) => ({ attachmentId: a.id, fileName: a.fileName }))
-  } catch {
-    /* 无 employee:view 权限时退回列表里的主附件 */
-  } finally {
-    if (!detailAttachments.value.length && record.attachmentId) {
-      detailAttachments.value = [{ attachmentId: record.attachmentId, fileName: record.attachmentName }]
-    }
-    detailLoading.value = false
-  }
-}
-
-function saveBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-async function downloadAttachment(item: { attachmentId: string; fileName?: string }) {
-  try {
-    const res: any = await downloadEhrAttachment(item.attachmentId)
-    saveBlob(res.data, item.fileName || `证明材料-${item.attachmentId}`)
-  } catch (e: any) {
-    message.error(e?.message || '证明材料下载失败')
   }
 }
 
@@ -1000,47 +830,12 @@ onMounted(() => {
     statusFilter.value = 0
   }
   load()
-  loadAnnualQuota()
   fetchLeaveTypeOptions().then((opts) => (leaveTypeOptions.value = opts)).catch(() => {})
 })
-
-/** 我的年假额度：12 月结转到期提示条 + 自动放弃入口 */
-const annualQuota = ref<LeaveQuotaItem | null>(null)
-const carryoverNotice = computed(() => !!annualQuota.value?.carryoverNotice)
-const carryoverRemaining = computed(() => annualQuota.value?.carryoverRemaining ?? 0)
-
-function loadAnnualQuota() {
-  myLeaveQuotas()
-    .then((list) => {
-      annualQuota.value = (list || []).find((q) => q.leaveType === 'ANNUAL') || null
-    })
-    .catch(() => {})
-}
-
-function openWaive() {
-  Modal.confirm({
-    title: '自动放弃上年结转年假',
-    content: `放弃后 ${carryoverRemaining.value} 天结转年假将立即作废且不可恢复，确定放弃吗？`,
-    okText: '确定放弃',
-    okButtonProps: { danger: true },
-    cancelText: '再想想',
-    centered: true,
-    onOk: () =>
-      waiveAnnualCarryover()
-        .then((days) => {
-          message.success(`已放弃 ${days} 天结转年假`)
-          loadAnnualQuota()
-        })
-        .catch((e: any) => message.error(e?.message || '操作失败'))
-  })
-}
 </script>
 
 <style scoped>
 /* 横向滚动由 .panel-body/.ft-scroll 承担，操作列由 .ft-table 固定 */
-.carryover-banner {
-  margin-bottom: 12px;
-}
 .page-root {
   --ft-min-width: 1100px;
 }
@@ -1122,22 +917,6 @@ function openWaive() {
 
 .danger {
   color: #ff4d4f;
-}
-
-.detail-proof {
-  margin-top: 16px;
-}
-.detail-proof-title {
-  font-weight: 600;
-  font-size: 13px;
-  margin-bottom: 8px;
-}
-.proof-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 </style>

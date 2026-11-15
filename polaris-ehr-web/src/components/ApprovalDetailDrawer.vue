@@ -16,12 +16,7 @@
 
     <a-spin :spinning="loading">
       <div v-if="detail" class="dt-body">
-        <!-- 自定义页面路由：信息区整段换成 iframe（自动带 instanceId），流程与操作区保持平台渲染 -->
-        <section v-if="routeSrc" class="card form-card">
-          <iframe :src="routeSrc" class="route-frame" title="自定义审批页面" />
-        </section>
         <!-- 基本信息：按模板配置的分组渲染；没配就退回默认版式 -->
-        <template v-else>
         <section v-for="sec in sections" :key="sec.key" class="card form-card" :class="{ emphasis: sec.emphasis }">
           <div v-if="sec.title" class="card-title">{{ sec.title }}</div>
           <a-descriptions v-if="descFields(sec).length" :column="sec.columns || 3" size="small" :colon="false" bordered class="desc">
@@ -52,7 +47,6 @@
             </a-table>
           </template>
         </section>
-        </template>
 
         <!-- 提交人 / 提交时间 / 审批方案 -->
         <section class="card">
@@ -132,9 +126,9 @@
             show-count
           />
           <div class="actions">
-            <a-button v-if="store.can('approval:approve')" type="primary" :loading="submitting" @click="submit(true)">通过</a-button>
-            <a-button v-if="store.can('approval:approve')" danger :loading="submitting" @click="submit(false)">驳回</a-button>
-            <a-dropdown v-if="store.can('approval:approve')">
+            <a-button type="primary" :loading="submitting" @click="submit(true)">通过</a-button>
+            <a-button danger :loading="submitting" @click="submit(false)">驳回</a-button>
+            <a-dropdown>
               <a-button>更多 <down-outlined /></a-button>
               <template #overlay>
                 <a-menu @click="onMore">
@@ -320,18 +314,6 @@ const sections = computed<ApprovalPageSection[]>(() => {
     columns: 3,
     fields: keys.map<ApprovalPageField>((k) => ({ key: k, label: DEFAULT_LABELS[k] || k, format: 'text' }))
   }]
-})
-
-/**
- * 自定义页面路由：renderMode=ROUTE 时信息区整段换成 iframe，地址自动拼 instanceId。
- * 返回空串表示不启用（未配 ROUTE 或没填地址），退回分组版式。
- */
-const routeSrc = computed(() => {
-  if (ctx.value?.renderMode !== 'ROUTE') return ''
-  const p = ctx.value?.page?.routePath || ''
-  if (!p) return ''
-  const sep = p.includes('?') ? '&' : '?'
-  return `${p}${sep}instanceId=${props.instanceId || ''}`
 })
 
 const steps = computed(() => detail.value?.steps || [])
@@ -710,13 +692,6 @@ watch(() => [props.open, props.instanceId], ([o, id]) => {
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 10px;
-}
-/* 自定义页面路由：iframe 占满信息区宽度，给一个可阅读的最小高度 */
-.route-frame {
-  display: block;
-  width: 100%;
-  height: 60vh;
-  border: none;
 }
 .steps {
   padding-top: 4px;

@@ -78,21 +78,7 @@
             <template #icon><reload-outlined /></template>
             刷新
           </a-button>
-          <a-button v-if="canViewSeniority" @click="openSeniorityLedger">司龄台账</a-button>
-          <a-button v-if="canViewLeaveQuota" @click="openAnnualLeaveLedger">年假台账</a-button>
           <span class="spacer" />
-          <a-button v-if="canExport" :loading="exporting" @click="doExport">
-            <template #icon><download-outlined /></template>
-            导出
-          </a-button>
-          <a-button v-if="canContractExport" :loading="contractExporting" @click="doExportContracts">
-            <template #icon><download-outlined /></template>
-            导出合同
-          </a-button>
-          <a-button v-if="canImport" @click="openImport">
-            <template #icon><upload-outlined /></template>
-            导入
-          </a-button>
           <a-button v-if="canCreate" type="primary" @click="openCreate">
             <template #icon><user-add-outlined /></template>
             新增人员
@@ -108,7 +94,6 @@
             row-key="id"
             size="middle"
             :pagination="pagination"
-            :scroll="{ x: tableScrollX }"
             @change="onTableChange"
           >
             <template #bodyCell="{ column, record }">
@@ -118,12 +103,7 @@
                     <span class="emp-name-text">{{ record.name }}</span>
                   </a-tooltip>
                 </div>
-                <div class="muted cell-sub">
-                  {{ record.empNo }}
-                  <a-tag v-if="dueTag(record)" :color="dueTag(record)?.color" class="due-tag">
-                    {{ dueTag(record)?.text }}
-                  </a-tag>
-                </div>
+                <div class="muted cell-sub">{{ record.empNo }}</div>
               </template>
               <template v-else-if="column.key === 'gender'">
                 {{ genderText(record.gender) }}
@@ -156,28 +136,19 @@
               <template v-else-if="column.key === 'action'">
                 <a-space size="small" wrap>
                   <a @click="openProfile(record)">查看</a>
-                  <a v-if="canSensitive && record.sensitiveMasked" @click="openPlain(record)">查看明文</a>
                   <!-- 只有「待入职」是编辑档案；试用期/在职走「变更」，只能改个人信息 -->
                   <a v-if="canEdit && canEditRecord(record)" @click="openEdit(record)">
                     {{ record.status === 10 ? '编辑' : '变更' }}
                   </a>
-                  <a v-if="canEdit && !record.seniorityConfirmedAt" @click="openSeniority(record)">司龄核定</a>
-                  <template v-if="canEdit && record.status === 10">
-                    <a
-                      v-if="!record.seniorityConfirmedAt"
-                      class="op-warn"
-                      @click="message.warning('提交入职前请先完成司龄核定（点击本行「司龄核定」）')"
-                    >提交入职</a>
-                    <a-popconfirm
-                      v-else
-                      title="提交后交由审批中心按「入职审批流程」审批，终审通过时自动开通统一账号。确定提交？"
-                      ok-text="提交"
-                      cancel-text="取消"
-                      @confirm="doSubmitDraft(record)"
-                    >
-                      <a>提交入职</a>
-                    </a-popconfirm>
-                  </template>
+                  <a-popconfirm
+                    v-if="canEdit && record.status === 10"
+                    title="提交后交由审批中心按「入职审批流程」审批，终审通过时自动开通统一账号。确定提交？"
+                    ok-text="提交"
+                    cancel-text="取消"
+                    @confirm="doSubmitDraft(record)"
+                  >
+                    <a>提交入职</a>
+                  </a-popconfirm>
                   <a-popconfirm
                     v-if="canEdit && record.status === 25"
                     :title="record.exemptProbation ? '该员工免试用期，办理入职后直接成为正式员工，确定办理入职？' : '办理入职后该员工进入试用期，确定办理入职？'"
@@ -204,15 +175,6 @@
                     审批信息
                   </a>
                   <a v-if="canResign && isWorking(record.status)" @click="openResign(record)">减员</a>
-                  <a-popconfirm
-                    v-if="canResign && record.status === 55"
-                    title="关闭后档案置为「已离职」并停用统一账号，操作不可撤销，确定关闭账号？"
-                    ok-text="关闭账号"
-                    cancel-text="取消"
-                    @confirm="doCloseAccount(record)"
-                  >
-                    <a class="danger">关闭账号</a>
-                  </a-popconfirm>
                   <a v-if="canResign && record.status === 60" @click="openReinstate(record)">复职</a>
                   <a-popconfirm
                     v-if="canDelete && record.status === 10"
@@ -244,10 +206,18 @@
     >
       <a-tabs v-model:active-key="formTab" class="emp-form-tabs">
         <a-tab-pane key="base" tab="基本信息">
+      <a-alert
+        v-if="personalOnly"
+        type="info"
+        show-icon
+        class="mb12"
+        message="变更员工信息：仅可修改个人信息"
+        description="可改：手机号、婚姻状况、政治面貌、最高学历、现居住址、紧急联系人及电话，以及银行卡、教育背景、工作经历、家庭成员。姓名、所属组织、职位、入职日期、身份证如需调整，请走人事异动。"
+      />
       <a-form layout="vertical">
         <div v-if="!personalOnly" class="form-hint">
           标 <span class="req-star">*</span> 的项为「提交入职」的前置条件（工号、邮箱由系统生成，备注选填）；提交入职还要求
-          银行卡、教育背景、工作经历、家庭成员、合同各至少 1 条（合同在本行「查看 → 合同」页签录入），并先在列表「司龄核定」完成核定。
+          银行卡、教育背景、工作经历、家庭成员各至少 1 条。
         </div>
         <a-row :gutter="12">
           <a-col :span="6">
@@ -322,40 +292,6 @@
                 :disabled-date="(d: any) => !!d && d < dayjs().startOf('day')"
                 placeholder="不能早于今天"
               />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-row :gutter="12">
-          <a-col :span="6">
-            <a-form-item label="司龄起算日" required>
-              <a-date-picker
-                v-model:value="form.seniorityStartDate"
-                value-format="YYYY-MM-DD"
-                style="width: 100%"
-                :disabled="personalOnly"
-                placeholder="默认入职日期"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label="首次参加工作日期" required>
-              <a-date-picker
-                v-model:value="form.firstWorkDate"
-                value-format="YYYY-MM-DD"
-                style="width: 100%"
-                :disabled="personalOnly"
-                placeholder="含前司，按社保核定"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label="当前司龄">
-              <a-input :value="form.seniorityYears ? `${form.seniorityYears} 年` : '—'" disabled />
-            </a-form-item>
-          </a-col>
-          <a-col :span="6">
-            <a-form-item label=" ">
-              <span class="probation-hint">年假档位按累计工龄（含前司）计算</span>
             </a-form-item>
           </a-col>
         </a-row>
@@ -493,6 +429,17 @@
           <a-input v-model:value="form.currentAddress" :maxlength="255" />
         </a-form-item>
 
+        <template v-if="!editing">
+          <a-form-item class="mt12">
+            <a-alert
+              type="info"
+              show-icon
+              message="保存后为「待入职」草稿，此时不开通账号"
+              description="在列表里点「提交入职」，由审批中心按「入职审批流程」模板审批；终审通过后状态为「入职审批通过」并自动开通统一账号（默认授权 统一账号中心 / 内容门户 / 人力中心，初始密码由系统生成），再由 HR 点「入职」转入试用期（免试用期则直接成为正式员工）。"
+            />
+          </a-form-item>
+        </template>
+
         <a-form-item label="备注" class="mt12">
           <a-textarea v-model:value="form.remark" :rows="2" :maxlength="255" :disabled="personalOnly" />
         </a-form-item>
@@ -602,14 +549,6 @@
               </template>
             </template>
           </a-table>
-        </a-tab-pane>
-
-        <!-- 劳动合同 / 档案附件：仅编辑已建档员工时展示（走独立接口实时保存，不随「提交变更」一起提交） -->
-        <a-tab-pane v-if="editing && canContractView" key="contracts" :tab="`劳动合同（${contractTabCount}）`">
-          <EmployeeContractPanel :employee-id="editing.id" :can-manage="canContractManage" @count="contractTabCount = $event" />
-        </a-tab-pane>
-        <a-tab-pane v-if="editing && canAttachmentView" key="attachments" :tab="`档案附件（${attachmentTabCount}）`">
-          <EmployeeAttachmentPanel :employee-id="editing.id" :can-manage="canContractManage" @count="attachmentTabCount = $event" />
         </a-tab-pane>
       </a-tabs>
     </a-modal>
@@ -1008,389 +947,21 @@
       :can-edit="false"
     />
 
-    <!-- 敏感信息明文（需 employee:sensitive:view，后端会记录 PLAIN 审计） -->
-    <a-modal
-      v-model:open="plainOpen"
-      :title="`敏感信息 · ${plainName}`"
-      :footer="null"
-      width="420px"
-      centered
-    >
-      <a-alert
-        type="warning"
-        show-icon
-        message="本次查看已记录审计日志（操作人 / 时间 / IP）"
-        style="margin-bottom: 12px"
-      />
-      <a-descriptions :column="1" bordered size="small">
-        <a-descriptions-item v-for="item in plainRows" :key="item.label" :label="item.label">
-          {{ item.value || '—' }}
-        </a-descriptions-item>
-      </a-descriptions>
-    </a-modal>
-
     <!-- 在途审批详情：流程进度 / 审批人 / 意见 / 我的处理，全部来自审批中心 -->
     <approval-detail-drawer
       v-model:open="approvalDrawerOpen"
       :instance-id="approvalInstanceId"
       @done="refreshAll"
     />
-
-    <!-- 批量导入员工：上传预览 → 确认入库（失败行不写库） -->
-    <a-modal
-      v-model:open="importOpen"
-      title="批量导入员工"
-      :footer="null"
-      width="780px"
-      centered
-      destroy-on-close
-    >
-      <template v-if="importStep === 'upload'">
-        <a-alert
-          type="info"
-          show-icon
-          message="先下载模板填写，再上传预览；预览阶段不会写入任何员工数据"
-          description="员工基础信息为必填表，教育/工作/家庭成员为选填表；按「姓名+身份证号」自动匹配。身份证号、手机号不可与现有员工重复。"
-        />
-        <div class="import-actions">
-          <a-button @click="doDownloadTemplate">
-            <template #icon><download-outlined /></template>
-            下载模板
-          </a-button>
-          <a-upload
-            accept=".xlsx,.xls"
-            :show-upload-list="false"
-            :before-upload="handleImportFile"
-            :disabled="importUploading"
-          >
-            <a-button type="primary" :loading="importUploading">
-              <template #icon><upload-outlined /></template>
-              选择文件并预览
-            </a-button>
-          </a-upload>
-        </div>
-      </template>
-
-      <template v-else-if="importStep === 'preview' && importPreview">
-        <a-descriptions :column="4" size="small" bordered class="mb12">
-          <a-descriptions-item label="文件">{{ importPreview.fileName }}</a-descriptions-item>
-          <a-descriptions-item label="数据行">{{ importPreview.total }}</a-descriptions-item>
-          <a-descriptions-item label="可导入">
-            <span class="ok-text">{{ importPreview.validCount }}</span>
-          </a-descriptions-item>
-          <a-descriptions-item label="校验失败">
-            <span :class="importPreview.invalidCount ? 'err-text' : ''">{{ importPreview.invalidCount }}</span>
-          </a-descriptions-item>
-        </a-descriptions>
-        <a-alert
-          v-if="importPreview.invalidCount"
-          type="warning"
-          show-icon
-          class="mb12"
-          message="存在校验失败行"
-          description="确认导入时只会写入校验通过的行，失败行会单独生成错误明细文件；可在确认后下载修正。"
-        />
-        <div v-if="importPreview.errors.length" class="import-error-wrap">
-          <a-table
-            size="small"
-            :columns="importErrorColumns"
-            :data-source="importPreview.errors"
-            :pagination="{ pageSize: 6, size: 'small' }"
-            :scroll="{ y: 220 }"
-            :row-key="(r: any) => `${r.sheet}-${r.row}-${r.message}`"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'row'">{{ record.sheet }} 第 {{ record.row }} 行</template>
-            </template>
-          </a-table>
-        </div>
-        <div class="import-footer">
-          <a-button @click="resetImport">重新选择</a-button>
-          <a-button @click="importOpen = false">取消</a-button>
-          <a-button
-            type="primary"
-            :loading="importing"
-            :disabled="importPreview.validCount === 0"
-            @click="doConfirmImport"
-          >
-            确认导入（{{ importPreview.validCount }} 行）
-          </a-button>
-        </div>
-      </template>
-
-      <template v-else-if="importStep === 'result' && importResult">
-        <a-result
-          :status="importResult.failed ? 'warning' : 'success'"
-          :title="importResult.failed ? '导入完成，部分行失败' : '导入完成'"
-          :sub-title="`共 ${importResult.total} 行，成功 ${importResult.success} 行，失败 ${importResult.failed} 行`"
-        >
-          <template #extra>
-            <a-button v-if="importResult.errorFileId" @click="doDownloadImportError">
-              <template #icon><download-outlined /></template>
-              下载错误明细
-            </a-button>
-            <a-button type="primary" class="ml8" @click="importOpen = false">知道了</a-button>
-          </template>
-        </a-result>
-      </template>
-    </a-modal>
-
-    <!-- 司龄台账 -->
-    <a-drawer v-model:open="seniorityLedgerOpen" title="司龄台账" width="1200px" destroy-on-close>
-      <div class="list-toolbar">
-        <a-input-search
-          v-model:value="seniorityKeyword"
-          placeholder="姓名 / 工号"
-          allow-clear
-          style="width: 220px"
-          @search="loadSeniorityLedger"
-        />
-        <a-button @click="loadSeniorityLedger">
-          <template #icon><reload-outlined /></template>
-          刷新
-        </a-button>
-      </div>
-      <a-table
-        :columns="seniorityColumns"
-        :data-source="seniorityRows"
-        :loading="seniorityLoading"
-        row-key="employeeId"
-        size="middle"
-        :scroll="{ x: 1140 }"
-        :pagination="seniorityPagination"
-        @change="onSeniorityTableChange"
-      >
-        <template #emptyText>
-          <a-empty v-if="!seniorityLoading" description="暂无司龄数据" />
-        </template>
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'confirmedAt'">{{ record.confirmedAt || '未核定' }}</template>
-          <template v-else-if="column.key === 'source'">{{ senioritySourceText(record.source) }}</template>
-          <template v-else-if="column.key === 'action'">
-            <a @click="openSenioritySegments(record)">查看</a>
-          </template>
-        </template>
-      </a-table>
-    </a-drawer>
-
-    <!-- 年假台账 -->
-    <a-drawer v-model:open="annualLedgerOpen" title="年假台账" width="1080px" destroy-on-close>
-      <div class="list-toolbar">
-        <a-input-search
-          v-model:value="annualLedgerKeyword"
-          placeholder="姓名 / 工号"
-          allow-clear
-          style="width: 200px"
-          @search="loadAnnualLeaveLedger"
-        />
-        <a-select
-          v-model:value="annualLedgerYear"
-          :options="annualLedgerYearOptions"
-          style="width: 110px"
-          @change="onAnnualLedgerYearChange"
-        />
-        <a-button @click="loadAnnualLeaveLedger">
-          <template #icon><reload-outlined /></template>
-          刷新
-        </a-button>
-      </div>
-      <a-table
-        :columns="annualLedgerColumns"
-        :data-source="annualLedgerRows"
-        :loading="annualLedgerLoading"
-        row-key="employeeId"
-        size="middle"
-        :scroll="{ x: 1160 }"
-        :pagination="annualLedgerPagination"
-        @change="onAnnualLedgerTableChange"
-      >
-        <template #emptyText>
-          <a-empty v-if="!annualLedgerLoading" description="暂无年假数据" />
-        </template>
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'generatedDays'">
-            <span>{{ record.generatedDays ?? 0 }}</span>
-            <a-tag v-if="record.missing" color="orange" class="ledger-tag">未生成</a-tag>
-          </template>
-          <template v-else-if="column.key === 'carryoverIn'">
-            <span>{{ record.carryoverIn ?? 0 }}</span>
-            <div v-if="record.carryoverRemaining > 0" class="muted cell-sub">
-              剩余 {{ record.carryoverRemaining }} 天
-            </div>
-          </template>
-          <template v-else-if="column.key === 'availableDays'">
-            <strong>{{ record.availableDays ?? 0 }}</strong>
-          </template>
-          <template v-else-if="column.key === 'carryoverExpireAt'">
-            {{ record.carryoverExpireAt || '—' }}
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ record.statusName || '—' }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'tier'">
-            <a-tag color="blue">{{ record.tier || '—' }}</a-tag>
-          </template>
-        </template>
-      </a-table>
-    </a-drawer>
-
-    <!-- 前司工作记录 -->
-    <a-modal v-model:open="segmentsViewOpen" :footer="null" width="880px" centered destroy-on-close>
-      <template #title>
-        前司工作记录 · {{ segmentsViewTarget?.name || '' }}
-        <span class="seg-summary">
-          前司 {{ segmentsViewTarget?.priorYears ?? 0 }} 年 · 累计 {{ segmentsViewTarget?.totalYears ?? 0 }} 年
-        </span>
-      </template>
-      <a-table
-        :columns="segmentViewColumns"
-        :data-source="segmentsViewRows"
-        :loading="segmentsViewLoading"
-        :row-key="segmentRowKey"
-        size="small"
-        :pagination="false"
-      >
-        <template #emptyText>
-          <a-empty v-if="!segmentsViewLoading" description="无前司工作记录" />
-        </template>
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'proofFileName'">
-            <a v-if="record.proofFileName" @click="downloadProof(record)">{{ record.proofFileName }}</a>
-            <span v-else class="muted">未上传</span>
-          </template>
-        </template>
-      </a-table>
-    </a-modal>
-
-    <!-- 司龄核定 -->
-    <a-modal
-      v-model:open="seniorityOpen"
-      title="司龄核定"
-      :confirm-loading="senioritySaving"
-      ok-text="提交核定"
-      cancel-text="取消"
-      width="1040px"
-      centered
-      destroy-on-close
-      :body-style="{ maxHeight: '74vh', overflowY: 'auto', overflowX: 'hidden' }"
-      @ok="submitSeniority"
-    >
-      <template v-if="seniorityTarget">
-        <a-descriptions :column="4" size="small" bordered class="mb12">
-          <a-descriptions-item label="员工">
-            {{ seniorityTarget.name || '—' }}
-            <span v-if="seniorityTarget.empNo" class="muted">（{{ seniorityTarget.empNo }}）</span>
-          </a-descriptions-item>
-          <a-descriptions-item label="组织">{{ seniorityTarget.orgName || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="入职日期">{{ seniorityTarget.hireDate || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="当前司龄">
-            {{ seniorityTarget.seniorityYears ?? '—' }} 年
-          </a-descriptions-item>
-        </a-descriptions>
-
-        <a-form layout="vertical">
-          <a-row :gutter="12">
-            <a-col :span="8">
-              <a-form-item label="核定生效日">
-                <a-date-picker v-model:value="seniorityForm.effectiveDate" value-format="YYYY-MM-DD" style="width: 100%" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="司龄起算日" required>
-                <a-date-picker v-model:value="seniorityForm.seniorityStartDate" value-format="YYYY-MM-DD" style="width: 100%" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="首次参加工作日期" :required="!senioritySegmentRows.length">
-                <a-date-picker
-                  v-if="!senioritySegmentRows.length"
-                  v-model:value="seniorityForm.firstWorkDate"
-                  value-format="YYYY-MM-DD"
-                  style="width: 100%"
-                />
-                <a-input v-else :value="seniorityFirstWorkText" disabled />
-              </a-form-item>
-            </a-col>
-          </a-row>
-
-          <div class="seg-head">
-            <span>前司工作经历（可多段、可不连续，断档不计工龄；每段必须上传证明）</span>
-            <a-button type="link" size="small" @click="addSenioritySegment()">+ 添加一段</a-button>
-          </div>
-          <div v-if="senioritySegmentRows.length" class="seg-list">
-            <div v-for="(seg, i) in senioritySegmentRows" :key="seg.key" class="seg-item">
-              <div class="seg-grid">
-                <a-input v-model:value="seg.company" placeholder="单位名称（选填）" />
-                <a-date-picker
-                  v-model:value="seg.startDate"
-                  value-format="YYYY-MM-DD"
-                  placeholder="开始时间"
-                  style="width: 100%"
-                />
-                <a-date-picker
-                  v-model:value="seg.endDate"
-                  value-format="YYYY-MM-DD"
-                  placeholder="结束时间"
-                  style="width: 100%"
-                />
-                <a-input v-model:value="seg.remark" placeholder="备注（选填）" class="seg-span2" />
-                <div class="seg-proof">
-                  <a-upload :show-upload-list="false" :before-upload="seniorityProofUploader(seg)">
-                    <a-button size="small">
-                      <UploadOutlined />
-                      {{ seg.proofFileName ? '重新上传证明' : '上传证明' }}
-                    </a-button>
-                  </a-upload>
-                  <span v-if="seg.proofFileName" class="seg-file" :title="seg.proofFileName">{{ seg.proofFileName }}</span>
-                  <a-button type="link" danger size="small" @click="removeSenioritySegment(i)">删除</a-button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div v-else class="muted seg-empty">无前司经历可不填；有前司经历请逐段添加，每段上传社保 / 离职证明。</div>
-
-          <a-row :gutter="12">
-            <a-col :span="8">
-              <a-form-item label="前司累计年限">
-                <a-input-number
-                  v-if="!senioritySegmentRows.length"
-                  v-model:value="seniorityForm.priorYears"
-                  :min="0"
-                  :step="0.5"
-                  style="width: 100%"
-                />
-                <a-input v-else :value="seniorityPriorText" disabled />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="累计工龄（自动加总）">
-                <a-input :value="seniorityTotalText" disabled />
-              </a-form-item>
-            </a-col>
-            <a-col :span="8">
-              <a-form-item label="核定依据">
-                <a-select v-model:value="seniorityForm.source" :options="senioritySourceOptions" />
-              </a-form-item>
-            </a-col>
-          </a-row>
-          <a-form-item label="备注">
-            <a-input v-model:value="seniorityForm.remark" :maxlength="100" placeholder="选填" />
-          </a-form-item>
-        </a-form>
-      </template>
-    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
-import { ApartmentOutlined, CloseCircleFilled, DownloadOutlined, ReloadOutlined, UploadOutlined, UserAddOutlined } from '@ant-design/icons-vue'
+import { ApartmentOutlined, CloseCircleFilled, ReloadOutlined, UserAddOutlined } from '@ant-design/icons-vue'
 import HandoverEditor from '@/components/HandoverEditor.vue'
 import EmployeeProfileDrawer from '@/components/EmployeeProfileDrawer.vue'
-import EmployeeContractPanel from '@/components/EmployeeContractPanel.vue'
-import EmployeeAttachmentPanel from '@/components/EmployeeAttachmentPanel.vue'
 import {
   addBank,
   addEducation,
@@ -1403,49 +974,27 @@ import {
   deleteFamily,
   deleteWork,
   bizOptions,
-  closeAccountEmployee,
-  confirmEmployeeImport,
-  confirmSeniority,
   dictOptions,
-  downloadImportError,
-  downloadEhrAttachment,
-  downloadImportTemplate,
   employeeProfile,
-  exportContractsXlsx,
-  exportEmployees,
-  previewEmployeeImport,
   onboardEmployee,
   orgTree,
-  pageAnnualLeaveLedger,
   pageEmployees,
-  pageSeniority,
   reduceEmployee,
   regularizeApply,
-  sensitiveEmployeeDetail,
-  senioritySegments,
   submitDraft,
-  submitEmpChange,
   submitRehireApply,
   updateBank,
   updateEducation,
   updateEmployee,
   updateFamily,
   updateWork,
-  uploadEhrAttachment,
   type AccountBrief,
-  type AnnualLeaveLedgerItem,
   type BankBody,
   type DictOption,
   type EducationBody,
-  type EmpChangeBody,
   type EmployeeItem,
   type FamilyBody,
-  type ImportPreview,
-  type ImportResult,
   type OrgNode,
-  type SeniorityConfirmBody,
-  type SeniorityItem,
-  type SenioritySegmentItem,
   type WorkBody
 } from '@/api/ehr'
 import { useUserStore } from '@/stores/user'
@@ -1471,17 +1020,8 @@ import dayjs from 'dayjs'
 const store = useUserStore()
 const canCreate = computed(() => store.can('employee:create'))
 const canEdit = computed(() => store.can('employee:edit'))
-const canContractView = computed(() => store.can('contract:view'))
-const canContractManage = computed(() => store.can('contract:manage'))
-const canAttachmentView = computed(() => store.can('contract:view') || store.can('employee:view'))
 const canDelete = computed(() => store.can('employee:delete'))
 const canResign = computed(() => store.can('employee:resign'))
-/** 敏感字段明文 / 导出按独立权限控制 */
-const canSensitive = computed(() => store.can('employee:sensitive:view'))
-const canExport = computed(() => store.can('employee:export'))
-const canContractExport = computed(() => store.can('contract:view'))
-const canImport = computed(() => store.can('employee:import'))
-const canViewSeniority = computed(() => store.can('employee:view'))
 /** 组织树要 org:view；普通员工没有，左侧只能空着 */
 const canSeeOrgTree = computed(() => store.can('org:view'))
 
@@ -1647,9 +1187,13 @@ async function loadApprovalBriefs(list: EmployeeItem[]) {
   approvalBriefs.value = refs.length ? await fetchLatestApprovals(refs).catch(() => []) : []
 }
 
-/** 只有审批中心里确实在途的单才算「审批中」 */
+/** 只有审批中心里确实在途的单才算「审批中」；业务行残留的已完成实例号不算 */
 function runningBriefForRow(r: EmployeeItem) {
-  return runningBriefOf(briefsForRow(approvalBriefs.value, r.id))
+  return runningBriefOf(
+    briefsForRow(approvalBriefs.value, r.id),
+    r.approvalInstanceId,
+    r.approvalBizType
+  )
 }
 
 /** 审批完成后不再给详情入口，只有被驳回时需要查看驳回意见 */
@@ -1698,16 +1242,13 @@ const columns = computed(() => {
   // 已经按组织筛选时，右侧每一行都是同一个组织，这一列没有信息量
   if (!selectedOrgId.value) cols.splice(4, 0, { title: '所属组织', key: 'org', width: 200, ellipsis: true })
   cols.push(
-    { title: '登录账号', key: 'account', width: 200, ellipsis: true },
+    { title: '登录账号', key: 'account', width: 130 },
     { title: '离职日期', dataIndex: 'resignDate', key: 'resignDate', width: 110 },
     // 操作列：横向滚动时始终贴住右边（改用 CSS sticky，见 .emp-table 样式）
     { title: '操作', key: 'action', width: 240 }
   )
   return cols
 })
-
-/** 表格总宽：交给 a-table 自己横向滚动，表头表体才能严格对齐，也不会撑出页面级滚动条 */
-const tableScrollX = computed(() => columns.value.reduce((sum, c) => sum + (c.width || 0), 0))
 
 async function loadOrgs(keepSelection = true) {
   orgLoading.value = true
@@ -1789,9 +1330,6 @@ function onTableChange(p: any) {
 /* ---------- 表单 ---------- */
 const modalOpen = ref(false)
 const editing = ref<EmployeeItem | null>(null)
-/** 变更弹窗「劳动合同 / 档案附件」页签角标条数（由子面板加载后回传） */
-const contractTabCount = ref(0)
-const attachmentTabCount = ref(0)
 /** 待入职 = 编辑档案；试用期/在职 = 变更个人信息 */
 const modalTitle = computed(() => {
   if (!editing.value) return '新增人员'
@@ -1822,9 +1360,6 @@ const form = reactive<{
   emergencyPhone: string
   currentAddress: string
   hireDate?: string
-  seniorityStartDate?: string
-  firstWorkDate?: string
-  seniorityYears?: string
   probationMonths?: number
   exemptProbation: boolean
   remark: string
@@ -1850,9 +1385,6 @@ const form = reactive<{
   emergencyPhone: '',
   currentAddress: '',
   hireDate: undefined,
-  seniorityStartDate: undefined,
-  firstWorkDate: undefined,
-  seniorityYears: undefined,
   probationMonths: 3,
   exemptProbation: false,
   remark: ''
@@ -2086,9 +1618,9 @@ const familyCols = [
   { title: '操作', key: 'action', width: 88 }
 ]
 
-/** 删除子档案：编辑模式（非变更）且有 id → 调接口并刷新；否则只删本地暂存行（变更模式随提交统一走审批） */
+/** 删除子档案：编辑模式且有 id → 调接口并刷新；否则只删本地暂存行 */
 async function removeSub(kind: 'bank' | 'edu' | 'work' | 'family', row: any) {
-  if (editing.value?.id && row.id && !personalOnly.value) {
+  if (editing.value?.id && row.id) {
     try {
       if (kind === 'bank') await deleteBank(editing.value.id, row.id)
       else if (kind === 'edu') await deleteEducation(editing.value.id, row.id)
@@ -2143,11 +1675,10 @@ async function submitBankModal() {
   bankSaving.value = true
   try {
     const target = bankRows.value.find((r) => r._key === bankEditKey.value)
-    // 变更模式（personalOnly）子表只暂存本地，随「提交变更」统一走审批落库；其余编辑模式仍直改
-    if (target && editing.value?.id && target.id && !personalOnly.value) {
+    if (target && editing.value?.id && target.id) {
       await updateBank(editing.value.id, target.id, body)
       await reloadSubs(editing.value.id)
-    } else if (editing.value?.id && !personalOnly.value) {
+    } else if (editing.value?.id) {
       await addBank(editing.value.id, body)
       await reloadSubs(editing.value.id)
     } else if (target) {
@@ -2200,11 +1731,10 @@ async function submitEduModal() {
   eduSaving.value = true
   try {
     const target = eduRows.value.find((r) => r._key === eduEditKey.value)
-    // 变更模式（personalOnly）子表只暂存本地，随「提交变更」统一走审批落库；其余编辑模式仍直改
-    if (target && editing.value?.id && target.id && !personalOnly.value) {
+    if (target && editing.value?.id && target.id) {
       await updateEducation(editing.value.id, target.id, body)
       await reloadSubs(editing.value.id)
-    } else if (editing.value?.id && !personalOnly.value) {
+    } else if (editing.value?.id) {
       await addEducation(editing.value.id, body)
       await reloadSubs(editing.value.id)
     } else if (target) {
@@ -2254,11 +1784,10 @@ async function submitWorkModal() {
   workSaving.value = true
   try {
     const target = workRows.value.find((r) => r._key === workEditKey.value)
-    // 变更模式（personalOnly）子表只暂存本地，随「提交变更」统一走审批落库；其余编辑模式仍直改
-    if (target && editing.value?.id && target.id && !personalOnly.value) {
+    if (target && editing.value?.id && target.id) {
       await updateWork(editing.value.id, target.id, body)
       await reloadSubs(editing.value.id)
-    } else if (editing.value?.id && !personalOnly.value) {
+    } else if (editing.value?.id) {
       await addWork(editing.value.id, body)
       await reloadSubs(editing.value.id)
     } else if (target) {
@@ -2316,11 +1845,10 @@ async function submitFamilyModal() {
   familySaving.value = true
   try {
     const target = familyRows.value.find((r) => r._key === familyEditKey.value)
-    // 变更模式（personalOnly）子表只暂存本地，随「提交变更」统一走审批落库；其余编辑模式仍直改
-    if (target && editing.value?.id && target.id && !personalOnly.value) {
+    if (target && editing.value?.id && target.id) {
       await updateFamily(editing.value.id, target.id, body)
       await reloadSubs(editing.value.id)
-    } else if (editing.value?.id && !personalOnly.value) {
+    } else if (editing.value?.id) {
       await addFamily(editing.value.id, body)
       await reloadSubs(editing.value.id)
     } else if (target) {
@@ -2359,9 +1887,6 @@ function resetForm() {
   form.emergencyPhone = ''
   form.currentAddress = ''
   form.hireDate = undefined
-  form.seniorityStartDate = undefined
-  form.firstWorkDate = undefined
-  form.seniorityYears = undefined
   form.probationMonths = 3
   form.exemptProbation = false
   form.remark = ''
@@ -2378,18 +1903,7 @@ function openCreate() {
   modalOpen.value = true
 }
 
-async function openEdit(row: EmployeeItem) {
-  // 列表里的手机号/身份证/紧急电话是掩码值，编辑需要明文回填；
-  // 无敏感权限时后端会拒绝，此时不允许打开表单，避免把掩码值提交回去
-  let source = row
-  if (row.sensitiveMasked) {
-    try {
-      source = await sensitiveEmployeeDetail(row.id)
-    } catch (e: any) {
-      message.error(e?.message || '无查看敏感字段权限，无法编辑该员工信息')
-      return
-    }
-  }
+function openEdit(row: EmployeeItem) {
   editing.value = row
   resetForm()
   clearSubRows()
@@ -2399,26 +1913,23 @@ async function openEdit(row: EmployeeItem) {
   form.name = row.name
   form.orgId = row.orgId
   form.position = row.position || ''
-  form.mobile = source.mobile || ''
+  form.mobile = row.mobile || ''
   form.email = row.email || ''
   form.gender = row.gender === 1 || row.gender === 2 ? row.gender : undefined
   form.nativeProvince = row.nativeProvince || undefined
   form.nativeCity = row.nativeCity || ''
   form.nativeDistrict = row.nativeDistrict || ''
   form.nativeDetail = row.nativeDetail || ''
-  form.idCard = source.idCard || ''
+  form.idCard = row.idCard || ''
   form.birthday = row.birthday || undefined
   form.nation = row.nation || undefined
   form.maritalStatus = row.maritalStatus || undefined
   form.politicalStatus = row.politicalStatus || undefined
   form.education = row.education || undefined
   form.emergencyContact = row.emergencyContact || ''
-  form.emergencyPhone = source.emergencyPhone || ''
+  form.emergencyPhone = row.emergencyPhone || ''
   form.currentAddress = row.currentAddress || ''
   form.hireDate = row.hireDate || undefined
-  form.seniorityStartDate = row.seniorityStartDate || row.hireDate || undefined
-  form.firstWorkDate = row.firstWorkDate || row.hireDate || undefined
-  form.seniorityYears = row.seniorityYears ?? undefined
   form.exemptProbation = !!row.exemptProbation
   form.probationMonths = row.probationMonths ?? (row.exemptProbation ? undefined : 3)
   form.remark = row.remark || ''
@@ -2457,41 +1968,12 @@ async function submit() {
       return
     }
   }
-  // P4-4：司龄起算日与首次参加工作日期是年假档位依据，建档时必填
-  if (!personalOnly.value && (!form.seniorityStartDate || !form.firstWorkDate)) {
-    message.warning('请填写司龄起算日与首次参加工作日期（含前司，按社保核定）')
-    return
-  }
   saving.value = true
   // empNo 不提交（后端自动生成且禁改）；邮箱不提交（后端按姓名拼音自动生成）；籍贯由省/市/区县/详细地址结构化传递
   const { empNo: _ignored, email: _ignoredEmail, ...rest } = form
   const body = { ...rest, orgId: form.orgId as string }
   try {
-    if (personalOnly.value && editing.value) {
-      // 试用期/在职的「变更」：基本信息可变项 + 四类子表目标态整表提交，
-      // 服务端比对出字段级/行级差异后进审批，审批通过才落库
-      const changeBody: EmpChangeBody = {
-        mobile: form.mobile.trim(),
-        maritalStatus: form.maritalStatus || '',
-        politicalStatus: form.politicalStatus || '',
-        education: form.education || '',
-        emergencyContact: form.emergencyContact.trim(),
-        emergencyPhone: form.emergencyPhone.trim(),
-        currentAddress: form.currentAddress.trim(),
-        banks: bankRows.value.map(({ _key, ...r }) => r),
-        educations: eduRows.value.map(({ _key, ...r }) => r),
-        works: workRows.value.map(({ _key, ...r }) => r),
-        families: familyRows.value.map(({ _key, ...r }) => r)
-      }
-      const ret = await submitEmpChange(editing.value.id, changeBody)
-      modalOpen.value = false
-      await refreshAll()
-      if (ret?.pendingApproval) {
-        message.success(`变更已提交审批，通过后生效（${ret.changeSummary}）`)
-      } else {
-        message.success('变更已处理')
-      }
-    } else if (editing.value) {
+    if (editing.value) {
       const saved = await updateEmployee(editing.value.id, body)
       // 试用期/在职的个人信息修改走审批：后端不动档案，只发起审批单
       message.success(saved?.pendingApproval ? '变更已提交审批，通过后生效' : '已保存')
@@ -2522,8 +2004,8 @@ async function submit() {
 /* ---------- 入职 / 转正 生命周期 ---------- */
 /** 转正申请是否可提交：试用期、且该员工当前没有任何在途审批单 */
 function hasPendingRegularize(row: EmployeeItem) {
-  // 入职/信息变更/离职在途时同样不能发起转正
-  return !!runningBriefForRow(row) || row.regularizeStatus === 1 || row.regularizeStatus === 2
+  // 通用在途指针优先（入职/信息变更/离职在途时同样不能发起转正），兼容老字段
+  return !!row.approvalInstanceId || row.regularizeStatus === 1 || row.regularizeStatus === 2
 }
 
 /** 当前登录账号对应的员工档案ID（用于「本人」判定） */
@@ -2772,16 +2254,6 @@ async function submitReinstate() {
   }
 }
 
-async function doCloseAccount(row: EmployeeItem) {
-  try {
-    await closeAccountEmployee(row.id)
-    message.success('账号已关闭，员工状态已更新为已离职')
-    await refreshAll()
-  } catch (e: any) {
-    message.error(e?.message || '关闭账号失败')
-  }
-}
-
 async function doDelete(row: EmployeeItem) {
   try {
     await deleteEmployee(row.id)
@@ -2799,162 +2271,6 @@ const profileId = ref<string | undefined>(undefined)
 function openProfile(row: EmployeeItem) {
   profileId.value = row.id
   profileOpen.value = true
-}
-
-/* ---------- 查看敏感明文 ---------- */
-const plainOpen = ref(false)
-const plainName = ref('')
-const plainRows = ref<{ label: string; value?: string }[]>([])
-
-async function openPlain(row: EmployeeItem) {
-  try {
-    const detail = await sensitiveEmployeeDetail(row.id)
-    plainName.value = detail.name
-    plainRows.value = [
-      { label: '手机号', value: detail.mobile },
-      { label: '身份证号', value: detail.idCard },
-      { label: '紧急联系电话', value: detail.emergencyPhone }
-    ]
-    plainOpen.value = true
-  } catch (e: any) {
-    message.error(e?.message || '获取明文失败')
-  }
-}
-
-/* ---------- 导出人员（CSV，后端按数据范围+权限处理并记审计） ---------- */
-const exporting = ref(false)
-
-function doExport() {
-  Modal.confirm({
-    title: '确认导出人员数据？',
-    content: '导出仅包含你当前数据范围内的人员；手机号等敏感字段会按权限掩码，本次操作将记录审计日志。',
-    okText: '导出',
-    cancelText: '取消',
-    onOk: async () => {
-      exporting.value = true
-      try {
-        const res: any = await exportEmployees({
-          keyword: query.keyword || undefined,
-          orgId: query.orgId || undefined,
-          status: query.status ?? undefined
-        })
-        const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `人员数据-${dayjs().format('YYYYMMDD')}.csv`
-        a.click()
-        URL.revokeObjectURL(url)
-        message.success('导出已开始')
-      } catch (e: any) {
-        message.error(e?.message || '导出失败')
-      } finally {
-        exporting.value = false
-      }
-    }
-  })
-}
-
-/* ---------- 导出合同（xlsx，仅数据范围内员工） ---------- */
-const contractExporting = ref(false)
-
-function saveBlob(data: Blob, fileName: string) {
-  const blob = data instanceof Blob ? data : new Blob([data])
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = fileName
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-async function doExportContracts() {
-  contractExporting.value = true
-  try {
-    const res: any = await exportContractsXlsx()
-    saveBlob(res.data, `劳动合同-${dayjs().format('YYYYMMDD')}.xlsx`)
-    message.success('合同导出已开始')
-  } catch (e: any) {
-    message.error(e?.message || '导出失败')
-  } finally {
-    contractExporting.value = false
-  }
-}
-
-/* ---------- 批量导入（上传预览 → 确认入库） ---------- */
-const importOpen = ref(false)
-const importStep = ref<'upload' | 'preview' | 'result'>('upload')
-const importUploading = ref(false)
-const importing = ref(false)
-const importPreview = ref<ImportPreview | null>(null)
-const importResult = ref<ImportResult | null>(null)
-const importErrorColumns = [
-  { title: '位置', key: 'row', width: 170 },
-  { title: '姓名', dataIndex: 'name', width: 110 },
-  { title: '错误原因', dataIndex: 'message' }
-]
-
-function openImport() {
-  resetImport()
-  importOpen.value = true
-}
-
-function resetImport() {
-  importStep.value = 'upload'
-  importPreview.value = null
-  importResult.value = null
-}
-
-async function doDownloadTemplate() {
-  try {
-    const res: any = await downloadImportTemplate()
-    saveBlob(res.data, '员工导入模板.xlsx')
-  } catch (e: any) {
-    message.error(e?.message || '模板下载失败')
-  }
-}
-
-async function handleImportFile(file: File) {
-  const name = file.name.toLowerCase()
-  if (!name.endsWith('.xlsx') && !name.endsWith('.xls')) {
-    message.warning('只支持 .xlsx / .xls 文件')
-    return false
-  }
-  importUploading.value = true
-  try {
-    importPreview.value = await previewEmployeeImport(file)
-    importStep.value = 'preview'
-  } catch (e: any) {
-    message.error(e?.message || '文件解析失败')
-  } finally {
-    importUploading.value = false
-  }
-  return false
-}
-
-async function doConfirmImport() {
-  if (!importPreview.value) return
-  importing.value = true
-  try {
-    importResult.value = await confirmEmployeeImport(importPreview.value.taskId)
-    importStep.value = 'result'
-    await refreshAll()
-  } catch (e: any) {
-    message.error(e?.message || '导入失败')
-  } finally {
-    importing.value = false
-  }
-}
-
-async function doDownloadImportError() {
-  const fileId = importResult.value?.errorFileId
-  if (!fileId) return
-  try {
-    const res: any = await downloadImportError(fileId)
-    saveBlob(res.data, `员工导入错误明细-${dayjs().format('YYYYMMDD')}.xlsx`)
-  } catch (e: any) {
-    message.error(e?.message || '错误明细下载失败')
-  }
 }
 
 /* ---------- 开户结果 ---------- */
@@ -3000,555 +2316,10 @@ function genderText(g?: number) {
   return g === 1 ? '男' : g === 2 ? '女' : '—'
 }
 
-/** 试用期且 30 天内到期：列表直接给出到期标签，颜色随紧急程度变化 */
-function dueTag(row: EmployeeItem): { text: string; color: string } | null {
-  if (row.status !== 30 || !row.expectedRegularizeDate) return null
-  const days = dayjs(row.expectedRegularizeDate).startOf('day').diff(dayjs().startOf('day'), 'day')
-  if (days < 0 || days > 30) return null
-  const color = days <= 1 ? 'red' : days <= 7 ? 'orange' : 'blue'
-  return { text: days === 0 ? '今日转正到期' : `转正 T-${days}`, color }
-}
-
-/* ---------- 司龄台账 / 核定 ---------- */
-interface SeniorityTarget {
-  employeeId: string
-  name?: string
-  empNo?: string
-  orgName?: string
-  hireDate?: string | null
-  seniorityStartDate?: string | null
-  firstWorkDate?: string | null
-  seniorityYears?: string | number | null
-  priorYears?: number | null
-  totalYears?: number | null
-  source?: string
-}
-
-const senioritySourceOptions = [
-  { value: 'SOCIAL_SECURITY', label: '社保核定' },
-  { value: 'MANUAL', label: '手工核定' },
-  { value: 'FIRST_HIRE', label: '入职默认' }
-]
-
-function senioritySourceText(source?: string) {
-  if (source === 'SOCIAL_SECURITY') return '社保核定'
-  if (source === 'FIRST_HIRE') return '入职默认'
-  if (source === 'MANUAL') return '手工核定'
-  if (source === 'AUTO') return '系统自动核算'
-  return source || '—'
-}
-
-/* 台账 */
-const seniorityLedgerOpen = ref(false)
-const seniorityKeyword = ref('')
-const seniorityRows = ref<SeniorityItem[]>([])
-const seniorityLoading = ref(false)
-const seniorityTotal = ref(0)
-const seniorityPage = ref(1)
-const senioritySize = ref(10)
-
-const seniorityColumns = [
-  { title: '工号', dataIndex: 'empNo', width: 100 },
-  { title: '姓名', dataIndex: 'name', width: 100 },
-  { title: '组织', dataIndex: 'orgName', width: 160 },
-  { title: '入职日期', dataIndex: 'hireDate', width: 110 },
-  { title: '司龄起算日', dataIndex: 'seniorityStartDate', width: 110 },
-  { title: '首次工作日期', dataIndex: 'firstWorkDate', width: 120 },
-  { title: '本单位司龄', dataIndex: 'seniorityYears', width: 100 },
-  { title: '累计工龄', dataIndex: 'totalYears', width: 100 },
-  { title: '核定时间', key: 'confirmedAt', width: 160 },
-  { title: '操作', key: 'action', width: 80 }
-]
-
-/* 年假台账 */
-const canViewLeaveQuota = computed(() => store.can('leave:quota:view'))
-const annualLedgerOpen = ref(false)
-const annualLedgerKeyword = ref('')
-const annualLedgerYear = ref(dayjs().year())
-const annualLedgerRows = ref<AnnualLeaveLedgerItem[]>([])
-const annualLedgerLoading = ref(false)
-const annualLedgerTotal = ref(0)
-const annualLedgerPage = ref(1)
-const annualLedgerSize = ref(10)
-const annualLedgerYearOptions = Array.from({ length: 5 }, (_, i) => {
-  const y = dayjs().year() - 2 + i
-  return { value: y, label: `${y} 年` }
-})
-
-const annualLedgerColumns = [
-  { title: '工号', dataIndex: 'empNo', width: 95 },
-  { title: '姓名', dataIndex: 'name', width: 95 },
-  { title: '组织', dataIndex: 'orgName', width: 160, ellipsis: true },
-  { title: '入职日期', dataIndex: 'hireDate', width: 110 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '年假档位', key: 'tier', width: 100 },
-  { title: '当年产生', key: 'generatedDays', width: 110 },
-  { title: '上年结转', key: 'carryoverIn', width: 110 },
-  { title: '已用', dataIndex: 'usedDays', width: 80 },
-  { title: '剩余', key: 'availableDays', width: 85 },
-  { title: '结转失效日', key: 'carryoverExpireAt', width: 115 }
-]
-
-const annualLedgerPagination = computed(() => ({
-  current: annualLedgerPage.value,
-  pageSize: annualLedgerSize.value,
-  total: annualLedgerTotal.value,
-  showSizeChanger: true,
-  showTotal: (t: number) => `共 ${t} 条`
-}))
-
-async function loadAnnualLeaveLedger() {
-  if (!canViewLeaveQuota.value) return
-  annualLedgerLoading.value = true
-  try {
-    const data = await pageAnnualLeaveLedger({
-      keyword: annualLedgerKeyword.value || undefined,
-      year: annualLedgerYear.value,
-      page: annualLedgerPage.value,
-      size: annualLedgerSize.value
-    })
-    annualLedgerRows.value = data.list || []
-    annualLedgerTotal.value = data.total || 0
-  } catch (e: any) {
-    message.error(e?.message || '加载年假台账失败')
-  } finally {
-    annualLedgerLoading.value = false
-  }
-}
-
-function onAnnualLedgerTableChange(p: any) {
-  annualLedgerPage.value = p.current || 1
-  annualLedgerSize.value = p.pageSize || 10
-  loadAnnualLeaveLedger()
-}
-
-function onAnnualLedgerYearChange() {
-  annualLedgerPage.value = 1
-  loadAnnualLeaveLedger()
-}
-
-function openAnnualLeaveLedger() {
-  annualLedgerOpen.value = true
-  annualLedgerPage.value = 1
-  loadAnnualLeaveLedger()
-}
-
-/* 台账：查看某人的前司工作记录 */
-const segmentsViewOpen = ref(false)
-const segmentsViewTarget = ref<SeniorityItem | null>(null)
-const segmentsViewRows = ref<SenioritySegmentItem[]>([])
-const segmentsViewLoading = ref(false)
-const segmentViewColumns = [
-  { title: '单位名称', dataIndex: 'company', ellipsis: true },
-  { title: '开始时间', dataIndex: 'startDate', width: 110 },
-  { title: '结束时间', dataIndex: 'endDate', width: 110 },
-  { title: '证明材料', key: 'proofFileName', width: 220, ellipsis: true },
-  { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true }
-]
-
-/** 分段行没有可靠的唯一 ID（雪花 ID 转 JSON 数字会丢精度），用单位+起止拼 key */
-function segmentRowKey(record: SenioritySegmentItem) {
-  return [record.company || '', record.startDate || '', record.endDate || ''].join('|')
-}
-
-async function openSenioritySegments(record: SeniorityItem) {
-  segmentsViewTarget.value = record
-  segmentsViewOpen.value = true
-  segmentsViewLoading.value = true
-  try {
-    segmentsViewRows.value = (await senioritySegments(record.employeeId)) || []
-  } catch {
-    segmentsViewRows.value = []
-  } finally {
-    segmentsViewLoading.value = false
-  }
-}
-
-/* 证明材料下载：真实附件走接口；模拟数据（proofFileId 为 0）现场生成一份占位 PDF */
-async function downloadProof(row: SenioritySegmentItem) {
-  const name = row.proofFileName || '离职证明.pdf'
-  const id = row.proofFileId == null ? '' : String(row.proofFileId)
-  if (id && id !== '0') {
-    try {
-      const res: any = await downloadEhrAttachment(id)
-      saveBlob(res.data, name)
-      return
-    } catch (e: any) {
-      // 落盘文件丢失时退回占位文件，避免点下载没有任何反馈
-      message.warning(e?.message || '附件已丢失，已为你生成占位文件')
-    }
-  }
-  saveBlob(buildMockProofPdf(row), name)
-}
-
-/** 生成一份可正常打开的单页 PDF（模拟证明材料） */
-function buildMockProofPdf(row: SenioritySegmentItem) {
-  const lines = [
-    'Mock Employment Proof (demo data)',
-    `Company: ${row.company || '-'}`.replace(/[^\x20-\x7E]/g, '?'),
-    `Period: ${row.startDate || '-'} to ${row.endDate || '-'}`
-  ]
-  const stream = `BT /F1 14 Tf 60 760 Td 20 TL ${lines.map((l) => `(${l}) Tj T*`).join(' ')} ET`
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
-  ]
-  let pdf = '%PDF-1.4\n'
-  const offsets: number[] = []
-  objects.forEach((body, i) => {
-    offsets.push(pdf.length)
-    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`
-  })
-  const xref = pdf.length
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
-  offsets.forEach((o) => {
-    pdf += `${String(o).padStart(10, '0')} 00000 n \n`
-  })
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`
-  return new Blob([pdf], { type: 'application/pdf' })
-}
-
-const seniorityPagination = computed(() => ({
-  current: seniorityPage.value,
-  pageSize: senioritySize.value,
-  total: seniorityTotal.value,
-  showSizeChanger: true,
-  showTotal: (t: number) => `共 ${t} 条`
-}))
-
-async function loadSeniorityLedger() {
-  if (!canViewSeniority.value) return
-  seniorityLoading.value = true
-  try {
-    const data = await pageSeniority({
-      keyword: seniorityKeyword.value || undefined,
-      page: seniorityPage.value,
-      size: senioritySize.value
-    })
-    seniorityRows.value = data.list || []
-    seniorityTotal.value = data.total || 0
-  } catch (e: any) {
-    message.error(e?.message || '加载司龄台账失败')
-  } finally {
-    seniorityLoading.value = false
-  }
-}
-
-function onSeniorityTableChange(p: any) {
-  seniorityPage.value = p.current || 1
-  senioritySize.value = p.pageSize || 10
-  loadSeniorityLedger()
-}
-
-function openSeniorityLedger() {
-  seniorityLedgerOpen.value = true
-  seniorityPage.value = 1
-  loadSeniorityLedger()
-}
-
-/* 核定弹窗 */
-const seniorityOpen = ref(false)
-const senioritySaving = ref(false)
-const seniorityTarget = ref<SeniorityTarget | null>(null)
-
-const seniorityForm = reactive({
-  effectiveDate: dayjs().format('YYYY-MM-DD'),
-  seniorityStartDate: '',
-  firstWorkDate: '',
-  priorYears: 0 as number | undefined,
-  source: 'MANUAL',
-  remark: ''
-})
-
-/** 前司工作段：可多段、可不连续，每段起止日期 + 证明附件 */
-interface SenioritySegmentRow {
-  key: number
-  company?: string
-  startDate?: string
-  endDate?: string
-  proofFileId?: string
-  proofFileName?: string
-  remark?: string
-}
-
-const senioritySegmentRows = ref<SenioritySegmentRow[]>([])
-let senioritySegmentKey = 0
-
-function addSenioritySegment(init?: Partial<SenioritySegmentRow>) {
-  senioritySegmentRows.value.push({ key: ++senioritySegmentKey, ...init })
-}
-
-function removeSenioritySegment(index: number) {
-  senioritySegmentRows.value.splice(index, 1)
-}
-
-function seniorityProofUploader(seg: SenioritySegmentRow) {
-  return (file: File) => uploadSeniorityProof(seg, file)
-}
-
-async function uploadSeniorityProof(seg: SenioritySegmentRow, file: File) {
-  if (file.size > 20 * 1024 * 1024) {
-    message.error('证明附件不能超过 20MB')
-    return false
-  }
-  try {
-    const att = await uploadEhrAttachment(file, 'SENIORITY')
-    seg.proofFileId = String(att.id)
-    seg.proofFileName = att.fileName
-    message.success('证明已上传')
-  } catch (e: any) {
-    message.error(e?.message || '证明上传失败')
-  }
-  return false
-}
-
-/** 多段经历合并后的年限：断档不计、重叠只算一次，算法与后端一致（365.25 天/年，含首尾） */
-function mergeSegmentYears() {
-  const segs = senioritySegmentRows.value
-    .filter((s) => s.startDate && s.endDate && !dayjs(s.endDate).isBefore(dayjs(s.startDate)))
-    .map((s) => [dayjs(s.startDate).valueOf(), dayjs(s.endDate).valueOf()] as [number, number])
-    .sort((a, b) => a[0] - b[0])
-  let days = 0
-  let curStart = -1
-  let curEnd = -1
-  for (const [start, end] of segs) {
-    if (curStart < 0) {
-      curStart = start
-      curEnd = end
-    } else if (start <= curEnd + 86400000) {
-      if (end > curEnd) curEnd = end
-    } else {
-      days += Math.round((curEnd - curStart) / 86400000) + 1
-      curStart = start
-      curEnd = end
-    }
-  }
-  if (curStart >= 0) days += Math.round((curEnd - curStart) / 86400000) + 1
-  return Math.floor((days / 365.25) * 10) / 10
-}
-
-const seniorityPriorYears = computed(() =>
-  senioritySegmentRows.value.some((s) => s.startDate || s.endDate)
-    ? mergeSegmentYears()
-    : Number(seniorityForm.priorYears || 0)
-)
-
-const seniorityLocalYears = computed(() => {
-  if (!seniorityForm.seniorityStartDate || !seniorityForm.effectiveDate) return 0
-  const days = dayjs(seniorityForm.effectiveDate).diff(dayjs(seniorityForm.seniorityStartDate), 'day')
-  return days <= 0 ? 0 : Math.floor((days / 365.25) * 10) / 10
-})
-
-const seniorityTotalYears = computed(() =>
-  Math.floor((seniorityPriorYears.value + seniorityLocalYears.value) * 10) / 10
-)
-
-const seniorityPriorText = computed(() => `按各段自动加总：${seniorityPriorYears.value.toFixed(1)} 年`)
-const seniorityTotalText = computed(
-  () =>
-    `${seniorityTotalYears.value.toFixed(1)} 年（前司 ${seniorityPriorYears.value.toFixed(1)} + 本单位 ${seniorityLocalYears.value.toFixed(1)}）`
-)
-
-function earliestSegmentStart() {
-  const starts = senioritySegmentRows.value.map((s) => s.startDate).filter(Boolean) as string[]
-  return starts.length ? starts.sort()[0] : ''
-}
-
-const seniorityFirstWorkText = computed(() => {
-  const earliest = earliestSegmentStart()
-  return earliest ? `${earliest}（取最早一段，之前空档不计）` : '—'
-})
-
-function targetFromRecord(record: EmployeeItem | SeniorityItem): SeniorityTarget {
-  const employeeId = 'employeeId' in record ? record.employeeId : record.id
-  return {
-    employeeId,
-    name: record.name,
-    empNo: record.empNo,
-    orgName: record.orgName,
-    hireDate: record.hireDate,
-    seniorityStartDate: 'seniorityStartDate' in record ? record.seniorityStartDate : null,
-    firstWorkDate: 'firstWorkDate' in record ? record.firstWorkDate : null,
-    seniorityYears: 'seniorityYears' in record ? record.seniorityYears : null,
-    priorYears: 'priorYears' in record ? record.priorYears : null,
-    totalYears: 'totalYears' in record ? record.totalYears : null,
-    source: 'source' in record ? record.source : undefined
-  }
-}
-
-async function openSeniority(record: EmployeeItem | SeniorityItem) {
-  const target = targetFromRecord(record)
-  seniorityTarget.value = target
-  seniorityForm.effectiveDate = dayjs().format('YYYY-MM-DD')
-  seniorityForm.seniorityStartDate = target.seniorityStartDate || target.hireDate || ''
-  seniorityForm.firstWorkDate = target.firstWorkDate || target.hireDate || ''
-  seniorityForm.priorYears = Number(target.priorYears ?? 0)
-  seniorityForm.source = target.source || 'MANUAL'
-  seniorityForm.remark = ''
-  senioritySegmentRows.value = []
-  seniorityOpen.value = true
-  await loadSenioritySegmentRows(target.employeeId)
-}
-
-async function loadSenioritySegmentRows(employeeId: string) {
-  try {
-    const rows = await senioritySegments(employeeId)
-    senioritySegmentRows.value = (rows || []).map((r) => ({
-      key: ++senioritySegmentKey,
-      company: r.company || undefined,
-      startDate: r.startDate || undefined,
-      endDate: r.endDate || undefined,
-      proofFileId: r.proofFileId == null ? undefined : String(r.proofFileId),
-      proofFileName: r.proofFileName || undefined,
-      remark: r.remark || undefined
-    }))
-  } catch {
-    // 没有历史分段（或旧数据未分段）时按空处理
-    senioritySegmentRows.value = []
-  }
-}
-
-async function submitSeniority() {
-  const target = seniorityTarget.value
-  if (!target) return
-  if (!seniorityForm.seniorityStartDate) {
-    message.warning('请选择司龄起算日')
-    return
-  }
-  const rows = senioritySegmentRows.value
-  for (let i = 0; i < rows.length; i++) {
-    const seg = rows[i]
-    if (!seg.startDate || !seg.endDate) {
-      message.warning(`第 ${i + 1} 段工作经历请补全起止日期`)
-      return
-    }
-    if (!seg.proofFileId) {
-      message.warning(`第 ${i + 1} 段工作经历请上传证明附件`)
-      return
-    }
-  }
-  const firstWork = rows.length ? earliestSegmentStart() : seniorityForm.firstWorkDate
-  if (!firstWork) {
-    message.warning('请选择首次参加工作日期')
-    return
-  }
-  const body: SeniorityConfirmBody = {
-    effectiveDate: seniorityForm.effectiveDate || null,
-    seniorityStartDate: seniorityForm.seniorityStartDate,
-    firstWorkDate: firstWork,
-    priorYears: rows.length ? null : (seniorityForm.priorYears ?? null),
-    totalYears: null,
-    source: seniorityForm.source,
-    proofFileId: null,
-    remark: seniorityForm.remark.trim(),
-    segments: rows.map((seg) => ({
-      company: seg.company || null,
-      startDate: seg.startDate as string,
-      endDate: seg.endDate as string,
-      proofFileId: seg.proofFileId as string,
-      proofFileName: seg.proofFileName || null,
-      remark: seg.remark || ''
-    }))
-  }
-  senioritySaving.value = true
-  try {
-    await confirmSeniority(target.employeeId, body)
-    message.success(`司龄核定已提交，累计工龄 ${seniorityTotalYears.value.toFixed(1)} 年`)
-    seniorityOpen.value = false
-    await loadSenioritySegmentRows(target.employeeId)
-    await refreshAll()
-    if (seniorityLedgerOpen.value) await loadSeniorityLedger()
-  } catch (e: any) {
-    message.error(e?.message || '司龄核定失败')
-  } finally {
-    senioritySaving.value = false
-  }
-}
-
-onMounted(async () => {
-  const route = useRoute()
-  // 看板卡片跳转：/employees?status=40 或 ?orgId=xxx，进入即带筛选
-  const statusQuery = route.query.status
-  if (typeof statusQuery === 'string' && statusQuery && !Number.isNaN(Number(statusQuery))) {
-    query.status = Number(statusQuery)
-  }
-  const orgQuery = route.query.orgId
-  if (typeof orgQuery === 'string' && orgQuery) {
-    query.orgId = orgQuery
-  }
-  await refreshAll()
-  // 从消息中心「关闭账号」待办跳过来：/employees?employeeId=xxx，直接打开该员工档案
-  const employeeId = route.query.employeeId
-  if (typeof employeeId === 'string' && employeeId) {
-    profileId.value = employeeId
-    profileOpen.value = true
-  }
-})
+onMounted(refreshAll)
 </script>
 
 <style scoped>
-/* 司龄核定：前司多段工作经历编辑区 */
-.seg-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 4px 0 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.seg-list {
-  margin-bottom: 10px;
-}
-.seg-item {
-  padding: 10px 0;
-  border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
-}
-.seg-item:last-child {
-  border-bottom: none;
-}
-/* 每段经历三列栅格：单位/开始/结束 各一格，备注占两格，证明材料占一格不撑满 */
-.seg-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.seg-grid > * {
-  min-width: 0;
-}
-.seg-span2 {
-  grid-column: span 2;
-}
-.seg-proof {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.seg-file {
-  overflow: hidden;
-  max-width: 96px;
-  font-size: 12px;
-  color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ledger-tag {
-  margin-left: 6px;
-}
-
-.seg-summary {
-  margin-left: 10px;
-  font-size: 12px;
-  font-weight: normal;
-  color: var(--muted);
-}
-.seg-empty {
-  margin-bottom: 10px;
-  font-size: 12px;
-}
 /* 表单顶部提示：说明哪些是「提交入职」的前置条件 */
 .form-hint {
   margin-bottom: 10px;
@@ -3559,11 +2330,6 @@ onMounted(async () => {
   background: var(--surface-2, #fafafa);
   border-left: 2px solid #d9d9d9;
   border-radius: 2px;
-}
-/* 未完成司龄核定的「提交入职」入口：橙色提示，点击给出引导 */
-.op-warn {
-  color: #fa8c16;
-  cursor: pointer;
 }
 .probation-hint {
   display: inline-block;
@@ -3620,16 +2386,16 @@ onMounted(async () => {
 }
 
 .tree-all:hover {
-  background: var(--tree-hover-bg);
+  background: rgba(22, 119, 255, 0.06);
 }
 
 .tree-all.active {
-  background: transparent;
+  background: rgba(22, 119, 255, 0.12);
   font-weight: 600;
 }
 
 .all-icon {
-  color: var(--brand);
+  color: #1677ff;
   font-size: 14px;
 }
 
@@ -3746,24 +2512,11 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-/* 试用期到期标签：跟在工号后面，避免挤压姓名 */
-.due-tag {
-  margin-left: 6px;
-}
-
 /* 账号列：标签与用户名之间留出间距，避免「已开户」紧贴用户名挤在一起 */
 .account-cell {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: 100%;
-  min-width: 0;
-}
-.account-cell > span:last-child {
-  overflow: hidden;
-  min-width: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .st-tag {
@@ -3792,43 +2545,6 @@ onMounted(async () => {
 
 .mt12 {
   margin-top: 12px;
-}
-
-/* 批量导入弹窗 */
-.mb12 {
-  margin-bottom: 12px;
-}
-
-.import-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.import-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.import-error-wrap {
-  max-height: 280px;
-}
-
-.import-error-wrap .ant-table {
-  font-size: 13px;
-}
-
-.ok-text {
-  color: var(--color-success, #16a34a);
-  font-weight: 600;
-}
-
-.err-text {
-  color: var(--color-error, #dc2626);
-  font-weight: 600;
 }
 
 /* 弹窗顶部的「办理对象」条：不再用表单标签，姓名加重 + 次要信息跟在后面 */

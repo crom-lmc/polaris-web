@@ -22,11 +22,6 @@ export function fetchEnabledApplications() {
   return request.get<never, { data: ApplicationVO[] }>('/api/applications/enabled')
 }
 
-/** 平台启用的全部应用（登录即可见、不做账号授权过滤），待办「应用」筛选用 */
-export function fetchAllEnabledApplications() {
-  return request.get<never, { data: Array<{ code: string; name: string }> }>('/api/auth/apps')
-}
-
 export function createApplication(data: ApplicationPayload) {
   return request.post<never, { data: ApplicationVO }>('/api/applications', data)
 }

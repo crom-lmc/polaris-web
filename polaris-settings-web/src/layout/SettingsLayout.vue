@@ -207,8 +207,6 @@ function onUserMenuClick({ key }: { key: string }) {
   background: var(--header-bg);
   color: var(--header-text);
   border-bottom: 1px solid var(--header-border);
-  /* 覆盖 Ant Design a-layout-header 默认的 line-height: 64px，让 flex 居中真正生效 */
-  line-height: 1;
 }
 
 .logo {
@@ -216,7 +214,6 @@ function onUserMenuClick({ key }: { key: string }) {
   align-items: center;
   gap: 6px;
   padding-left: 24px;
-  height: 32px;
   color: var(--header-text);
   font-weight: 600;
   font-size: 14px;
@@ -300,10 +297,8 @@ function onUserMenuClick({ key }: { key: string }) {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 4px;
-  height: 32px;
-  padding: 0 10px;
+  padding: 4px 8px;
   border-radius: 6px;
   transition: background 0.2s;
 }

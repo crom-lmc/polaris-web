@@ -49,6 +49,8 @@ export interface AccountVO {
   lastLoginAt?: string
   createdAt?: string
   roles?: string[]
+  /** 数据权限根组织编码；为空表示未配置 */
+  dataScopeOrgCode?: string
 }
 
 /** 应用（SSO 保护的下游系统） */
@@ -189,10 +191,7 @@ export interface ApprovalInstance {
   bizType: string
   bizName?: string
   bizId: string
-  /** 业务方自己的业务单号 */
   bizNo?: string
-  /** 审批单自身的单号（按单号规则生成） */
-  apprNo?: string
   title: string
   applicantId?: number
   applicantName?: string
@@ -253,8 +252,8 @@ export interface ApprovalPageConfig {
   titleTpl?: string
   sections?: ApprovalPageSection[]
   actions?: string[]
-  /** renderMode=ROUTE 的自定义页面地址：信息区整段换成 iframe 嵌入 */
-  routePath?: string
+  htmlTpl?: string
+  componentKey?: string
 }
 
 /** 审批弹窗渲染上下文：版式 + 已算好的值 + 我的待办 */

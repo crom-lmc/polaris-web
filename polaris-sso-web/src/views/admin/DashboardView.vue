@@ -287,6 +287,7 @@ async function loadStats() {
       fetchUnreadNoticeCount(2)
     ])
     if (pending.status === 'fulfilled') pendingCount.value = pending.value.data?.length ?? 0
+    // fetchUnreadNoticeCount 返回 { data: number }，拦截器解包后 todo.value.data 就是 number 本体
     if (todo.status === 'fulfilled') todoCount.value = Number(todo.value.data ?? 0)
     if (msg.status === 'fulfilled') unreadMsgCount.value = Number(msg.value.data ?? 0)
   } finally {

@@ -25,9 +25,6 @@ body,
   --muted: #8a9099;
   --code-bg: #f2f3f5;
   --border-subtle: #eef0f4;
-  /* 表格表头 / 行 hover 底色：深色模式下不能用固定的浅色，否则悬停会出现白块 */
-  --table-head-bg: #fafafa;
-  --table-row-hover: #fafafa;
 }
 
 :root[data-theme='dark'] {
@@ -44,8 +41,6 @@ body,
   --muted: #9aa6b2;
   --code-bg: rgba(255, 255, 255, 0.12);
   --border-subtle: rgba(255, 255, 255, 0.12);
-  --table-head-bg: #1b1e26;
-  --table-row-hover: rgba(255, 255, 255, 0.08);
 }
 
 body {
@@ -124,29 +119,4 @@ body {
   z-index: 3;
   background: var(--header-bg) !important;
   border-left: 1px solid var(--header-border);
-}
-
-/* 深色模式：全局兜底表格行 hover 底色。
-   各页面若有写死的浅色 hover（如 #fafafa），深色下会整行变白；这里统一走主题变量。 */
-:root[data-theme='dark'] .ant-table-tbody > tr:hover > td,
-:root[data-theme='dark'] .ant-table-tbody > tr.ant-table-row-hover > td {
-  background: var(--table-row-hover) !important;
-}
-
-/* 深色模式：空态占位行 hover 不要变白 */
-:root[data-theme='dark'] .ant-table-tbody > tr.ant-table-placeholder:hover > td {
-  background: transparent !important;
-}
-
-/* 必填星号不占布局：必填与选填标签文字左边缘对齐 */
-.ant-form-item-label > label {
-  position: relative;
-  padding-left: 10px;
-}
-.ant-form-item-label > label.ant-form-item-required::before {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  margin: 0;
-  transform: translateY(-50%);
 }

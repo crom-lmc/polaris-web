@@ -16,12 +16,7 @@
 
     <a-spin :spinning="loading">
       <div v-if="detail" class="dt-body">
-        <!-- 自定义页面路由：信息区整段换成 iframe（自动带 instanceId），流程与操作区保持平台渲染 -->
-        <section v-if="routeSrc" class="card form-card">
-          <iframe :src="routeSrc" class="route-frame" title="自定义审批页面" />
-        </section>
         <!-- 基本信息：按模板配置的分组渲染；没配就退回默认版式 -->
-        <template v-else>
         <section v-for="sec in sections" :key="sec.key" class="card form-card" :class="{ emphasis: sec.emphasis }">
           <div v-if="sec.title" class="card-title">{{ sec.title }}</div>
           <a-descriptions
@@ -59,7 +54,6 @@
             </a-table>
           </template>
         </section>
-        </template>
 
         <!-- 流程进度：后端 steps 只含审批节点，最前面补一个「发起申请」，流程才从发起人开始 -->
         <section class="card">
@@ -308,20 +302,6 @@ const sections = computed<ApprovalPageSection[]>(() => {
       format: 'text'
     }))
   }]
-})
-
-/**
- * 自定义页面路由：renderMode=ROUTE 时信息区整段换成 iframe，地址自动拼 instanceId。
- * 返回空串表示不启用（未配 ROUTE 或没填地址），退回分组版式。
- */
-const routeSrc = computed(() => {
-  if (ctx.value?.renderMode !== 'ROUTE') return ''
-  const p = ctx.value?.page?.routePath || ''
-  if (!p) return ''
-  const sep = p.includes('?') ? '&' : '?'
-  // 带上当前主题：iframe 与主应用不同源（端口不同），无法共享 localStorage，只能靠 URL 传参
-  const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
-  return `${p}${sep}instanceId=${props.instanceId || ''}&theme=${theme}`
 })
 
 /** 发起人姓名：实例字段优先，老单子没有时退回表单快照里的 submitter */
@@ -665,13 +645,6 @@ watch(() => [props.open, props.instanceId], ([o, id]) => {
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 10px;
-}
-/* 自定义页面路由：iframe 占满信息区宽度，给一个可阅读的最小高度 */
-.route-frame {
-  display: block;
-  width: 100%;
-  height: 60vh;
-  border: none;
 }
 .steps {
   padding-top: 4px;

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useUserStore } from '@/stores/user'
-const store = useUserStore()
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { deleteMedia, pageMedia, uploadMedia, type MediaItem } from '@/api/cms'
@@ -107,7 +105,7 @@ const isImage = (m: MediaItem) => (m.contentType || m.originalName).toLowerCase(
         allow-clear
         @search="() => { query.page = 1; load() }"
       />
-      <a-button v-if="store.can('media:upload')" :loading="uploading" type="primary" @click="pick">上传文件</a-button>
+      <a-button :loading="uploading" type="primary" @click="pick">上传文件</a-button>
       <a-button @click="load">刷新</a-button>
     </div>
 
@@ -125,7 +123,7 @@ const isImage = (m: MediaItem) => (m.contentType || m.originalName).toLowerCase(
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" size="small" @click="copyUrl(record)">复制地址</a-button>
-            <a-button v-if="store.can('media:delete')" type="link" size="small" danger @click="askDelete(record)">删除</a-button>
+            <a-button type="link" size="small" danger @click="askDelete(record)">删除</a-button>
           </a-space>
         </template>
       </template>

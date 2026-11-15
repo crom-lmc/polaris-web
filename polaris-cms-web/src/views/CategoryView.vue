@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useUserStore } from '@/stores/user'
-const store = useUserStore()
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { createCategory, deleteCategory, listCategories, updateCategory, type TaxonomyItem } from '@/api/cms'
@@ -23,6 +21,10 @@ const columns = [
 const page = ref(1)
 const pageSize = ref(10)
 /** 接口返回全量列表，这里做前端分页；分页条由 ft-bottom 固定到滚动容器底部 */
+const pagedList = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return list.value.slice(start, start + pageSize.value)
+})
 const pagination = computed(() => ({
   current: page.value,
   pageSize: pageSize.value,
@@ -105,16 +107,16 @@ const askDelete = (r: TaxonomyItem) =>
   <div class="ft-page">
     <div class="toolbar ft-head">
       <a-button @click="load">刷新</a-button>
-      <a-button v-if="store.can('category:manage')" type="primary" @click="openCreate">新建分类</a-button>
+      <a-button type="primary" @click="openCreate">新建分类</a-button>
     </div>
 
     <section class="ft-scroll ft-bottom">
-    <a-table class="ft-table" :columns="columns" :data-source="list" :loading="loading" row-key="id" :pagination="pagination" @change="onTableChange">
+    <a-table class="ft-table" :columns="columns" :data-source="pagedList" :loading="loading" row-key="id" :pagination="pagination" @change="onTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'action'">
           <a-space>
-            <a-button v-if="store.can('category:manage')" type="link" size="small" @click="openEdit(record)">编辑</a-button>
-            <a-button v-if="store.can('category:manage')" type="link" size="small" danger @click="askDelete(record)">删除</a-button>
+            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" size="small" danger @click="askDelete(record)">删除</a-button>
           </a-space>
         </template>
       </template>

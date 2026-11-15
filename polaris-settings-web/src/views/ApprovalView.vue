@@ -1,6 +1,6 @@
 <template>
   <a-layout class="page-container at-root">
-    <a-layout-sider width="300" class="approval-nav-sider" :theme="theme.mode === 'dark' ? 'dark' : 'light'">
+    <a-layout-sider width="260" class="approval-nav-sider" :theme="theme.mode === 'dark' ? 'dark' : 'light'">
       <a-tree
         class="approval-nav-tree"
         :tree-data="treeData"
@@ -11,10 +11,7 @@
         @expand="onExpand"
       >
         <template #title="node">
-          <span class="approval-nav-node">
-            <span :class="['approval-nav-name', navTitleClass(String(node.key))]">{{ node.title }}</span>
-            <span v-if="navCount(node)" class="approval-nav-count">{{ navCount(node) }}</span>
-          </span>
+          <span :class="navTitleClass(String(node.key))">{{ node.title }}</span>
         </template>
       </a-tree>
       <a-empty v-if="!treeData.length" :image-style="{ height: '40px' }" description="暂无应用" />
@@ -314,7 +311,7 @@
       <template #footer>
         <a-space>
           <a-button @click="editorOpen = false">取消</a-button>
-          <a-button v-if="store.can('approval:manage')" type="primary" :loading="saving" @click="saveTemplate">保存模板</a-button>
+          <a-button type="primary" :loading="saving" @click="saveTemplate">保存模板</a-button>
         </a-space>
       </template>
     </a-drawer>
@@ -328,7 +325,6 @@
       destroy-on-close
     >
       <a-alert
-        v-if="pageForm.renderMode !== 'ROUTE'"
         class="page-alert"
         type="info"
         show-icon
@@ -346,32 +342,31 @@
           <a-form-item label="渲染模式">
             <a-select v-model:value="pageForm.renderMode">
               <a-select-option value="SECTIONS">分组卡片（推荐）</a-select-option>
-              <a-select-option value="ROUTE">自定义页面路由（iframe 嵌入）</a-select-option>
+              <a-select-option value="TEMPLATE">受限 HTML 模板</a-select-option>
+              <a-select-option value="COMPONENT">前端注册组件</a-select-option>
             </a-select>
           </a-form-item>
         </div>
       </a-form>
 
-      <!-- ROUTE 模式信息区整体交给自定义页面，无需配置字段，设计器与字段说明一并隐藏 -->
       <ApprovalPageDesigner
-        v-if="pageForm.renderMode !== 'ROUTE'"
         v-model="pageForm.config"
         :field-pool="pageFieldPool"
         :biz-name="pageTarget?.bizName || ''"
       />
 
       <a-form v-if="pageForm.renderMode !== 'SECTIONS'" layout="vertical" class="compact">
-        <a-form-item
-          v-if="pageForm.renderMode === 'ROUTE'"
-          label="自定义页面地址（审批抽屉信息区 iframe 嵌入，自动拼 instanceId 参数；流程与操作区保持平台渲染）"
-        >
-          <a-input v-model:value="pageForm.routePath" placeholder="应用内路由如 /approval/onboard-panel，或完整 URL" />
+        <a-form-item v-if="pageForm.renderMode === 'TEMPLATE'" label="HTML 模板（受限白名单编译，非原生 innerHTML）">
+          <a-textarea v-model:value="pageForm.htmlTpl" :rows="6" class="mono" />
+        </a-form-item>
+        <a-form-item v-if="pageForm.renderMode === 'COMPONENT'" label="前端注册的组件 key">
+          <a-input v-model:value="pageForm.componentKey" placeholder="如 ehr-onboard-panel" />
         </a-form-item>
       </a-form>
       <template #footer>
         <a-space>
           <a-button @click="pageOpen = false">取消</a-button>
-          <a-button v-if="store.can('approval:manage')" type="primary" :loading="savingPage" @click="savePageCfg">保存页面配置</a-button>
+          <a-button type="primary" :loading="savingPage" @click="savePageCfg">保存页面配置</a-button>
         </a-space>
       </template>
     </a-drawer>
@@ -568,22 +563,17 @@ const treeData = computed(() => {
   for (const t of templates.value) if (t.appCode) counts.set(t.appCode, (counts.get(t.appCode) || 0) + 1)
   const arr = [...known.entries()].map(([code, name]) => ({
     key: `app:${code}`,
-    title: name,
-    count: counts.get(code) || 0,
+    title: `${name}（${counts.get(code) || 0}）`,
     isLeaf: true
   }))
   arr.sort((a, b) => a.title.localeCompare(b.title, 'zh'))
-  // 统一包一层 root「业务类型」，与另外两页（业务场景、消息配置）风格一致
-  return arr.length ? [{ key: 'root', title: '业务类型', children: arr }] : []
+  return arr
 })
 
 /* ---------------- 左树统一样式与展开（三个审批菜单共用同一套 class） ---------------- */
 
 /** 本页只有一级应用节点，字重按「应用」这一层走，与另外两页同层一致 */
 const navTitleClass = (_key: string) => 'approval-nav-title-app'
-
-/** 树节点右侧数量（节点数据里带 count；根节点不展示） */
-const navCount = (node: any) => (typeof node?.count === 'number' ? node.count : 0)
 
 /**
  * 默认全展开：这棵树目前是扁平一级、本来就全部可见，仍与另外两页保持同一套受控写法，
@@ -1083,7 +1073,7 @@ async function saveTemplate() {
 const pageOpen = ref(false)
 const pageTarget = ref<ApprovalTemplate | null>(null)
 const savingPage = ref(false)
-const pageForm = reactive({ view: 'APPROVAL', renderMode: 'SECTIONS', config: '', routePath: '' })
+const pageForm = reactive({ view: 'APPROVAL', renderMode: 'SECTIONS', config: '', htmlTpl: '', componentKey: '' })
 
 /**
  * 页面配置器字段池条目。
@@ -1209,14 +1199,16 @@ async function openPage(record: ApprovalTemplate) {
   pageForm.view = 'APPROVAL'
   pageForm.renderMode = 'SECTIONS'
   pageForm.config = ''
-  pageForm.routePath = ''
+  pageForm.htmlTpl = ''
+  pageForm.componentKey = ''
   try {
     const p = await requestPage(record.id)
     if (p) {
       pageForm.view = p.view || 'APPROVAL'
       pageForm.renderMode = p.renderMode || 'SECTIONS'
       pageForm.config = pretty(p.config)
-      pageForm.routePath = p.routePath || ''
+      pageForm.htmlTpl = p.htmlTpl || ''
+      pageForm.componentKey = p.componentKey || ''
     }
   } catch (e) {
     message.error((e as Error).message)
@@ -1255,10 +1247,6 @@ async function savePageCfg() {
       return
     }
   }
-  if (pageForm.renderMode === 'ROUTE' && !pageForm.routePath.trim()) {
-    message.warning('自定义页面路由模式需要填写页面地址')
-    return
-  }
   if (!pageTarget.value) return
   savingPage.value = true
   try {
@@ -1266,7 +1254,8 @@ async function savePageCfg() {
       view: pageForm.view,
       renderMode: pageForm.renderMode,
       config: pageForm.config,
-      routePath: pageForm.routePath.trim()
+      htmlTpl: pageForm.htmlTpl,
+      componentKey: pageForm.componentKey
     })
     message.success('页面配置已保存')
     pageOpen.value = false

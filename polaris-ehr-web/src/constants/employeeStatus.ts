@@ -1,6 +1,6 @@
 /**
  * 员工生命周期状态：与后端 EmployeeStatus 一一对应。
- * 10 待入职 → 20 入职审批中 → 25 入职审批通过 → 30 试用期 → 40 在职 → 50 离职中 → 55 待关闭账号 → 60 已离职
+ * 10 待入职 → 20 入职审批中 → 25 入职审批通过 → 30 试用期 → 40 在职 → 50 离职中 → 60 已离职
  */
 export interface EmpStatusMeta {
   code: number
@@ -15,7 +15,6 @@ export const EMP_STATUS_LIST: EmpStatusMeta[] = [
   { code: 30, label: '试用期', color: 'gold' },
   { code: 40, label: '在职', color: 'green' },
   { code: 50, label: '离职中', color: 'orange' },
-  { code: 55, label: '待关闭账号', color: 'red' },
   { code: 60, label: '已离职', color: 'default' }
 ]
 
