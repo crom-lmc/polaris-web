@@ -1,11 +1,11 @@
 <template>
   <div class="page-root">
-    <div class="toolbar">
+    <div v-if="visibleLeaveTabs.length" class="toolbar">
       <div class="toolbar-left">
-        <a-radio-group v-model:value="scope" button-style="solid" @change="onScopeChange">
-          <a-radio-button value="mine">我的请假</a-radio-button>
-          <a-radio-button v-if="canApprove" value="all">审批列表</a-radio-button>
-          <a-radio-button v-if="canViewTeam" value="team">团队请假</a-radio-button>
+        <a-radio-group v-model:value="scope" button-style="solid">
+          <a-radio-button v-for="item in visibleLeaveTabs" :key="item.key" :value="item.key">
+            {{ item.label }}
+          </a-radio-button>
         </a-radio-group>
         <a-select
           v-model:value="statusFilter"
@@ -21,7 +21,7 @@
         </a-button>
       </div>
       <div class="toolbar-right">
-        <a-button v-if="canApply" type="primary" @click="openApply">
+        <a-button v-if="scope === 'mine' && canApply" type="primary" @click="openApply">
           <template #icon><plus-outlined /></template>
           申请请假
         </a-button>
@@ -29,18 +29,18 @@
     </div>
 
     <a-alert
-      v-if="carryoverNotice"
+      v-if="scope === 'mine' && carryoverNotice"
       type="warning"
       show-icon
       class="carryover-banner"
       :message="`你还有 ${carryoverRemaining} 天上年结转年假未休完，将于 ${annualQuota?.carryoverExpireAt || ''} 到期作废，请及时休假或签署自动放弃`"
     >
       <template #action>
-        <a-button size="small" danger @click="openWaive">自动放弃</a-button>
+        <a-button v-if="canWaiveCarryover" size="small" danger @click="openWaive">自动放弃</a-button>
       </template>
     </a-alert>
 
-    <section class="panel ft-grow">
+    <section v-if="visibleLeaveTabs.length" class="panel ft-grow">
       <div class="panel-head">
         <span>{{ scope === 'mine' ? '我的请假记录' : scope === 'team' ? '团队请假记录' : '全部请假记录' }}</span>
         <span class="muted">
@@ -99,7 +99,7 @@
                   @click="openApprovalDetail(rejectedBriefForRow(record)!.id)"
                 >审批信息</a>
                 <a-popconfirm
-                  v-if="record.status === 0 && record.mine && canApply"
+                  v-if="record.status === 0 && record.mine && canCancel"
                   title="撤销后需要重新提交，确定撤销？"
                   ok-text="撤销"
                   cancel-text="取消"
@@ -108,7 +108,7 @@
                   <a class="act danger">撤销</a>
                 </a-popconfirm>
                 <a
-                  v-if="record.status === 1 && record.mine && canApply"
+                  v-if="record.status === 1 && record.mine && canEarlyReturn"
                   class="act"
                   @click="openEarlyReturn(record)"
                 >销假</a>
@@ -118,6 +118,7 @@
         </a-table>
       </div>
     </section>
+    <a-empty v-if="!visibleLeaveTabs.length" description="暂无权限访问请假功能" />
 
     <a-modal
       v-model:open="applyOpen"
@@ -353,10 +354,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import {
   applyLeave,
   cancelLeave,
@@ -394,11 +396,37 @@ import {
 } from '@/api/approvals'
 
 const store = useUserStore()
-const canApply = computed(() => store.can('leave:apply'))
-const canApprove = computed(() => store.can('leave:approve') || store.can('approval:approve'))
-const canViewTeam = computed(() => store.can('leave:view:team'))
+const leaveTabs = [
+  { key: 'mine', label: '我的请假', permission: 'leave:mine' },
+  { key: 'all', label: '审批列表', permission: 'leave:all' },
+  { key: 'team', label: '团队请假', permission: 'leave:team' }
+] as const
+type LeaveScope = (typeof leaveTabs)[number]['key']
+const visibleLeaveTabs = computed(() => leaveTabs.filter((item) => store.can(item.permission)))
+const canApply = computed(() => store.can('leave:mine:apply'))
+const canCancel = computed(() => store.can('leave:mine:cancel'))
+const canEarlyReturn = computed(() => store.can('leave:mine:early-return'))
+const canWaiveCarryover = computed(() => store.can('leave:mine:waive-carryover'))
 
-const scope = ref<'mine' | 'all' | 'team'>('mine')
+const route = useRoute()
+const router = useRouter()
+function isVisibleLeaveScope(value: string): value is LeaveScope {
+  return visibleLeaveTabs.value.some((item) => item.key === value)
+}
+function resolveLeaveScope(requested: unknown): LeaveScope | '' {
+  const key = typeof requested === 'string' ? requested : ''
+  return isVisibleLeaveScope(key) ? key : visibleLeaveTabs.value[0]?.key || ''
+}
+const scope = ref<LeaveScope | ''>(resolveLeaveScope(route.query.tab))
+watch([visibleLeaveTabs, () => route.query.tab], ([, requested]) => {
+  const resolved = resolveLeaveScope(requested)
+  if (requested !== undefined || !isVisibleLeaveScope(scope.value)) scope.value = resolved
+  if (requested !== undefined && requested !== resolved) {
+    const query = { ...route.query }
+    delete query.tab
+    router.replace({ query })
+  }
+}, { immediate: true })
 const statusFilter = ref<number | undefined>(undefined)
 const rows = ref<LeaveItem[]>([])
 
@@ -455,6 +483,7 @@ const columns = [
 ]
 
 async function load() {
+  if (!isVisibleLeaveScope(scope.value)) return
   loading.value = true
   try {
     if (scope.value === 'team') {
@@ -483,12 +512,6 @@ async function load() {
 function reload() {
   page.value = 1
   load()
-}
-
-function onScopeChange() {
-  // 审批列表默认只看待审批，避免历史单据淹没待办；团队视图展示待审批 + 已通过
-  statusFilter.value = scope.value === 'all' ? 0 : undefined
-  reload()
 }
 
 function onTableChange(p: any) {
@@ -761,6 +784,7 @@ function onLeaveTypeChange() {
 }
 
 function openApply() {
+  if (scope.value !== 'mine' || !canApply.value) return
   applyForm.leaveType = 'ANNUAL'
   applyForm.range = undefined
   applyForm.startTime = '09:00'
@@ -800,6 +824,9 @@ function openApply() {
     })
     .catch(() => {})
     .finally(() => (leaveQuotaLoaded.value = true))
+  if (!leaveTypeOptions.value.length) {
+    fetchLeaveTypeOptions().then((opts) => (leaveTypeOptions.value = opts)).catch(() => {})
+  }
 }
 
 /** 证明附件上传：支持多选，逐个直传后端并收集附件ID */
@@ -994,22 +1021,13 @@ async function doCancel(row: LeaveItem) {
   }
 }
 
-onMounted(() => {
-  if (!canApply.value && canApprove.value) {
-    scope.value = 'all'
-    statusFilter.value = 0
-  }
-  load()
-  loadAnnualQuota()
-  fetchLeaveTypeOptions().then((opts) => (leaveTypeOptions.value = opts)).catch(() => {})
-})
-
 /** 我的年假额度：12 月结转到期提示条 + 自动放弃入口 */
 const annualQuota = ref<LeaveQuotaItem | null>(null)
 const carryoverNotice = computed(() => !!annualQuota.value?.carryoverNotice)
 const carryoverRemaining = computed(() => annualQuota.value?.carryoverRemaining ?? 0)
 
 function loadAnnualQuota() {
+  if (scope.value !== 'mine' || !store.can('leave:mine')) return
   myLeaveQuotas()
     .then((list) => {
       annualQuota.value = (list || []).find((q) => q.leaveType === 'ANNUAL') || null
@@ -1034,6 +1052,18 @@ function openWaive() {
         .catch((e: any) => message.error(e?.message || '操作失败'))
   })
 }
+
+watch(scope, (value) => {
+  if (!isVisibleLeaveScope(value)) {
+    scope.value = resolveLeaveScope('')
+    return
+  }
+  // 审批列表默认只看待审批，避免历史单据淹没待办；团队视图展示待审批 + 已通过
+  statusFilter.value = value === 'all' ? 0 : undefined
+  page.value = 1
+  load()
+  if (value === 'mine') loadAnnualQuota()
+}, { immediate: true })
 </script>
 
 <style scoped>

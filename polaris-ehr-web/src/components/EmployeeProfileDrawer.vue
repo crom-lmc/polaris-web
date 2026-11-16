@@ -173,6 +173,25 @@
           </a-table>
         </a-tab-pane>
 
+        <!-- 非激活页签也预加载，确保首次打开抽屉时角标就是真实数量 -->
+        <!-- 合同 -->
+        <a-tab-pane v-if="canContractView" key="contracts" :tab="`合同（${contractTabCount}）`" force-render>
+          <EmployeeContractPanel
+            :employee-id="employeeId"
+            :can-manage="canContractManage && !!canEdit"
+            @count="contractTabCount = $event"
+          />
+        </a-tab-pane>
+
+        <!-- 档案附件 -->
+        <a-tab-pane v-if="canAttachmentView" key="attachments" :tab="`档案附件（${attachmentTabCount}）`" force-render>
+          <EmployeeAttachmentPanel
+            :employee-id="employeeId"
+            :can-manage="canContractManage && !!canEdit"
+            @count="attachmentTabCount = $event"
+          />
+        </a-tab-pane>
+
         <!-- 家庭成员 -->
         <a-tab-pane key="families" :tab="`家庭成员（${profile?.families?.length || 0}）`">
           <div class="sub-toolbar">
@@ -400,6 +419,9 @@ import {
   type WorkItem
 } from '@/api/ehr'
 import { statusColor, statusLabel } from '@/constants/employeeStatus'
+import EmployeeContractPanel from './EmployeeContractPanel.vue'
+import EmployeeAttachmentPanel from './EmployeeAttachmentPanel.vue'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps<{
   open: boolean
@@ -407,11 +429,18 @@ const props = defineProps<{
   canEdit?: boolean
 }>()
 
+const store = useUserStore()
+const canContractView = computed(() => store.can('contract:view'))
+const canContractManage = computed(() => store.can('contract:manage'))
+const canAttachmentView = computed(() => store.can('contract:view') || store.can('employee:view'))
+
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const loading = ref(false)
 const profile = ref<EmployeeProfile | null>(null)
 const activeTab = ref('banks')
+const contractTabCount = ref(0)
+const attachmentTabCount = ref(0)
 
 async function load() {
   if (!props.employeeId) return
@@ -430,6 +459,8 @@ watch(
   ([o]) => {
     if (o) {
       activeTab.value = 'banks'
+      contractTabCount.value = 0
+      attachmentTabCount.value = 0
       load()
     }
   }

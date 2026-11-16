@@ -1,17 +1,18 @@
 <template>
   <div class="page-root">
-    <div class="toolbar">
+    <div v-if="!visibleModes.length" class="tab-empty">
+      <a-empty description="暂无可访问的招聘页签" />
+    </div>
+    <div v-if="visibleModes.length" class="toolbar">
       <div class="toolbar-left">
         <a-radio-group v-model:value="mode" button-style="solid" @change="onModeChange">
-          <template v-if="canView">
-            <a-radio-button value="board">候选人看板</a-radio-button>
-            <a-radio-button value="offers">Offer 列表</a-radio-button>
-            <a-radio-button value="jobs">职位管理</a-radio-button>
-          </template>
-          <a-radio-button value="interviews">我的面试</a-radio-button>
+          <a-radio-button v-if="store.can('recruit:board')" value="board">候选人看板</a-radio-button>
+          <a-radio-button v-if="store.can('recruit:offers')" value="offers">Offer 列表</a-radio-button>
+          <a-radio-button v-if="store.can('recruit:jobs')" value="jobs">职位管理</a-radio-button>
+          <a-radio-button v-if="store.can('recruit:interviews')" value="interviews">我的面试</a-radio-button>
         </a-radio-group>
         <a-input-search
-          v-if="canView"
+          v-if="mode !== 'interviews'"
           v-model:value="keyword"
           placeholder="姓名 / 手机号 / 职位"
           allow-clear
@@ -40,21 +41,22 @@
             @change="loadJobs"
           />
         </template>
-        <template v-if="canManage">
-          <a-button v-if="mode === 'jobs'" type="primary" @click="openJobModal()">
-            <plus-outlined />新建职位
+        <a-button v-if="mode === 'jobs' && store.can('recruit:jobs:create')" type="primary" @click="openJobModal()">
+          <plus-outlined />新建职位
+        </a-button>
+        <a-button v-if="mode === 'offers' && store.can('recruit:offers:create')" @click="openOfferModal()">
+          发起 Offer
+        </a-button>
+        <template v-if="mode === 'board'">
+          <a-button v-if="store.can('recruit:board:offer:create')" @click="openOfferModal()">发起 Offer</a-button>
+          <a-button v-if="store.can('recruit:board:candidate:create')" type="primary" @click="openCandidateModal()">
+            <plus-outlined />新建候选人
           </a-button>
-          <template v-else>
-            <a-button @click="openOfferModal()">发起 Offer</a-button>
-            <a-button type="primary" @click="openCandidateModal()">
-              <plus-outlined />新建候选人
-            </a-button>
-          </template>
         </template>
       </div>
     </div>
 
-    <div class="panel ft-grow">
+    <div v-if="visibleModes.length" class="panel ft-grow">
       <div class="panel-head">
         <span>{{ modeTitle }}</span>
         <span class="muted">
@@ -85,7 +87,7 @@
                     {{ c.education || '学历未填' }}<span v-if="c.workYears"> · {{ c.workYears }} 年</span>
                   </div>
                   <div v-if="c.jobTitle" class="muted kb-line" :title="c.jobTitle">投递职位：{{ c.jobTitle }}</div>
-                  <div v-if="c.resumeFileId" class="muted kb-line">
+                  <div v-if="c.resumeFileId && store.can('recruit:board:resume:download')" class="muted kb-line">
                     <a @click="downloadResume(c)">简历：{{ c.resumeFileName || '下载' }}</a>
                   </div>
                   <div v-if="c.remark" class="muted kb-remark" :title="c.remark">{{ c.remark }}</div>
@@ -121,24 +123,25 @@
                     <a-tag color="green">{{ c.employeeStatusLabel || '已建档' }}</a-tag>
                     <span v-if="!c.accountOpened" class="muted">未开户</span>
                   </div>
-                  <div v-if="canManage" class="kb-actions">
+                  <div class="kb-actions">
                     <a v-if="c.hasActiveOffer" class="act" @click="openCandidateModal(c, true)">查看</a>
-                    <a v-else class="act" @click="openCandidateModal(c)">编辑</a>
+                    <a v-else-if="store.can('recruit:board:candidate:edit')" class="act" @click="openCandidateModal(c)">编辑</a>
+                    <span v-else></span>
                     <div class="kb-actions-main">
                       <a class="act" @click="openDetail(c)">详情</a>
                       <a
-                        v-if="c.stage !== 'REJECTED' && !c.hasActiveOffer && !c.interviewPendingCount"
+                        v-if="store.can('recruit:board:interview:schedule') && c.stage !== 'REJECTED' && !c.hasActiveOffer && !c.interviewPendingCount"
                         class="act primary"
                         @click="openInterviewModal(c)"
                       >{{ c.interviewRoundNo ? '约下一轮' : '约面试' }}</a>
                       <a v-if="c.interviewPendingCount" class="act primary" @click="openDetail(c)">查看面试</a>
                       <a
-                        v-if="c.stage !== 'REJECTED' && !c.hasActiveOffer && c.interviewRoundNo && !c.interviewPendingCount"
+                        v-if="store.can('recruit:board:offer:create') && c.stage !== 'REJECTED' && !c.hasActiveOffer && c.interviewRoundNo && !c.interviewPendingCount"
                         class="act primary"
                         @click="openOfferModal(c)"
                       >发起 Offer</a>
                       <a-popconfirm
-                        v-if="c.stage === 'REJECTED'"
+                        v-if="c.stage === 'REJECTED' && store.can('recruit:board:candidate:restore')"
                         title="恢复该候选人到面试中？"
                         ok-text="恢复"
                         cancel-text="取消"
@@ -147,12 +150,12 @@
                         <a class="act">恢复</a>
                       </a-popconfirm>
                       <span
-                        v-else-if="isOfferApproving(c)"
+                        v-else-if="isOfferApproving(c) && store.can('recruit:board:candidate:eliminate')"
                         class="act act-disabled"
                         title="Offer 审批中，暂不可淘汰"
                       >淘汰</span>
                       <a-popconfirm
-                        v-else-if="!c.hasActiveOffer"
+                        v-else-if="c.stage !== 'REJECTED' && !c.hasActiveOffer && store.can('recruit:board:candidate:eliminate')"
                         title="淘汰后不可再发起 Offer，确定淘汰？"
                         ok-text="淘汰"
                         cancel-text="取消"
@@ -160,12 +163,6 @@
                       >
                         <a class="act danger">淘汰</a>
                       </a-popconfirm>
-                    </div>
-                  </div>
-                  <div v-else class="kb-actions">
-                    <span></span>
-                    <div class="kb-actions-main">
-                      <a class="act" @click="openDetail(c)">详情</a>
                     </div>
                   </div>
                 </div>
@@ -219,7 +216,7 @@
                   审批详情
                 </a>
                 <a-popconfirm
-                  v-if="record.status === 'APPROVING' && canManage"
+                  v-if="record.status === 'APPROVING' && store.can('recruit:offers:cancel')"
                   title="撤销后审批流程立即终止，确定撤销？"
                   ok-text="撤销"
                   cancel-text="取消"
@@ -228,12 +225,12 @@
                   <a class="act danger">撤销</a>
                 </a-popconfirm>
                 <a
-                  v-if="record.status === 'APPROVED' && canManage"
+                  v-if="record.status === 'APPROVED' && store.can('recruit:offers:confirm')"
                   class="act"
                   @click="doConfirmOffer(record)"
                 >确认 Offer</a>
                 <a-popconfirm
-                  v-if="(record.status === 'APPROVED' || record.status === 'CONFIRMED') && !record.employeeId && canManage"
+                  v-if="(record.status === 'APPROVED' || record.status === 'CONFIRMED') && !record.employeeId && store.can('recruit:offers:decline')"
                   title="确认候选人已放弃该 Offer？"
                   ok-text="确认放弃"
                   cancel-text="取消"
@@ -242,11 +239,11 @@
                   <a class="act danger">候选人放弃</a>
                 </a-popconfirm>
                 <a
-                  v-if="record.status === 'CONFIRMED' && !record.employeeId && canManage"
+                  v-if="record.status === 'CONFIRMED' && !record.employeeId && store.can('recruit:offers:onboard')"
                   class="act"
                   @click="doOnboard(record)"
                 >办理入职</a>
-                <span v-if="record.status === 'REJECTED' && canManage" class="muted" style="padding: 0 8px">已结束</span>
+                <span v-if="record.status === 'REJECTED'" class="muted" style="padding: 0 8px">已结束</span>
               </div>
             </template>
           </template>
@@ -292,7 +289,7 @@
               <a-tag v-else color="orange">待反馈</a-tag>
             </template>
             <template v-else-if="column.key === 'action'">
-              <a v-if="record.status !== 'DONE'" class="act" @click="openFeedback(record)">填写反馈</a>
+              <a v-if="record.status !== 'DONE' && store.can('recruit:interviews:feedback')" class="act" @click="openFeedback(record)">填写反馈</a>
             </template>
           </template>
         </a-table>
@@ -332,10 +329,10 @@
             </template>
             <template v-else-if="column.key === 'action'">
               <div class="row-actions">
-                <a v-if="canManage" class="act" @click="openJobModal(record)">编辑</a>
-                <a v-if="canManage && record.status !== 'PUBLISHED'" class="act" @click="doPublishJob(record)">发布</a>
+                <a v-if="store.can('recruit:jobs:update')" class="act" @click="openJobModal(record)">编辑</a>
+                <a v-if="store.can('recruit:jobs:publish') && record.status !== 'PUBLISHED'" class="act" @click="doPublishJob(record)">发布</a>
                 <a-popconfirm
-                  v-if="canManage && record.status === 'PUBLISHED'"
+                  v-if="store.can('recruit:jobs:close') && record.status === 'PUBLISHED'"
                   title="关闭后门户不再展示该职位，确定关闭？"
                   ok-text="关闭"
                   cancel-text="取消"
@@ -344,7 +341,7 @@
                   <a class="act">关闭</a>
                 </a-popconfirm>
                 <a-popconfirm
-                  v-if="canManage && !record.applyCount"
+                  v-if="store.can('recruit:jobs:delete') && !record.applyCount"
                   title="删除后不可恢复，确定删除？"
                   ok-text="删除"
                   cancel-text="取消"
@@ -534,7 +531,12 @@
       <template #footer>
         <div class="drawer-footer">
           <a-button @click="candidateModalOpen = false">{{ candidateReadOnly ? '关闭' : '取消' }}</a-button>
-          <a-button v-if="!candidateReadOnly" type="primary" :loading="candidateSaving" @click="saveCandidate">保存</a-button>
+          <a-button
+            v-if="!candidateReadOnly && (candidateForm.id ? store.can('recruit:board:candidate:edit') : store.can('recruit:board:candidate:create'))"
+            type="primary"
+            :loading="candidateSaving"
+            @click="saveCandidate"
+          >保存</a-button>
         </div>
       </template>
     </a-drawer>
@@ -710,14 +712,14 @@
         <div class="form-section-title">
           面试记录
           <a
-            v-if="canManage && detailCandidate.stage !== 'REJECTED' && !detailCandidate.interviewPendingCount"
+            v-if="store.can('recruit:board:interview:schedule') && detailCandidate.stage !== 'REJECTED' && !detailCandidate.interviewPendingCount"
             class="act"
             :class="{ 'act-disabled': detailLocked }"
             :title="detailLocked ? 'Offer 审批中/已通过，暂不可约面试' : undefined"
             style="margin-left: 12px"
             @click="openInterviewModal(detailCandidate)"
           >+ 约面试</a>
-          <span v-else-if="canManage && detailCandidate.interviewPendingCount" class="muted" style="margin-left: 12px">
+          <span v-else-if="store.can('recruit:board:interview:schedule') && detailCandidate.interviewPendingCount" class="muted" style="margin-left: 12px">
             当前面试进行中，出结果后才能约下一轮
           </span>
         </div>
@@ -738,7 +740,7 @@
                 <a-tag v-else-if="iv.status === 'SCHEDULED'" color="processing">待面试</a-tag>
                 <a-tag v-else color="green">已反馈</a-tag>
                 <a-popconfirm
-                  v-if="canManage && iv.status === 'SCHEDULED' && !r.result && !detailLocked"
+                  v-if="store.can('recruit:board:interview:cancel') && iv.status === 'SCHEDULED' && !r.result && !detailLocked"
                   title="取消这场面试？面试官待办将同步关闭。"
                   ok-text="取消面试"
                   cancel-text="返回"
@@ -751,26 +753,26 @@
                 <span v-if="iv.score" class="muted">评分 {{ iv.score }} · </span>{{ iv.feedback }}
               </div>
             </div>
-            <div v-if="canManage && r.result === 'PASS' && r.roundNo === interviewRounds[interviewRounds.length - 1].roundNo" class="round-actions">
+            <div v-if="store.can('recruit:board:interview:schedule') && r.result === 'PASS' && r.roundNo === interviewRounds[interviewRounds.length - 1].roundNo" class="round-actions">
               <a-button size="small" type="primary" :disabled="detailLocked" @click="openInterviewModal(detailCandidate)">
                 约下一轮
               </a-button>
               <span class="muted">{{ detailLocked ? 'Offer 审批中/已通过，暂不可约下一轮' : '或直接在该候选人卡片上发起 Offer' }}</span>
             </div>
-            <div v-else-if="canManage && !r.result" class="round-actions">
+            <div v-else-if="store.can('recruit:board:interview:schedule') && !r.result" class="round-actions">
               <span class="muted">等待面试官填写反馈，不通过将自动淘汰</span>
             </div>
           </div>
         </a-spin>
 
         <div class="form-section-title">沟通记录</div>
-        <div v-if="canManage && detailCandidate.stage === 'REJECTED'" class="muted" style="margin-bottom: 8px">
+        <div v-if="store.can('recruit:board:communication:add') && detailCandidate.stage === 'REJECTED'" class="muted" style="margin-bottom: 8px">
           候选人已淘汰，不可编辑沟通记录
         </div>
-        <div v-else-if="canManage && detailLocked" class="muted" style="margin-bottom: 8px">
+        <div v-else-if="store.can('recruit:board:communication:add') && detailLocked" class="muted" style="margin-bottom: 8px">
           Offer 审批中/已通过，暂不可新增沟通记录
         </div>
-        <div v-if="canManage" class="comm-form">
+        <div v-if="store.can('recruit:board:communication:add')" class="comm-form">
           <a-input v-model:value="commForm.content" :disabled="commLocked" placeholder="沟通内容（期望薪资、到岗时间等）" />
           <div class="comm-form-actions">
             <a-select v-model:value="commForm.type" :options="commTypeOptions" :disabled="commLocked" style="width: 140px" />
@@ -923,8 +925,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import {
@@ -941,7 +943,7 @@ import {
   declineRecruitOffer,
   deleteJobPost,
   dictOptions,
-  downloadEhrAttachment,
+  downloadRecruitResume,
   eliminateRecruitCandidate,
   listCandidateComms,
   listJobPosts,
@@ -979,11 +981,36 @@ import {
 
 const store = useUserStore()
 const route = useRoute()
-const canManage = computed(() => store.can('recruit:manage'))
-const canView = computed(() => store.can('recruit:view'))
+const router = useRouter()
 
 type Mode = 'board' | 'offers' | 'jobs' | 'interviews'
-const mode = ref<Mode>(canView.value ? 'board' : 'interviews')
+const modeOrder: Mode[] = ['board', 'offers', 'jobs', 'interviews']
+const visibleModes = computed(() => modeOrder.filter((item) => store.can(`recruit:${item}`)))
+function requestedMode(requested: unknown): Mode | null {
+  const key = requested === 'mine' ? 'interviews' : requested
+  return typeof key === 'string' && modeOrder.includes(key as Mode) ? key as Mode : null
+}
+function resolveMode(requested: unknown): Mode {
+  const requestedKey = requestedMode(requested)
+  return requestedKey && visibleModes.value.includes(requestedKey)
+    ? requestedKey
+    : visibleModes.value[0] || 'board'
+}
+const mode = ref<Mode>(resolveMode(route.query.tab))
+let mounted = false
+watch([visibleModes, () => route.query.tab], ([, requested]) => {
+  const requestedKey = requestedMode(requested)
+  const valid = !!requestedKey && visibleModes.value.includes(requestedKey)
+  const resolved = resolveMode(requested)
+  const changed = resolved !== mode.value
+  mode.value = resolved
+  if (requested !== undefined && !valid) {
+    const query = { ...route.query }
+    delete query.tab
+    router.replace({ query })
+  }
+  if (mounted && changed) onModeChange()
+}, { immediate: true })
 const modeTitle = computed(() =>
   mode.value === 'board'
     ? '候选人看板'
@@ -1089,7 +1116,7 @@ async function loadOrgs() {
 }
 
 /* ---------- 列表 ---------- */
-async function loadCandidates() {
+async function loadCandidates(withBriefs = true) {
   candidateLoading.value = true
   try {
     const data = await listRecruitCandidates({
@@ -1099,7 +1126,7 @@ async function loadCandidates() {
     })
     candidateRows.value = data.list || []
     candidateTotal.value = data.total || 0
-    await loadBoardBriefs()
+    if (withBriefs) await loadBoardBriefs()
   } finally {
     candidateLoading.value = false
   }
@@ -1140,11 +1167,25 @@ async function loadOffers() {
   }
 }
 
+function loadActiveMode(): Promise<void> {
+  if (mode.value === 'offers') return loadOffers()
+  if (mode.value === 'jobs') return loadJobs()
+  if (mode.value === 'interviews') return loadMyInterviews()
+  return loadCandidates()
+}
+
+async function loadModeReferences() {
+  if (mode.value === 'interviews') return
+  const tasks: Promise<void>[] = [loadOrgs()]
+  if (mode.value === 'board' || mode.value === 'jobs') tasks.push(loadJobReferenceOptions())
+  if (mode.value === 'board') tasks.push(loadRecruitDicts())
+  await Promise.all(tasks)
+}
+
 function onModeChange() {
-  if (mode.value === 'offers') loadOffers()
-  else if (mode.value === 'jobs') loadJobs()
-  else if (mode.value === 'interviews') loadMyInterviews()
-  else loadCandidates()
+  if (!visibleModes.value.length) return
+  loadModeReferences()
+  loadActiveMode()
 }
 
 function onSearch() {
@@ -1719,7 +1760,7 @@ async function saveFeedback() {
 async function downloadResume(c: RecruitCandidate) {
   if (!c.resumeFileId) return
   try {
-    const res: any = await downloadEhrAttachment(c.resumeFileId)
+    const res: any = await downloadRecruitResume(c.id)
     const blob = new Blob([res.data])
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -1737,7 +1778,6 @@ async function eliminateCandidate(c: RecruitCandidate) {
     await eliminateRecruitCandidate(c.id)
     message.success('已淘汰')
     loadCandidates()
-    if (mode.value === 'offers') loadOffers()
   } catch (e: any) {
     message.error(e?.message || '淘汰失败')
   }
@@ -1784,7 +1824,15 @@ const offerCandidateOptions = computed(() =>
     }))
 )
 
-function openOfferModal(c?: RecruitCandidate) {
+async function openOfferModal(c?: RecruitCandidate) {
+  if (!c && mode.value === 'offers') {
+    try {
+      await loadCandidates(false)
+    } catch (e: any) {
+      message.error(e?.message || '加载候选人失败')
+      return
+    }
+  }
   offerForm.candidateId = c?.id
   offerForm.lockedCandidate = !!c
   offerForm.position = c?.position || ''
@@ -1823,8 +1871,7 @@ async function saveOffer() {
     })
     message.success('已提交录用审批')
     offerModalOpen.value = false
-    loadCandidates()
-    await loadOffers()
+    await loadActiveMode()
   } catch (e: any) {
     message.error(e?.message || '提交失败')
   } finally {
@@ -1837,7 +1884,6 @@ async function doCancelOffer(o: RecruitOffer) {
     await cancelRecruitOffer(o.id)
     message.success('已撤销')
     loadOffers()
-    loadCandidates()
   } catch (e: any) {
     message.error(e?.message || '撤销失败')
   }
@@ -1848,7 +1894,6 @@ async function doConfirmOffer(o: RecruitOffer) {
     await confirmRecruitOffer(o.id)
     message.success('Offer 已确认，可办理入职')
     loadOffers()
-    loadCandidates()
   } catch (e: any) {
     message.error(e?.message || '确认失败')
   }
@@ -1859,7 +1904,6 @@ async function doDeclineOffer(o: RecruitOffer) {
     await declineRecruitOffer(o.id, 'HR 线下确认候选人放弃')
     message.success('已标记候选人放弃')
     loadOffers()
-    loadCandidates()
   } catch (e: any) {
     message.error(e?.message || '操作失败')
   }
@@ -1870,7 +1914,6 @@ async function doOnboard(o: RecruitOffer) {
     await onboardRecruitOffer(o.id)
     message.success('已生成待入职档案，请到人员管理继续办理入职')
     loadOffers()
-    loadCandidates()
   } catch (e: any) {
     message.error(e?.message || '办理入职失败')
   }
@@ -2069,10 +2112,9 @@ function openApprovalDetail(id: string) {
   approvalDrawerOpen.value = true
 }
 
-/** 审批抽屉里通过/驳回/撤回后：撤回会改变 Offer 状态，看板与 Offer 列表都要重拉 */
+/** 审批抽屉操作后只刷新当前页签，其他页签在激活时重新加载 */
 function onApprovalChanged() {
-  loadCandidates()
-  if (mode.value === 'offers') loadOffers()
+  loadActiveMode()
 }
 
 /** 职位表单参考数据：职位/学历主数据 + 经验/标签/城市字典（配置中心不可用时保持空选项，不阻塞页面） */
@@ -2102,19 +2144,16 @@ async function loadJobReferenceOptions() {
 }
 
 onMounted(async () => {
-  loadJobReferenceOptions().catch(() => {})
-  loadRecruitDicts().catch(() => {})
-  await loadOrgs()
+  mounted = true
+  if (!visibleModes.value.length) return
+  await loadModeReferences()
+  await loadActiveMode().catch(() => {})
   // 待办链接带 tab=mine / interviewId：直接进入「我的面试」并打开反馈弹窗
-  if (!canView.value || route.query.tab === 'mine') {
-    mode.value = 'interviews'
-    await loadMyInterviews()
+  if (mode.value === 'interviews' && store.can('recruit:interviews:feedback')) {
     const id = String(route.query.interviewId || '')
     const todo = id ? interviewTodos.value.find((t) => t.id === id) : undefined
     if (todo) openFeedback(todo)
-    return
   }
-  await Promise.all([loadCandidates().catch(() => {}), loadOffers().catch(() => {})])
 })
 </script>
 

@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { ApplicationVO, AuthUser, SessionInfo, TokenResponse } from '@/types'
-import { fetchSession, me, sessionToken } from '@/api/auth'
+import { me, sessionToken } from '@/api/auth'
+import { fetchMyApps } from '@/api/accounts'
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/utils/token'
 
 /**
@@ -92,10 +93,9 @@ export const useUserStore = defineStore('user', () => {
   /** 拉取「我的应用」详情；失败不影响主流程（只是少个磁贴） */
   async function loadAppList() {
     try {
-      // 这里靠中心会话 cookie 取应用详情。只有 access token、没有会话时必 401，
-      // 必须标记为 silent，否则会被拦截器判成「登录失效」直接踢回登录页。
-      const res = await fetchSession(true)
-      appList.value = res.data.appList || []
+      // 当前 access token 有效时即可查询，不依赖可能已失效的中心会话 cookie。
+      const res = await fetchMyApps()
+      appList.value = res.data || []
     } catch {
       appList.value = []
     }

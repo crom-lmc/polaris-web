@@ -8,118 +8,28 @@
       <div class="hero-actions">
         <a-button v-if="store.can('org:view')" @click="$router.push('/orgs')">组织架构</a-button>
         <a-button v-if="store.can('employee:view')" @click="$router.push('/employees')">人员名录</a-button>
-        <a-button v-if="store.can('leave:apply')" type="primary" @click="$router.push('/leaves')">请假</a-button>
+        <a-button v-if="store.can('leave:mine:apply')" type="primary" @click="$router.push('/leaves')">请假</a-button>
       </div>
     </section>
 
     <a-spin :spinning="dashLoading">
       <div class="stat-grid">
         <div v-for="c in cards" :key="c.key" class="stat-card clickable" @click="openCard(c)">
+          <div class="stat-icon" :class="`stat-icon--${c.tone}`">
+            <component :is="c.icon" />
+          </div>
           <div class="stat-label">{{ c.label }}</div>
           <div class="stat-value">{{ c.value }}</div>
           <div class="muted">{{ c.hint }}</div>
         </div>
       </div>
 
-      <div class="chart-grid">
-        <section class="panel">
-          <div class="panel-head">
-            <span>部门人力分布</span>
-            <span class="muted">试用 + 在职，按直属组织</span>
-          </div>
-          <div class="panel-body">
-            <a-empty v-if="!deptSlices.length" description="当前范围还没有在职人员" />
-            <div v-else class="pie-wrap">
-              <div class="pie" :style="{ background: donutBackground }">
-                <div class="pie-hole">
-                  <div class="pie-num">{{ deptTotal }}</div>
-                  <div class="pie-cap">在岗</div>
-                </div>
-              </div>
-              <div class="legend">
-                <div v-for="s in deptSlices" :key="s.name" class="legend-item">
-                  <i class="dot" :style="{ background: s.color }"></i>
-                  <span class="legend-name" :title="s.name">{{ s.name }}</span>
-                  <span class="legend-val">{{ s.count }} 人 · {{ s.pct.toFixed(0) }}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <span>编制 vs 实有</span>
-            <span class="muted">
-              整体利用率 {{ fmtPct(dash?.headcountTotal?.utilization) }}
-            </span>
-          </div>
-          <div class="panel-body">
-            <a-empty v-if="!headcountRows.length" description="还没有配置编制数据" />
-            <div v-else class="hc-list">
-              <div class="hc-legend">
-                <i class="dot plan"></i><span>编制</span>
-                <i class="dot actual"></i><span>实有</span>
-              </div>
-              <div v-for="r in headcountRows" :key="r.orgId" class="hc-row">
-                <div class="hc-name" :title="r.orgName">{{ r.orgName }}</div>
-                <div class="hc-bars">
-                  <div class="hc-bar">
-                    <i class="fill plan" :style="{ width: barWidth(r.headcount) }"></i>
-                    <span class="hc-num">{{ r.headcount }}</span>
-                  </div>
-                  <div class="hc-bar">
-                    <i class="fill actual" :style="{ width: barWidth(r.actual) }"></i>
-                    <span class="hc-num">{{ r.actual }}</span>
-                  </div>
-                </div>
-                <div class="hc-rate" :class="{ over: r.utilization !== null && r.utilization > 100 }">
-                  {{ fmtPct(r.utilization) }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <section class="panel">
-        <div class="panel-head">
-          <span>请假趋势</span>
-          <span class="muted">近 6 个月已通过的请假天数，按类型堆叠</span>
-        </div>
-        <div class="panel-body">
-          <a-empty v-if="!trendView.rows.length" description="统计周期内暂无已通过的请假" />
-          <template v-else>
-            <div class="trend">
-              <div v-for="r in trendView.rows" :key="r.month" class="trend-col">
-                <div class="trend-stack" :style="{ height: trendHeight(r.total) }">
-                  <div
-                    v-for="seg in r.segments"
-                    :key="seg.name"
-                    class="trend-seg"
-                    :style="{ height: seg.pct + '%', background: seg.color }"
-                    :title="`${seg.name} ${seg.days} 天`"
-                  ></div>
-                </div>
-                <div class="trend-label">{{ r.month.slice(5) }} 月</div>
-                <div class="trend-total">{{ r.total || '' }}</div>
-              </div>
-            </div>
-            <div class="legend trend-legend">
-              <div v-for="l in trendView.legend" :key="l.name" class="legend-item">
-                <i class="dot" :style="{ background: l.color }"></i>
-                <span class="legend-name">{{ l.name }}</span>
-              </div>
-            </div>
-          </template>
-        </div>
-      </section>
     </a-spin>
 
     <section class="panel">
       <div class="panel-head">
         <span>最近请假</span>
-        <a v-if="store.can('leave:view')" @click="$router.push('/leaves')">查看全部</a>
+        <a v-if="canViewLeave" @click="$router.push('/leaves')">查看全部</a>
       </div>
       <div class="panel-body">
         <a-empty v-if="!recent.length" description="暂无请假记录" />
@@ -173,8 +83,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, type Component } from 'vue'
 import { useRouter } from 'vue-router'
+import {
+  ApartmentOutlined,
+  AuditOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
+  LoginOutlined,
+  LogoutOutlined,
+  TeamOutlined,
+  UserAddOutlined,
+  UserDeleteOutlined
+} from '@ant-design/icons-vue'
 import {
   dashboardSummary,
   myReminderUnreadCount,
@@ -191,7 +113,8 @@ import { useUserStore } from '@/stores/user'
 
 const store = useUserStore()
 const router = useRouter()
-const canApprove = computed(() => store.can('leave:approve'))
+const canViewLeave = computed(() => store.canAny('leave:mine', 'leave:all', 'leave:team'))
+const canApprove = computed(() => store.can('leave:all'))
 
 const stats = reactive({ orgNodes: 0, pending: 0 })
 const recent = ref<LeaveItem[]>([])
@@ -208,6 +131,8 @@ interface DashCard {
   label: string
   value: number | string
   hint: string
+  icon: Component
+  tone: 'blue' | 'gold' | 'green' | 'red' | 'cyan' | 'orange' | 'purple'
   /** 人员状态筛选：点击后带 status 跳人员名录 */
   status?: number
   /** 直接跳转的路径（组织架构 / 审批） */
@@ -216,28 +141,45 @@ interface DashCard {
 
 const cards = computed<DashCard[]>(() => {
   const o = dash.value?.overview
-  return [
-    { key: 'active', label: '在职', value: o?.active ?? 0, hint: '正式员工', status: 40 },
-    { key: 'probation', label: '试用期', value: o?.probation ?? 0, hint: '待转正', status: 30 },
-    { key: 'onboarding', label: '待入职', value: o?.onboarding ?? 0, hint: '含入职审批中', status: 10 },
-    { key: 'terminating', label: '离职中', value: o?.terminating ?? 0, hint: '交接处理中', status: 50 },
-    { key: 'onboardMonth', label: '本月入职', value: o?.onboardThisMonth ?? 0, hint: '按入职日期统计', status: 30 },
-    { key: 'resignMonth', label: '本月离职', value: o?.resignThisMonth ?? 0, hint: '按离职日期统计', status: 60 },
-    { key: 'regularMonth', label: '本月转正', value: o?.regularizedThisMonth ?? 0, hint: '按转正日期统计', status: 40 },
-    { key: 'orgNodes', label: '组织节点', value: stats.orgNodes, hint: '集团/子公司/部门/项目', path: '/orgs' },
+  const list: DashCard[] = [
+    { key: 'active', label: '在职', value: o?.active ?? 0, hint: '正式员工', status: 40, icon: TeamOutlined, tone: 'blue' },
+    { key: 'probation', label: '试用期', value: o?.probation ?? 0, hint: '待转正', status: 30, icon: ClockCircleOutlined, tone: 'gold' },
+    { key: 'onboarding', label: '待入职', value: o?.onboarding ?? 0, hint: '含入职审批中', status: 10, icon: UserAddOutlined, tone: 'green' },
+    { key: 'terminating', label: '离职中', value: o?.terminating ?? 0, hint: '交接处理中', status: 50, icon: UserDeleteOutlined, tone: 'red' }
+  ]
+  if (store.can('contract:view')) {
+    list.push({
+      key: 'contractExpiring',
+      label: '合同到期',
+      value: o?.contractExpiring30Days ?? 0,
+      hint: '未来 30 天内到期',
+      path: '/hr-ledgers',
+      icon: FileTextOutlined,
+      tone: 'red'
+    })
+  }
+  list.push(
+    { key: 'onboardMonth', label: '本月入职', value: o?.onboardThisMonth ?? 0, hint: '按入职日期统计', status: 30, icon: LoginOutlined, tone: 'cyan' },
+    { key: 'resignMonth', label: '本月离职', value: o?.resignThisMonth ?? 0, hint: '按离职日期统计', status: 60, icon: LogoutOutlined, tone: 'orange' },
+    { key: 'regularMonth', label: '本月转正', value: o?.regularizedThisMonth ?? 0, hint: '按转正日期统计', status: 40, icon: CheckCircleOutlined, tone: 'green' },
+    { key: 'orgNodes', label: '组织节点', value: stats.orgNodes, hint: '集团/子公司/部门/项目', path: '/orgs', icon: ApartmentOutlined, tone: 'purple' },
     {
       key: 'pending',
       label: canApprove.value ? '待我审批' : '我的待审批',
       value: stats.pending,
       hint: canApprove.value ? '其他人提交、等待你处理' : '你提交、等待审批的请假',
-      path: store.can('approval:todo') ? '/approvals' : '/leaves'
+      path: store.can('approval:todo') ? '/approvals' : '/leaves',
+      icon: AuditOutlined,
+      tone: 'blue'
     }
-  ]
+  )
+  return list
 })
 
 function openCard(c: DashCard) {
   if (c.path) {
     if (c.path === '/orgs' && !store.can('org:view')) return
+    if (c.path === '/hr-ledgers' && !store.can('contract:view')) return
     router.push(c.path)
     return
   }
@@ -257,94 +199,6 @@ async function loadDashboard() {
   } finally {
     dashLoading.value = false
   }
-}
-
-/* 部门分布：取前 6 个组织，其余合并为「其他」 */
-const PALETTE = ['#1677ff', '#13c2c2', '#faad14', '#eb2f96', '#722ed1', '#52c41a', '#8c8c8c']
-const deptSlices = computed(() => {
-  const list = dash.value?.orgDistribution || []
-  const total = list.reduce((s, x) => s + x.employees, 0)
-  if (!total) return []
-  const head = list.slice(0, 6).map((x, i) => ({
-    name: x.orgName || '未知组织',
-    count: x.employees,
-    pct: (x.employees / total) * 100,
-    color: PALETTE[i]
-  }))
-  const rest = list.slice(6).reduce((s, x) => s + x.employees, 0)
-  if (rest > 0) {
-    head.push({ name: '其他', count: rest, pct: (rest / total) * 100, color: PALETTE[6] })
-  }
-  return head
-})
-const deptTotal = computed(() => deptSlices.value.reduce((s, x) => s + x.count, 0))
-const donutBackground = computed(() => {
-  if (!deptSlices.value.length) return '#f0f0f0'
-  let acc = 0
-  const stops = deptSlices.value.map((s) => {
-    const start = acc
-    acc += s.pct
-    return `${s.color} ${start}% ${acc}%`
-  })
-  return `conic-gradient(${stops.join(',')})`
-})
-
-/* 编制 vs 实有：最多展示 8 个组织，条形按两者最大值归一 */
-const headcountRows = computed(() => (dash.value?.headcount || []).slice(0, 8))
-const barMax = computed(() =>
-  Math.max(1, ...headcountRows.value.map((r) => Math.max(r.headcount, r.actual)))
-)
-
-function barWidth(value: number) {
-  return `${Math.round((value / barMax.value) * 100)}%`
-}
-
-function fmtPct(value?: number | null) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—'
-  return `${Number(value).toFixed(1)}%`
-}
-
-/* 请假趋势：按月份堆叠，颜色按类型出现顺序固定 */
-const trendView = computed(() => {
-  const rows = dash.value?.leaveTrend || []
-  const legendMap = new Map<string, { name: string; color: string }>()
-  const byMonth = new Map<string, { month: string; total: number; segments: Record<string, number> }>()
-  for (const t of rows) {
-    if (!legendMap.has(t.leaveType)) {
-      legendMap.set(t.leaveType, {
-        name: t.leaveTypeName || t.leaveType,
-        color: PALETTE[legendMap.size % PALETTE.length]
-      })
-    }
-    const row = byMonth.get(t.month) || { month: t.month, total: 0, segments: {} }
-    row.total += Number(t.days) || 0
-    row.segments[t.leaveType] = (row.segments[t.leaveType] || 0) + (Number(t.days) || 0)
-    byMonth.set(t.month, row)
-  }
-  const months = Array.from(byMonth.values()).sort((a, b) => a.month.localeCompare(b.month))
-  const max = Math.max(0, ...months.map((m) => m.total))
-  return {
-    legend: Array.from(legendMap.values()),
-    rows: months.map((m) => ({
-      month: m.month,
-      total: Number(m.total.toFixed(2)),
-      segments: legendMap.size
-        ? Array.from(legendMap.entries()).map(([type, l]) => ({
-            name: l.name,
-            color: l.color,
-            days: Number((m.segments[type] || 0).toFixed(2)),
-            pct: m.total > 0 ? ((m.segments[type] || 0) / m.total) * 100 : 0
-          })).filter((s) => s.days > 0)
-        : []
-    })),
-    max
-  }
-})
-
-/** 最高月份占 170px，其余按比例；没有数据时为 0 */
-function trendHeight(total: number) {
-  if (!trendView.value.max) return '0px'
-  return `${Math.round((total / trendView.value.max) * 170)}px`
 }
 
 async function loadReminders() {
@@ -393,7 +247,7 @@ onMounted(async () => {
   }
   await loadDashboard()
   try {
-    if (store.can('leave:view')) {
+    if (store.can('leave:mine')) {
       const mine = await pageLeaves({ scope: 'mine', page: 1, size: 5 })
       recent.value = mine.list || []
       stats.pending = (mine.list || []).filter((x) => x.status === 0).length
@@ -410,11 +264,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 卡片与图表随内容自然增高：不参与父级 flex 压缩，超出视口时由外层 .content
-   出现纵向滚动条，避免下方的请假趋势/最近请假/试用期提醒被压扁或裁掉。 */
+/* 看板至少占满内容区，最近请假和试用期提醒平分剩余高度。 */
 .dash {
-  flex: 0 0 auto;
+  flex: 1;
   min-height: 100%;
+}
+
+.dash > .panel {
+  flex: 1 1 0;
+  min-height: 160px;
+}
+
+.dash > .panel .panel-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash > .panel .panel-body > :deep(.ant-empty) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .hero {
@@ -444,241 +314,41 @@ onMounted(async () => {
 
 .stat-grid {
   display: grid;
-  /* auto-fit 折叠多余空轨道，9 张指标卡等分整行宽度，auto-fill 会在右侧留空列 */
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  /* 桌面端固定每行 5 张，10 张指标卡整齐分为两行 */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 12px;
-}
-
-.chart-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.pie-wrap {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.pie {
-  position: relative;
-  width: 132px;
-  height: 132px;
-  border-radius: 50%;
-  flex: none;
-}
-
-.pie-hole {
-  position: absolute;
-  inset: 24px;
-  border-radius: 50%;
-  background: var(--panel-bg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.pie-num {
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.1;
-}
-
-.pie-cap {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.legend {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  flex: 1;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  min-width: 0;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: none;
-}
-
-.dot.plan {
-  background: #bfbfbf;
-}
-
-.dot.actual {
-  background: #1677ff;
-}
-
-.legend-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-2, #595959);
-}
-
-.legend-val {
-  color: var(--muted);
-  flex: none;
-}
-
-.hc-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.hc-legend {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 2px;
-}
-
-.hc-row {
-  display: grid;
-  grid-template-columns: 108px 1fr 56px;
-  align-items: center;
-  gap: 10px;
-}
-
-.hc-name {
-  font-size: 12.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hc-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.hc-bar {
-  position: relative;
-  height: 12px;
-  border-radius: 3px;
-  background: var(--track-bg, #f0f0f0);
-  overflow: hidden;
-}
-
-.hc-bar .fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: 3px;
-  min-width: 2px;
-}
-
-.hc-bar .fill.plan {
-  background: #bfbfbf;
-}
-
-.hc-bar .fill.actual {
-  background: #1677ff;
-}
-
-.hc-num {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 10.5px;
-  color: var(--muted);
-}
-
-.hc-rate {
-  font-size: 12.5px;
-  text-align: right;
-  color: var(--muted);
-}
-
-.hc-rate.over {
-  color: #cf1322;
-  font-weight: 600;
-}
-
-.trend {
-  display: flex;
-  align-items: flex-end;
-  gap: 18px;
-  height: 210px;
-  padding: 0 8px 0;
-  overflow-x: auto;
-}
-
-.trend-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 44px;
-  flex: 1;
-  height: 100%;
-}
-
-.trend-stack {
-  width: 26px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  border-radius: 4px 4px 0 0;
-  overflow: hidden;
-  transition: height .2s;
-}
-
-.trend-seg {
-  width: 100%;
-}
-
-.trend-label {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 6px;
-}
-
-.trend-total {
-  font-size: 11.5px;
-  color: var(--muted);
-  min-height: 15px;
-}
-
-.trend-legend {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.trend-legend .legend-item {
-  flex: none;
 }
 
 .stat-card {
+  position: relative;
+  overflow: hidden;
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 14px 16px;
 }
+
+.stat-icon {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 18px;
+}
+
+.stat-icon--blue { color: #1677ff; background: rgba(22, 119, 255, .1); }
+.stat-icon--gold { color: #d4a106; background: rgba(212, 161, 6, .12); }
+.stat-icon--green { color: #389e0d; background: rgba(56, 158, 13, .1); }
+.stat-icon--red { color: #cf1322; background: rgba(207, 19, 34, .09); }
+.stat-icon--cyan { color: #08979c; background: rgba(8, 151, 156, .1); }
+.stat-icon--orange { color: #d46b08; background: rgba(212, 107, 8, .1); }
+.stat-icon--purple { color: #722ed1; background: rgba(114, 46, 209, .1); }
 
 /* 概览数字卡片可点击跳转：给出手型光标与轻微悬浮反馈 */
 .stat-card.clickable {
@@ -692,6 +362,7 @@ onMounted(async () => {
 }
 
 .stat-label {
+  padding-right: 42px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -725,8 +396,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 800px) {
-  .stat-grid,
-  .chart-grid {
+  .stat-grid {
     grid-template-columns: 1fr;
   }
 }

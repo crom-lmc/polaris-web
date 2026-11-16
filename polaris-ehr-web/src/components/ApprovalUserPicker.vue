@@ -81,7 +81,7 @@ import type { ApprovalOrgNode, ApprovalOrgUser } from '@/api/approvals'
 
 /**
  * 转办 / 加签的按组织选人弹窗（单选）。
- * 组织与成员数据来自 EHR（审批中心代理 /api/accounts/approvals/orgs/**），
+ * 组织与成员数据来自 EHR（审批中心薄代理 /api/ehr/approvals/center/orgs/**），
  * 只列已开户、未离职的员工——派不了审批任务的人选了也没用。
  */
 const props = defineProps<{ open: boolean; title: string }>()

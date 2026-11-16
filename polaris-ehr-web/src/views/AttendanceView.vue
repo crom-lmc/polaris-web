@@ -2,28 +2,19 @@
   <div class="page-root">
     <div class="att-head">
       <a-tabs v-model:active-key="tab" class="tabs" @change="onTabChange">
-        <a-tab-pane v-if="canOvertime" key="overtime" tab="加班 / 月度考勤" />
-        <a-tab-pane key="my" tab="我的考勤" />
-        <a-tab-pane v-if="canAttendanceView" key="daily" tab="日结果" />
-        <a-tab-pane v-if="canAttendanceView" key="punches" tab="打卡记录" />
-        <a-tab-pane v-if="canAttendanceManage" key="corrections" tab="补卡审批" />
-        <a-tab-pane v-if="canAttendanceView" key="rules" tab="考勤规则" />
-        <a-tab-pane v-if="canAttendanceView" key="calendar" tab="工作日历" />
-        <a-tab-pane v-if="canQuotaAdjust" key="annual" tab="年假策略" />
+        <a-tab-pane v-for="item in visibleTabs" :key="item.key" :tab="item.label" />
       </a-tabs>
-      <a-button v-if="canAttendanceManage" :loading="mockLoading" class="mock-btn" @click="doMock">
-        模拟数据
-      </a-button>
     </div>
+    <a-empty v-if="!visibleTabs.length" description="暂无权限访问考勤功能" />
 
-    <!-- ================= 原有：加班 / 月度考勤 ================= -->
-    <template v-if="tab === 'overtime'">
+    <!-- ================= 加班 ================= -->
+    <template v-if="tab === 'overtime' && canOvertime">
       <div class="toolbar">
         <div class="toolbar-left">
-          <a-radio-group v-model:value="scope" button-style="solid" @change="reload">
-            <a-radio-button value="mine">我的加班</a-radio-button>
-            <a-radio-button v-if="canTeam" value="team">团队加班</a-radio-button>
-            <a-radio-button v-if="canTeam" value="all">全部加班</a-radio-button>
+          <a-radio-group v-model:value="scope" button-style="solid">
+            <a-radio-button v-for="item in visibleOvertimeScopes" :key="item.value" :value="item.value">
+              {{ item.label }}
+            </a-radio-button>
           </a-radio-group>
           <a-date-picker
             v-model:value="month"
@@ -40,11 +31,7 @@
           </a-button>
         </div>
         <div class="toolbar-right">
-          <a-button v-if="canExportAttendance" :loading="attendanceExporting" @click="doExportAttendance">
-            <template #icon><download-outlined /></template>
-            导出月度考勤
-          </a-button>
-          <a-button type="primary" @click="openApply">
+          <a-button v-if="canOvertimeSubmit" type="primary" @click="openApply">
             <template #icon><plus-outlined /></template>
             提交加班
           </a-button>
@@ -103,7 +90,7 @@
               </template>
               <template v-else-if="column.key === 'action'">
                 <a-popconfirm
-                  v-if="record.status === 0 && record.mine"
+                  v-if="canOvertimeCancel && record.status === 0 && record.mine"
                   title="撤销后需要重新提交，确定撤销？"
                   ok-text="撤销"
                   cancel-text="取消"
@@ -117,12 +104,36 @@
           </a-table>
         </div>
       </section>
+    </template>
 
+    <!-- ================= 员工考勤汇总 ================= -->
+    <template v-else-if="tab === 'monthly' && canMonthly">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <a-date-picker
+            v-model:value="summaryMonth"
+            picker="month"
+            value-format="YYYY-MM"
+            placeholder="选择月份"
+            style="width: 140px"
+          />
+          <a-button @click="loadMonthly">
+            <template #icon><reload-outlined /></template>
+            刷新
+          </a-button>
+        </div>
+        <div class="toolbar-right">
+          <a-button v-if="canMonthExport" :loading="attendanceExporting" @click="doExportAttendance">
+            <template #icon><download-outlined /></template>
+            导出月度考勤
+          </a-button>
+        </div>
+      </div>
       <section class="panel month-panel">
         <div class="panel-head">
-          <span>月度考勤汇总</span>
+          <span>员工考勤汇总</span>
           <span class="muted">
-            {{ canConfirm ? '按工作日历与已通过的请假/加班计算，确认后锁定' : '数据由系统按工作日历与已通过的请假/加班计算' }}
+            {{ canMonthConfirm ? '按工作日历与已通过的请假/加班计算，确认后锁定' : '数据由系统按工作日历与已通过的请假/加班计算' }}
           </span>
         </div>
         <div class="panel-body table-body ft-scroll ft-bottom month-body">
@@ -148,13 +159,13 @@
               </template>
               <template v-else-if="column.key === 'action'">
                 <a-button
-                  v-if="canConfirm && record.confirmed !== 1"
+                  v-if="canMonthConfirm && record.confirmed !== 1"
                   size="small"
                   type="link"
                   @click="doConfirm(record)"
                 >确认</a-button>
                 <a-button
-                  v-else-if="canUnlock && record.confirmed === 1"
+                  v-else-if="canMonthUnlock && record.confirmed === 1"
                   size="small"
                   type="link"
                   danger
@@ -169,7 +180,7 @@
     </template>
 
     <!-- ================= 我的考勤 ================= -->
-    <template v-else-if="tab === 'my'">
+    <template v-else-if="tab === 'my' && canMy">
       <div class="toolbar">
         <div class="toolbar-left">
           <a-date-picker
@@ -215,7 +226,7 @@
               <template v-else-if="column.key === 'absentHours'">{{ record.absentHours ?? '—' }}</template>
               <template v-else-if="column.key === 'overtimeMinutes'">{{ record.overtimeMinutes || '—' }}</template>
               <template v-else-if="column.key === 'action'">
-                <a v-if="record.status === 'MISSING_PUNCH'" @click="openCorrection(record)">申请补卡</a>
+                <a v-if="canMyCorrectionApply && record.status === 'MISSING_PUNCH'" @click="openCorrection(record)">申请补卡</a>
                 <span v-else class="muted">—</span>
               </template>
             </template>
@@ -225,7 +236,7 @@
     </template>
 
     <!-- ================= 日结果 ================= -->
-    <template v-else-if="tab === 'daily' && canAttendanceView">
+    <template v-else-if="tab === 'daily' && canDaily">
       <div class="toolbar">
         <div class="toolbar-left">
           <a-date-picker
@@ -261,13 +272,16 @@
             查询
           </a-button>
         </div>
-        <div v-if="canAttendanceManage" class="toolbar-right">
+        <div v-if="canDailyGenerate || canDailyMock" class="toolbar-right">
           <a-date-picker
             v-model:value="generateDate"
             value-format="YYYY-MM-DD"
             style="width: 130px"
           />
-          <a-button type="primary" :loading="generating" @click="doGenerate">生成考勤</a-button>
+          <a-button v-if="canDailyGenerate" type="primary" :loading="generating" @click="doGenerate">生成考勤</a-button>
+          <a-button v-if="canDailyMock" :loading="mockLoading" class="mock-btn" @click="doMock">
+            模拟数据
+          </a-button>
         </div>
       </div>
       <section class="panel ft-grow">
@@ -303,7 +317,7 @@
     </template>
 
     <!-- ================= 打卡记录 ================= -->
-    <template v-else-if="tab === 'punches' && canAttendanceView">
+    <template v-else-if="tab === 'punches' && canPunches">
       <div class="toolbar">
         <div class="toolbar-left">
           <a-select
@@ -331,7 +345,7 @@
             查询
           </a-button>
         </div>
-        <div v-if="canAttendanceManage" class="toolbar-right">
+        <div v-if="canPunchCreate" class="toolbar-right">
           <a-button type="primary" @click="openPunch">手工补录</a-button>
         </div>
       </div>
@@ -363,7 +377,7 @@
     </template>
 
     <!-- ================= 补卡审批 ================= -->
-    <template v-else-if="tab === 'corrections' && canAttendanceManage">
+    <template v-else-if="tab === 'corrections' && canCorrections">
       <div class="toolbar">
         <div class="toolbar-left">
           <a-select
@@ -414,9 +428,9 @@
               </template>
               <template v-else-if="column.key === 'createdAt'">{{ fmtTime(record.createdAt) }}</template>
               <template v-else-if="column.key === 'action'">
-                <a-space v-if="record.status === 0" size="small">
-                  <a @click="openReview(record, 'approve')">通过</a>
-                  <a class="danger" @click="openReview(record, 'reject')">驳回</a>
+                <a-space v-if="record.status === 0 && (canCorrectionApprove || canCorrectionReject)" size="small">
+                  <a v-if="canCorrectionApprove" @click="openReview(record, 'approve')">通过</a>
+                  <a v-if="canCorrectionReject" class="danger" @click="openReview(record, 'reject')">驳回</a>
                 </a-space>
                 <span v-else class="muted">—</span>
               </template>
@@ -427,7 +441,7 @@
     </template>
 
     <!-- ================= 考勤规则 ================= -->
-    <template v-else-if="tab === 'rules' && canAttendanceView">
+    <template v-else-if="tab === 'rules' && canRules">
       <div class="toolbar">
         <div class="toolbar-left">
           <a-input-search
@@ -442,7 +456,7 @@
             刷新
           </a-button>
         </div>
-        <div v-if="canAttendanceManage" class="toolbar-right">
+        <div v-if="canRuleCreate" class="toolbar-right">
           <a-button type="primary" @click="openRule()">新增规则</a-button>
         </div>
       </div>
@@ -479,10 +493,10 @@
                 <span class="ellipsis">{{ scopeSummary(record) }}</span>
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-space v-if="canAttendanceManage" size="small">
-                  <a @click="openRule(record)">编辑</a>
-                  <a @click="doToggleRule(record)">{{ record.status === 1 ? '停用' : '启用' }}</a>
-                  <a-popconfirm title="删除后不可恢复，确定删除该规则？" ok-text="删除" cancel-text="取消" @confirm="doDeleteRule(record)">
+                <a-space v-if="canRuleUpdate || canRuleToggle || canRuleDelete" size="small">
+                  <a v-if="canRuleUpdate" @click="openRule(record)">编辑</a>
+                  <a v-if="canRuleToggle" @click="doToggleRule(record)">{{ record.status === 1 ? '停用' : '启用' }}</a>
+                  <a-popconfirm v-if="canRuleDelete" title="删除后不可恢复，确定删除该规则？" ok-text="删除" cancel-text="取消" @confirm="doDeleteRule(record)">
                     <a class="danger">删除</a>
                   </a-popconfirm>
                 </a-space>
@@ -495,7 +509,7 @@
     </template>
 
     <!-- ================= 工作日历 ================= -->
-    <template v-else-if="tab === 'calendar' && canAttendanceView">
+    <template v-else-if="tab === 'calendar' && canCalendar">
       <div class="toolbar">
         <div class="toolbar-left">
           <a-button @click="shiftCalendar(-1)">上月</a-button>
@@ -514,7 +528,7 @@
         </div>
         <div class="toolbar-right">
           <a-popconfirm
-            v-if="calNextYear?.showButton"
+            v-if="canCalendarApplyNextYear && calNextYear?.showButton"
             :title="`将写入 ${calNextYear.nextYear} 年法定节假日 ${calNextYear.holidayCount} 天、调休上班日 ${calNextYear.makeupCount} 天；已手工配置的日期不会被覆盖。确认更新？`"
             ok-text="更新"
             cancel-text="取消"
@@ -530,16 +544,15 @@
           >
             <span class="cal-applied">✓ {{ calNextYear.nextYear }} 年日历已更新</span>
           </a-tooltip>
-          <template v-if="canAttendanceManage">
-            <a-upload
-              accept=".csv"
-              :show-upload-list="false"
-              :before-upload="onCalendarCsv"
-            >
-              <a-button :loading="calImporting" style="margin-right: 8px">导入 CSV</a-button>
-            </a-upload>
-            <a-button type="primary" :loading="calSaving" @click="saveCalendar">保存本月</a-button>
-          </template>
+          <a-upload
+            v-if="canCalendarImport"
+            accept=".csv"
+            :show-upload-list="false"
+            :before-upload="onCalendarCsv"
+          >
+            <a-button :loading="calImporting" style="margin-right: 8px">导入 CSV</a-button>
+          </a-upload>
+          <a-button v-if="canCalendarSave" type="primary" :loading="calSaving" @click="saveCalendar">保存本月</a-button>
         </div>
       </div>
       <section class="panel ft-grow">
@@ -564,13 +577,13 @@
                   v-model:checked="record.isWorkday"
                   :checked-value="1"
                   :un-checked-value="0"
-                  :disabled="!canAttendanceManage || isPastDate(record.workDate)"
+                  :disabled="!canCalendarSave || isPastDate(record.workDate)"
                 />
               </template>
               <template v-else-if="column.key === 'holidayName'">
                 <a-input
                   v-model:value="record.holidayName"
-                  :disabled="!canAttendanceManage || isPastDate(record.workDate)"
+                  :disabled="!canCalendarSave || isPastDate(record.workDate)"
                   placeholder="节假日名称（选填）"
                   size="small"
                 />
@@ -589,7 +602,7 @@
     </template>
 
     <!-- ================= 年假策略 ================= -->
-    <template v-else-if="tab === 'annual' && canQuotaAdjust">
+    <template v-else-if="tab === 'annual' && canAnnual">
       <div class="toolbar">
         <div class="toolbar-left">
           <a-button @click="loadPolicies">
@@ -598,10 +611,10 @@
           </a-button>
           <span class="muted">同时只有一条策略启用，启用后作为全员年假档位依据</span>
         </div>
-        <div class="toolbar-right">
-          <a-input-number v-model:value="generateYear" :min="2000" :max="2100" style="width: 100px" />
-          <a-button :loading="annualGenerating" @click="doGenerateAnnual">生成年度额度</a-button>
-          <a-button type="primary" @click="openPolicy()">新增策略</a-button>
+        <div v-if="canAnnualGenerate || canAnnualCreate" class="toolbar-right">
+          <a-input-number v-if="canAnnualGenerate" v-model:value="generateYear" :min="2000" :max="2100" style="width: 100px" />
+          <a-button v-if="canAnnualGenerate" :loading="annualGenerating" @click="doGenerateAnnual">生成年度额度</a-button>
+          <a-button v-if="canAnnualCreate" type="primary" @click="openPolicy()">新增策略</a-button>
         </div>
       </div>
       <section class="panel ft-grow">
@@ -628,11 +641,11 @@
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-space size="small">
-                  <a @click="openPolicy(record)">编辑</a>
-                  <a v-if="record.enabled !== 1" @click="doEnablePolicy(record)">启用</a>
-                  <span v-else class="muted">—</span>
+                <a-space v-if="canAnnualUpdate || (canAnnualEnable && record.enabled !== 1)" size="small">
+                  <a v-if="canAnnualUpdate" @click="openPolicy(record)">编辑</a>
+                  <a v-if="canAnnualEnable && record.enabled !== 1" @click="doEnablePolicy(record)">启用</a>
                 </a-space>
+                <span v-else class="muted">—</span>
               </template>
             </template>
           </a-table>
@@ -688,7 +701,7 @@
           </a-col>
         </a-row>
         <a-alert
-          v-if="form.workDate"
+          v-if="canOvertimePreview && form.workDate"
           :type="previewTip.includes('有效加班不足') || previewTip.includes('无有效加班') || previewTip.includes('无法提交') ? 'warning' : 'info'"
           show-icon
           style="margin-bottom: 16px"
@@ -1127,7 +1140,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import ApprovalDetailDrawer from '@/components/ApprovalDetailDrawer.vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -1184,23 +1197,87 @@ import {
 import { useUserStore } from '@/stores/user'
 
 const store = useUserStore()
-const canOvertime = computed(() => store.can('overtime:view'))
-const canTeam = computed(() => store.can('overtime:approve'))
-const canConfirm = computed(() => store.can('overtime:approve'))
-const canAttendanceView = computed(() => store.can('attendance:view'))
-const canAttendanceManage = computed(() => store.can('attendance:manage'))
-const canUnlock = computed(() => store.can('attendance:month:unlock'))
-const canQuotaAdjust = computed(() => store.can('leave:quota:adjust'))
 
-/* 支持通过 ?tab=calendar 等路由参数直达指定页签（如工作日历维护待办跳转） */
+const attendanceTabs = [
+  { key: 'overtime', label: '加班', permission: 'attendance:overtime' },
+  { key: 'monthly', label: '员工考勤汇总', permission: 'attendance:monthly' },
+  { key: 'my', label: '我的考勤', permission: 'attendance:my' },
+  { key: 'daily', label: '日结果', permission: 'attendance:daily' },
+  { key: 'punches', label: '打卡记录', permission: 'attendance:punches' },
+  { key: 'corrections', label: '补卡审批', permission: 'attendance:corrections' },
+  { key: 'rules', label: '考勤规则', permission: 'attendance:rules' },
+  { key: 'calendar', label: '工作日历', permission: 'attendance:calendar' },
+  { key: 'annual', label: '年假策略', permission: 'attendance:annual' }
+] as const
+type AttendanceTab = (typeof attendanceTabs)[number]['key']
+const visibleTabs = computed(() => attendanceTabs.filter((item) => store.can(item.permission)))
+
+const canOvertime = computed(() => store.can('attendance:overtime'))
+const canMonthly = computed(() => store.can('attendance:monthly'))
+const canMy = computed(() => store.can('attendance:my'))
+const canDaily = computed(() => store.can('attendance:daily'))
+const canPunches = computed(() => store.can('attendance:punches'))
+const canCorrections = computed(() => store.can('attendance:corrections'))
+const canRules = computed(() => store.can('attendance:rules'))
+const canCalendar = computed(() => store.can('attendance:calendar'))
+const canAnnual = computed(() => store.can('attendance:annual'))
+const canOvertimePreview = computed(() => store.can('attendance:overtime:preview'))
+const canOvertimeSubmit = computed(() => store.can('attendance:overtime:submit'))
+const canOvertimeCancel = computed(() => store.can('attendance:overtime:cancel'))
+const canMonthConfirm = computed(() => store.can('attendance:monthly:confirm'))
+const canMonthUnlock = computed(() => store.can('attendance:monthly:unlock'))
+const canMonthExport = computed(() => store.can('attendance:monthly:export'))
+const canMyCorrectionApply = computed(() => store.can('attendance:my:correction:apply'))
+const canDailyGenerate = computed(() => store.can('attendance:daily:generate'))
+const canDailyMock = computed(() => store.can('attendance:daily:mock'))
+const canPunchCreate = computed(() => store.can('attendance:punches:create'))
+const canCorrectionApprove = computed(() => store.can('attendance:corrections:approve'))
+const canCorrectionReject = computed(() => store.can('attendance:corrections:reject'))
+const canRuleCreate = computed(() => store.can('attendance:rules:create'))
+const canRuleUpdate = computed(() => store.can('attendance:rules:update'))
+const canRuleDelete = computed(() => store.can('attendance:rules:delete'))
+const canRuleToggle = computed(() => store.can('attendance:rules:toggle'))
+const canCalendarSave = computed(() => store.can('attendance:calendar:save'))
+const canCalendarImport = computed(() => store.can('attendance:calendar:import'))
+const canCalendarApplyNextYear = computed(() => store.can('attendance:calendar:apply-next-year'))
+const canAnnualCreate = computed(() => store.can('attendance:annual:create'))
+const canAnnualUpdate = computed(() => store.can('attendance:annual:update'))
+const canAnnualEnable = computed(() => store.can('attendance:annual:enable'))
+const canAnnualGenerate = computed(() => store.can('attendance:annual:generate'))
+
+const overtimeScopes = [
+  { value: 'mine', label: '我的加班', permission: 'attendance:overtime:mine' },
+  { value: 'team', label: '团队加班', permission: 'attendance:overtime:team' },
+  { value: 'all', label: '全部加班', permission: 'attendance:overtime:all' }
+] as const
+type OvertimeScope = (typeof overtimeScopes)[number]['value']
+const visibleOvertimeScopes = computed(() => overtimeScopes.filter((item) => store.can(item.permission)))
+
+/* 支持通过 ?tab=calendar 等路由参数直达已授权页签，未授权时回退到第一个可见页签 */
 const route = useRoute()
-const initTab = typeof route.query.tab === 'string' ? route.query.tab : ''
-const tab = ref(initTab || 'overtime')
-const mockLoading = ref(false)
-
-function onTabChange() {
-  /* 数据加载由下方 watch(tab) 统一处理 */
+const router = useRouter()
+function isVisibleTab(key: string): key is AttendanceTab {
+  return visibleTabs.value.some((item) => item.key === key)
 }
+function resolveTab(requested: unknown): AttendanceTab | '' {
+  const key = typeof requested === 'string' ? requested : ''
+  return isVisibleTab(key) ? key : visibleTabs.value[0]?.key || ''
+}
+const tab = ref<AttendanceTab | ''>(resolveTab(route.query.tab))
+watch([visibleTabs, () => route.query.tab], ([, requested]) => {
+  const resolved = resolveTab(requested)
+  if (requested !== undefined || !isVisibleTab(tab.value)) tab.value = resolved
+  if (requested !== undefined && requested !== resolved) {
+    const query = { ...route.query }
+    delete query.tab
+    router.replace({ query })
+  }
+}, { immediate: true })
+
+function onTabChange(key: string | number) {
+  if (!isVisibleTab(String(key))) tab.value = resolveTab('')
+}
+const mockLoading = ref(false)
 
 async function doMock() {
   mockLoading.value = true
@@ -1232,7 +1309,7 @@ function onEmployeeSearch(keyword: string) {
 }
 
 async function loadEmployeeOptions(keyword?: string) {
-  if (!canAttendanceView.value) return
+  if ((tab.value !== 'daily' || !canDaily.value) && (tab.value !== 'punches' || !canPunches.value)) return
   empLoading.value = true
   try {
     const data = await pageEmployees({ keyword: keyword || undefined, page: 1, size: 50 })
@@ -1298,7 +1375,13 @@ function dailyStatusColor(status: string) {
 }
 
 /* ================= 原有：加班 ================= */
-const scope = ref<'mine' | 'team' | 'all'>('mine')
+const scope = ref<OvertimeScope | ''>(visibleOvertimeScopes.value[0]?.value || '')
+function isVisibleOvertimeScope(value: string): value is OvertimeScope {
+  return visibleOvertimeScopes.value.some((item) => item.value === value)
+}
+watch(visibleOvertimeScopes, (items) => {
+  if (!isVisibleOvertimeScope(scope.value)) scope.value = items[0]?.value || ''
+}, { immediate: true })
 const month = ref<string>('')
 const loading = ref(false)
 const rows = ref<OvertimeItem[]>([])
@@ -1331,11 +1414,11 @@ function onTableChange(p: any) {
 }
 
 async function reload() {
-  if (!canOvertime.value) return
+  if (tab.value !== 'overtime' || !canOvertime.value || !isVisibleOvertimeScope(scope.value)) return
   loading.value = true
   try {
     const res = await listOvertimes({
-      scope: scope.value,
+      scope: scope.value || undefined,
       month: month.value || undefined,
       page: page.value,
       size: size.value
@@ -1349,9 +1432,13 @@ async function reload() {
   }
 }
 
-watch(scope, () => {
+watch(scope, (value) => {
+  if (!isVisibleOvertimeScope(value)) {
+    scope.value = visibleOvertimeScopes.value[0]?.value || ''
+    return
+  }
   page.value = 1
-  reload()
+  if (tab.value === 'overtime') reload()
 })
 
 /* ---------- 提交加班 ---------- */
@@ -1381,7 +1468,7 @@ let previewTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   () => [form.workDate, form.startTime, form.endTime],
   () => {
-    if (!applyOpen.value) return
+    if (!applyOpen.value || !canOvertimePreview.value) return
     if (previewTimer) clearTimeout(previewTimer)
     previewTimer = setTimeout(async () => {
       if (!form.workDate || !form.startTime || !form.endTime) { preview.value = {}; return }
@@ -1428,7 +1515,7 @@ async function submitApply() {
     })
     message.success('加班审批已提交，请在审批中心跟进')
     applyOpen.value = false
-    scope.value = 'mine'
+    scope.value = isVisibleOvertimeScope('mine') ? 'mine' : visibleOvertimeScopes.value[0]?.value || ''
     page.value = 1
     await reload()
   } catch (e: any) {
@@ -1486,7 +1573,7 @@ const monthColumns = [
 ]
 
 async function loadMonthly() {
-  if (!canOvertime.value) return
+  if (tab.value !== 'monthly' || !canMonthly.value) return
   monthLoading.value = true
   try {
     monthRows.value = await listAttendanceMonthly(summaryMonth.value)
@@ -1540,7 +1627,6 @@ async function doUnlock() {
 }
 
 /* ---------- 导出月度考勤 ---------- */
-const canExportAttendance = computed(() => store.can('overtime:view'))
 const attendanceExporting = ref(false)
 
 async function doExportAttendance() {
@@ -1562,7 +1648,9 @@ async function doExportAttendance() {
   }
 }
 
-watch([summaryMonth, canConfirm], () => loadMonthly(), { immediate: true })
+watch(summaryMonth, () => {
+  if (tab.value === 'monthly') loadMonthly()
+})
 
 /* ================= 我的考勤 ================= */
 const myMonth = ref(dayjs().format('YYYY-MM'))
@@ -1584,7 +1672,7 @@ const myColumns = [
 ]
 
 async function loadMy() {
-  if (!myMonth.value) return
+  if (tab.value !== 'my' || !canMy.value || !myMonth.value) return
   myLoading.value = true
   try {
     myRows.value = await myAttendance(myMonth.value)
@@ -1690,7 +1778,7 @@ const dailyPagination = computed(() => ({
 }))
 
 async function loadDaily() {
-  if (!canAttendanceView.value) return
+  if (tab.value !== 'daily' || !canDaily.value) return
   dailyLoading.value = true
   try {
     const res = await pageAttendanceDaily({
@@ -1767,7 +1855,7 @@ const punchPagination = computed(() => ({
 }))
 
 async function loadPunches() {
-  if (!canAttendanceView.value) return
+  if (tab.value !== 'punches' || !canPunches.value) return
   punchLoading.value = true
   try {
     const res = await pageAttendancePunches({
@@ -1908,7 +1996,7 @@ function correctionStatusColor(status: number) {
 }
 
 async function loadCorrections() {
-  if (!canAttendanceManage.value) return
+  if (tab.value !== 'corrections' || !canCorrections.value) return
   corrLoading.value = true
   try {
     const res = await pageAttendanceCorrections({
@@ -2011,7 +2099,7 @@ function scopeSummary(r: AttendanceRuleItem) {
 }
 
 async function loadRules() {
-  if (!canAttendanceView.value) return
+  if (tab.value !== 'rules' || !canRules.value) return
   ruleLoading.value = true
   try {
     const res = await pageAttendanceRules({
@@ -2188,7 +2276,7 @@ async function openRule(record?: AttendanceRuleItem) {
   ruleSegments.value = []
   ruleScopes.value = [{ _key: keyOf('scope'), scopeType: 'ALL', scopeId: undefined, priority: 0 }]
   ruleModalOpen.value = true
-  if (canAttendanceManage.value) void loadOrgTree()
+  if (canRuleCreate.value || canRuleUpdate.value) void loadOrgTree()
   if (record) {
     try {
       const detail = await getAttendanceRule(record.id)
@@ -2329,7 +2417,7 @@ const calColumns = [
 ]
 
 async function loadCalendar() {
-  if (!calMonth.value) return
+  if (tab.value !== 'calendar' || !canCalendar.value || !calMonth.value) return
   calLoading.value = true
   try {
     const list = await listWorkCalendar(calMonth.value)
@@ -2470,7 +2558,7 @@ function policyCarryText(p: AnnualLeavePolicyItem) {
 }
 
 async function loadPolicies() {
-  if (!canQuotaAdjust.value) return
+  if (tab.value !== 'annual' || !canAnnual.value) return
   policyLoading.value = true
   try {
     policyRows.value = (await listAnnualLeavePolicies()) || []
@@ -2564,7 +2652,9 @@ async function doGenerateAnnual() {
 watch(
   tab,
   (key) => {
-    if (key === 'overtime') reload()
+    if (key === 'overtime') {
+      reload()
+    } else if (key === 'monthly') loadMonthly()
     else if (key === 'my') loadMy()
     else if (key === 'daily') {
       loadEmployeeOptions()
@@ -2582,8 +2672,6 @@ watch(
   { immediate: true }
 )
 
-/* 未指定页签且无加班权限时默认「我的考勤」；显式 ?tab= 跳转优先 */
-if (!initTab && !canOvertime.value) tab.value = 'my'
 </script>
 
 <style scoped>

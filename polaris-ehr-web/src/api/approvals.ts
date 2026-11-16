@@ -2,8 +2,8 @@ import request from './request'
 import type { ApprovalContext, ApprovalInstance, ApprovalStatus } from '@/types/approval'
 
 /**
- * 审批中心接口。全部走统一账号中心 `/api/accounts/approvals/**`：
- * 审批单在 settings 库，但「谁在审批」由账号中心定，前端不直连 settings。
+ * EHR 审批中心接口。全部走 `/api/ehr/approvals/center/**` 薄代理：
+ * EHR 校验页签/按钮权限并补当前账号身份，settings 继续校验流程状态与任务归属。
  *
  * 注意：ehr-web 的 request 拦截器会把 Result 壳解包成 data 本体，
  * 所以这里声明的返回类型是本体（不像 sso-web 那样带 { data: ... } 壳）。
@@ -13,23 +13,23 @@ import type { ApprovalContext, ApprovalInstance, ApprovalStatus } from '@/types/
 export type ApprovalScope = 'pending' | 'approved' | 'mine' | 'cc' | 'delegated'
 
 export function fetchApprovals(scope: ApprovalScope) {
-  return request.get<never, ApprovalInstance[]>('/api/accounts/approvals', { params: { scope } })
+  return request.get<never, ApprovalInstance[]>('/api/ehr/approvals/center', { params: { scope } })
 }
 
 export function fetchApprovalDetail(id: string) {
-  return request.get<never, ApprovalInstance>(`/api/accounts/approvals/${id}`)
+  return request.get<never, ApprovalInstance>(`/api/ehr/approvals/center/${id}`)
 }
 
 /** 审批弹窗上下文：版式 + 已算好的字段值 + 我的待办（服务端算值，前端只画） */
 export function fetchApprovalContext(id: string, view = 'APPROVAL') {
-  return request.get<never, ApprovalContext>(`/api/accounts/approvals/${id}/context`, {
+  return request.get<never, ApprovalContext>(`/api/ehr/approvals/center/${id}/context`, {
     params: { view }
   })
 }
 
 export function approveTask(taskId: string, pass: boolean, note?: string) {
   return request.post<never, ApprovalInstance>(
-    `/api/accounts/approvals/tasks/${taskId}/approve`,
+    `/api/ehr/approvals/center/tasks/${taskId}/approve`,
     { pass, note }
   )
 }
@@ -37,7 +37,7 @@ export function approveTask(taskId: string, pass: boolean, note?: string) {
 /** 转办：把待办交给别人（一次性，原任务终结） */
 export function transferTask(taskId: string, targetId: string, note?: string) {
   return request.post<never, void>(
-    `/api/accounts/approvals/tasks/${taskId}/transfer`,
+    `/api/ehr/approvals/center/tasks/${taskId}/transfer`,
     { targetId, note }
   )
 }
@@ -45,7 +45,7 @@ export function transferTask(taskId: string, targetId: string, note?: string) {
 /** 加签：临时把人插进当前节点 */
 export function addSignTask(taskId: string, targetId: string, position = 'AFTER', note?: string) {
   return request.post<never, void>(
-    `/api/accounts/approvals/tasks/${taskId}/add-sign`,
+    `/api/ehr/approvals/center/tasks/${taskId}/add-sign`,
     { targetId, position, note }
   )
 }
@@ -53,7 +53,7 @@ export function addSignTask(taskId: string, targetId: string, position = 'AFTER'
 /** 撤回：仅发起人且流程未结束 */
 export function withdrawApproval(id: string, note?: string) {
   return request.post<never, ApprovalInstance>(
-    `/api/accounts/approvals/${id}/withdraw`,
+    `/api/ehr/approvals/center/${id}/withdraw`,
     { note }
   )
 }
@@ -61,7 +61,7 @@ export function withdrawApproval(id: string, note?: string) {
 /** 终止：管理员强制结束在途单 */
 export function terminateApproval(id: string, note?: string) {
   return request.post<never, ApprovalInstance>(
-    `/api/accounts/approvals/${id}/terminate`,
+    `/api/ehr/approvals/center/${id}/terminate`,
     { note }
   )
 }
@@ -108,7 +108,7 @@ export interface ApprovalBrief {
 }
 
 export function fetchLatestApprovals(refs: BizRef[]) {
-  return request.post<never, ApprovalBrief[]>('/api/accounts/approvals/latest-batch', refs)
+  return request.post<never, ApprovalBrief[]>('/api/ehr/approvals/center/latest-batch', refs)
 }
 
 /** 一行 × 该页可能出现的业务类型，拼成批量查询入参 */
@@ -217,11 +217,11 @@ export interface ApprovalOrgUser {
 }
 
 export function fetchApprovalOrgTree() {
-  return request.get<never, ApprovalOrgNode[]>('/api/accounts/approvals/orgs/tree')
+  return request.get<never, ApprovalOrgNode[]>('/api/ehr/approvals/center/orgs/tree')
 }
 
 export function fetchApprovalOrgUsers(orgId: string) {
   return request.get<never, ApprovalOrgUser[]>(
-    `/api/accounts/approvals/orgs/${orgId}/employees`
+    `/api/ehr/approvals/center/orgs/${orgId}/employees`
   )
 }

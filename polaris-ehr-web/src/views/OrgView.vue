@@ -159,47 +159,49 @@
                       v-else-if="rejectedBriefForRow(record)"
                       @click="openApprovalDetail(rejectedBriefForRow(record)!.id)"
                     >审批信息</a>
-                    <a-tooltip
-                      v-if="(record.allowedChildTypes || []).length"
-                      :title="record.status === 2 ? '节点已禁用，请先启用再新增下级' : ''"
-                    >
-                      <a
-                        :class="{ 'op-disabled': record.status === 2 }"
-                        @click="record.status === 2 ? undefined : openCreate(record)"
+                    <template v-if="canManage">
+                      <a-tooltip
+                        v-if="(record.allowedChildTypes || []).length"
+                        :title="record.status === 2 ? '节点已禁用，请先启用再新增下级' : ''"
                       >
-                        新增下级
+                        <a
+                          :class="{ 'op-disabled': record.status === 2 }"
+                          @click="record.status === 2 ? undefined : openCreate(record)"
+                        >
+                          新增下级
+                        </a>
+                      </a-tooltip>
+                      <a @click="openLeader(record)">
+                        {{ record.leaderEmployeeId ? '更换负责人' : '设置负责人' }}
                       </a>
-                    </a-tooltip>
-                    <a @click="openLeader(record)">
-                      {{ record.leaderEmployeeId ? '更换负责人' : '设置负责人' }}
-                    </a>
-                    <a-tooltip :title="toggleTip(record)">
-                      <a v-if="toggleTip(record)" class="op-disabled">{{ record.status === 2 ? '启用' : '禁用' }}</a>
-                    </a-tooltip>
-                    <a-popconfirm
-                      v-if="!toggleTip(record)"
-                      :title="record.status === 2
-                        ? '启用后该节点重新参与审批流转，确定启用？'
-                        : '禁用后该节点不再参与审批流转，可随时重新启用。确定禁用？'"
-                      ok-text="确定"
-                      cancel-text="取消"
-                      @confirm="doToggle(record)"
-                    >
-                      <a :class="{ danger: record.status !== 2 }">{{ record.status === 2 ? '启用' : '禁用' }}</a>
-                    </a-popconfirm>
-                    <a @click="openEdit(record)">编辑</a>
-                    <a-tooltip :title="deleteTip(record)">
-                      <a v-if="deleteTip(record)" class="op-disabled">删除</a>
-                    </a-tooltip>
-                    <a-popconfirm
-                      v-if="!deleteTip(record)"
-                      title="删除后不可恢复，确定删除该节点？"
-                      ok-text="删除"
-                      cancel-text="取消"
-                      @confirm="doRemove(record)"
-                    >
-                      <a class="danger">删除</a>
-                    </a-popconfirm>
+                      <a-tooltip :title="toggleTip(record)">
+                        <a v-if="toggleTip(record)" class="op-disabled">{{ record.status === 2 ? '启用' : '禁用' }}</a>
+                      </a-tooltip>
+                      <a-popconfirm
+                        v-if="!toggleTip(record)"
+                        :title="record.status === 2
+                          ? '启用后该节点重新参与审批流转，确定启用？'
+                          : '禁用后该节点不再参与审批流转，可随时重新启用。确定禁用？'"
+                        ok-text="确定"
+                        cancel-text="取消"
+                        @confirm="doToggle(record)"
+                      >
+                        <a :class="{ danger: record.status !== 2 }">{{ record.status === 2 ? '启用' : '禁用' }}</a>
+                      </a-popconfirm>
+                      <a @click="openEdit(record)">编辑</a>
+                      <a-tooltip :title="deleteTip(record)">
+                        <a v-if="deleteTip(record)" class="op-disabled">删除</a>
+                      </a-tooltip>
+                      <a-popconfirm
+                        v-if="!deleteTip(record)"
+                        title="删除后不可恢复，确定删除该节点？"
+                        ok-text="删除"
+                        cancel-text="取消"
+                        @confirm="doRemove(record)"
+                      >
+                        <a class="danger">删除</a>
+                      </a-popconfirm>
+                    </template>
                   </a-space>
                 </template>
               </template>

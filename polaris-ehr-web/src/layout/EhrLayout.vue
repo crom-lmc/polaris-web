@@ -55,11 +55,15 @@
               <template #icon><team-outlined /></template>
               人员管理
             </a-menu-item>
-            <a-menu-item v-if="store.can('leave:view')" key="/leaves">
+            <a-menu-item v-if="store.canAny('contract:view', 'employee:view', 'attendance:daily')" key="/hr-ledgers">
+              <template #icon><fund-outlined /></template>
+              人力台账
+            </a-menu-item>
+            <a-menu-item v-if="store.canAny('leave:mine', 'leave:all', 'leave:team')" key="/leaves">
               <template #icon><calendar-outlined /></template>
               请假管理
             </a-menu-item>
-            <a-menu-item v-if="store.can('resign:apply')" key="/my-resign">
+            <a-menu-item v-if="store.canAny('resign:apply', 'approval:resign:apply')" key="/my-resign">
               <template #icon><export-outlined /></template>
               离职申请
             </a-menu-item>
@@ -71,7 +75,7 @@
               <template #icon><audit-outlined /></template>
               审批中心
             </a-menu-item>
-            <a-menu-item v-if="store.can('recruit:view')" key="/recruit">
+            <a-menu-item v-if="store.canAny('recruit:board', 'recruit:offers', 'recruit:jobs', 'recruit:interviews')" key="/recruit">
               <template #icon><user-add-outlined /></template>
               招聘管理
             </a-menu-item>
@@ -79,7 +83,20 @@
               <template #icon><notification-outlined /></template>
               通知管理
             </a-menu-item>
-            <a-menu-item v-if="store.can('attendance:view')" key="/attendance">
+            <a-menu-item
+              v-if="store.canAny(
+                'attendance:overtime',
+                'attendance:monthly',
+                'attendance:my',
+                'attendance:daily',
+                'attendance:punches',
+                'attendance:corrections',
+                'attendance:rules',
+                'attendance:calendar',
+                'attendance:annual'
+              )"
+              key="/attendance"
+            >
               <template #icon><clock-circle-outlined /></template>
               考勤管理
             </a-menu-item>
@@ -109,6 +126,7 @@ import {
   DownOutlined,
   ExportOutlined,
   FileSearchOutlined,
+  FundOutlined,
   LogoutOutlined,
   MenuOutlined,
   NotificationOutlined,
@@ -147,13 +165,16 @@ function handleOpenChange(keys: string[]) {
   openKeys.value = keys
 }
 
-/** 审批中心对两类人可见：有审批权的负责人、能提交离职申请的普通员工 */
-const canSeeApproval = computed(
-  () =>
-    store.can('approval:view') ||
-    store.can('approval:approve') ||
-    store.can('leave:approve') ||
-    store.can('resign:apply')
+const canSeeApproval = computed(() =>
+  store.canAny(
+    'approval:todo',
+    'approval:approved',
+    'approval:started',
+    'approval:cc',
+    'approval:delegated',
+    'approval:handover',
+    'approval:resign'
+  )
 )
 
 function handleMenuClick({ key }: { key: string }) {

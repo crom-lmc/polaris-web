@@ -14,13 +14,62 @@ const router = createRouter({
         { path: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '概览' } },
         { path: 'orgs', component: () => import('@/views/OrgView.vue'), meta: { title: '组织架构', perm: 'org:view' } },
         { path: 'employees', component: () => import('@/views/EmployeeView.vue'), meta: { title: '人员管理', perm: 'employee:view' } },
-        { path: 'leaves', component: () => import('@/views/LeaveView.vue'), meta: { title: '请假管理', perm: 'leave:view' } },
-        { path: 'my-resign', component: () => import('@/views/MyResignView.vue'), meta: { title: '离职申请', perm: 'resign:apply' } },
+        {
+          path: 'hr-ledgers',
+          component: () => import('@/views/HrLedgerView.vue'),
+          meta: { title: '人力台账', perms: ['contract:view', 'employee:view', 'attendance:daily'] }
+        },
+        {
+          path: 'leaves',
+          component: () => import('@/views/LeaveView.vue'),
+          meta: { title: '请假管理', perms: ['leave:mine', 'leave:all', 'leave:team'] }
+        },
+        {
+          path: 'my-resign',
+          component: () => import('@/views/MyResignView.vue'),
+          meta: { title: '离职申请', perms: ['resign:apply', 'approval:resign:apply'] }
+        },
         { path: 'my-regularize', component: () => import('@/views/MyRegularizeView.vue'), meta: { title: '转正申请', perm: 'regularize:apply' } },
-        { path: 'approvals', component: () => import('@/views/ApprovalView.vue'), meta: { title: '审批中心' } },
-        { path: 'recruit', component: () => import('@/views/RecruitView.vue'), meta: { title: '招聘管理', perm: 'recruit:view' } },
+        {
+          path: 'approvals',
+          component: () => import('@/views/ApprovalView.vue'),
+          meta: {
+            title: '审批中心',
+            perms: [
+              'approval:todo',
+              'approval:approved',
+              'approval:started',
+              'approval:cc',
+              'approval:delegated',
+              'approval:handover',
+              'approval:resign'
+            ]
+          }
+        },
+        {
+          path: 'recruit',
+          component: () => import('@/views/RecruitView.vue'),
+          meta: { title: '招聘管理', perms: ['recruit:board', 'recruit:offers', 'recruit:jobs', 'recruit:interviews'] }
+        },
         { path: 'announcements', component: () => import('@/views/AnnouncementView.vue'), meta: { title: '通知管理', perm: 'announcement:view' } },
-        { path: 'attendance', component: () => import('@/views/AttendanceView.vue'), meta: { title: '考勤管理', perm: 'attendance:view' } },
+        {
+          path: 'attendance',
+          component: () => import('@/views/AttendanceView.vue'),
+          meta: {
+            title: '考勤管理',
+            perms: [
+              'attendance:overtime',
+              'attendance:monthly',
+              'attendance:my',
+              'attendance:daily',
+              'attendance:punches',
+              'attendance:corrections',
+              'attendance:rules',
+              'attendance:calendar',
+              'attendance:annual'
+            ]
+          }
+        },
         { path: 'audit-logs', component: () => import('@/views/AuditLogView.vue'), meta: { title: '审计日志', perm: 'audit:view' } },
         { path: 'no-access', component: () => import('@/views/NoAccessView.vue'), meta: { title: '无权限', public: true } }
       ]
@@ -39,6 +88,10 @@ router.beforeEach(async (to) => {
     return false
   }
   if (to.meta.perm && !store.can(to.meta.perm as string)) {
+    return '/no-access'
+  }
+  const perms = to.meta.perms as string[] | undefined
+  if (perms?.length && !store.canAny(...perms)) {
     return '/no-access'
   }
   return true

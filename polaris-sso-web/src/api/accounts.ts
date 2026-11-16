@@ -79,6 +79,11 @@ export function fetchLoginLogs(params: {
 
 // ---------------- 账号的应用授权 ----------------
 
+/** 当前登录者可访问的应用详情（仅启用） */
+export function fetchMyApps() {
+  return request.get<never, { data: ApplicationVO[] }>('/api/accounts/me/apps')
+}
+
 /** 该账号已授权的应用 ID（含停用应用，用于勾选回显） */
 export function fetchAccountAppIds(id: string) {
   return request.get<never, { data: string[] }>(`/api/accounts/${id}/apps`)

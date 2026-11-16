@@ -494,6 +494,7 @@ export interface DashboardSummary {
     onboardThisMonth: number
     resignThisMonth: number
     regularizedThisMonth: number
+    contractExpiring30Days: number
   }
   orgDistribution: Array<{ orgId: string; orgName: string; type: string; employees: number }>
   headcount: Array<{
@@ -1086,7 +1087,7 @@ export function leaveConflicts(startDate: string, endDate: string) {
   return request.get<never, LeaveItem[]>('/api/ehr/leaves/conflicts', { params: { startDate, endDate } })
 }
 
-/** 团队请假视图：需 leave:view:team */
+/** 团队请假视图：需 leave:team */
 export function teamLeaves(params: { orgId?: string; from?: string; to?: string }) {
   return request.get<never, LeaveItem[]>('/api/ehr/leaves/team', { params })
 }
@@ -1687,6 +1688,12 @@ export const listRecruitCandidates = (params: {
   page?: number
   size?: number
 }) => request.get<never, PageData<RecruitCandidate>>('/api/ehr/recruits/candidates', { params })
+
+export function downloadRecruitResume(id: string) {
+  return request.get<never, { data: Blob }>(`/api/ehr/recruits/candidates/${id}/resume/download`, {
+    responseType: 'blob'
+  })
+}
 
 export const createRecruitCandidate = (body: RecruitCandidateBody) =>
   request.post<never, RecruitCandidate>('/api/ehr/recruits/candidates', body)

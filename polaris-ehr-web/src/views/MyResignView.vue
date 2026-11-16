@@ -139,7 +139,7 @@
                   @click="openApprovalDetail(rejectedBriefForRow(record)!.id)"
                 >审批信息</a>
                 <a-popconfirm
-                  v-if="record.status === 0 && record.mine"
+                  v-if="canCancel && record.status === 0 && record.mine"
                   title="撤销后需要重新提交，确定撤销？"
                   ok-text="撤销"
                   cancel-text="取消"
@@ -297,7 +297,8 @@ import {
 } from '@/api/approvals'
 
 const store = useUserStore()
-const canApply = computed(() => store.can('resign:apply'))
+const canApply = computed(() => store.canAny('resign:apply', 'approval:resign:apply'))
+const canCancel = computed(() => store.canAny('resign:apply', 'approval:resign:cancel'))
 
 /* ---------- 在途审批详情：审批动作统一在审批中心完成 ---------- */
 const approvalDrawerOpen = ref(false)

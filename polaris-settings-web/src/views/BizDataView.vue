@@ -17,15 +17,14 @@
             >新建数据项</a-button>
           </a-space>
         </div>
-        <div class="panel-body table-body ft-scroll ft-bottom">
+        <div class="panel-body table-body ft-scroll">
           <a-table class="ft-table"
             :columns="itemColumns"
             :data-source="pagedItems"
             :loading="itemLoading"
             row-key="id"
             size="small"
-            :pagination="pagination"
-            @change="onTableChange"
+            :pagination="false"
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'code'">
@@ -53,6 +52,9 @@
               </template>
             </template>
           </a-table>
+        </div>
+        <div class="table-pagination">
+          <a-pagination v-bind="pagination" @change="onPageChange" />
         </div>
       </section>
     </div>
@@ -141,8 +143,7 @@ const items = ref<BizItem[]>([])
 const itemLoading = ref(false)
 const includeDisabled = ref(false)
 
-/** 主数据项接口返回全量，做前端分页；分页条由 ft-bottom 贴到容器底部。
- *  注意：不要手动设 total —— 设了 a-table 会误认为是后端分页，不截取当前页数据 */
+/** 主数据项接口返回全量，做前端分页；分页条固定在表格滚动区域外。 */
 const page = ref(1)
 const pageSize = ref(10)
 const pagedItems = computed(() => {
@@ -156,9 +157,9 @@ const pagination = computed(() => ({
   showSizeChanger: true,
   showTotal: (t: number) => `共 ${t} 条`
 }))
-function onTableChange(pag: any) {
-  page.value = pag?.current || 1
-  pageSize.value = pag?.pageSize || pageSize.value
+function onPageChange(current: number, size: number) {
+  page.value = current
+  pageSize.value = size
 }
 
 const itemColumns = computed(() => {
@@ -304,6 +305,16 @@ onMounted(loadCategories)
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.table-pagination {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--panel-border, var(--header-border));
+  background: var(--panel-bg, var(--header-bg));
 }
 
 .head-sub {

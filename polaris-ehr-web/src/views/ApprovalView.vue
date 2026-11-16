@@ -1,9 +1,10 @@
 <template>
   <div class="page-root">
+    <template v-if="visibleTabs.length">
     <!-- 与统一账号中心审批中心同一套版式：下划线 tabs + 右上角工具按钮，不套面板边框/说明条 -->
     <div class="head ft-head">
       <a-tabs v-model:activeKey="tab" class="tabs" @change="onTabChange">
-        <a-tab-pane v-for="t in TABS" :key="t.key">
+        <a-tab-pane v-for="t in visibleTabs" :key="t.key">
           <template #tab>
             <span class="tab">
               {{ t.label }}
@@ -113,7 +114,7 @@
               <a-space size="small" @click.stop>
                 <a-button type="link" size="small" @click="openApprovalDetail(record.id, 'view')">查看</a-button>
                 <a-button
-                  v-if="tab === 'todo' || record.myTaskId"
+                  v-if="(tab === 'todo' || record.myTaskId) && canProcessTodo"
                   type="link"
                   size="small"
                   @click="openApprovalDetail(record.id, 'approve')"
@@ -185,7 +186,7 @@
                   @click="openApprovalDetail(record.approvalInstanceId)"
                 >{{ record.status === 2 ? '审批信息' : '审批详情' }}</a>
                 <span v-if="record.status === 0 && record.handoverStatus !== 0" class="muted">已完成</span>
-                <a v-else-if="record.status === 0" @click="openHandover(record)">确认交接</a>
+                <a v-else-if="record.status === 0 && canConfirmHandover" @click="openHandover(record)">确认交接</a>
                 <span v-else-if="!record.approvalInstanceId && record.status !== 0" class="muted">—</span>
               </a-space>
             </template>
@@ -248,10 +249,10 @@
                 >
                   {{ record.status === 2 ? '审批信息' : '审批详情' }}
                 </a>
-                <a v-if="record.handoverMine && record.status === 0 && record.handoverStatus === 0"
+                <a v-if="canConfirmHandover && record.handoverMine && record.status === 0 && record.handoverStatus === 0"
                    @click="openHandover(record)">确认交接</a>
                 <a-popconfirm
-                  v-if="record.status === 0 && record.mine"
+                  v-if="canCancelResign && record.status === 0 && record.mine"
                   title="撤销后需要重新提交，确定撤销？"
                   ok-text="撤销"
                   cancel-text="取消"
@@ -270,6 +271,8 @@
           </template>
         </a-table>
     </section>
+    </template>
+    <a-empty v-else class="no-permission" description="暂无审批中心访问权限" />
 
     <!-- 审批中心实例详情：表单快照 / 流程进度 / 审批人 / 意见 / 我的处理 -->
     <approval-detail-drawer
@@ -320,7 +323,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { ExportOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import HandoverList from '@/components/HandoverList.vue'
@@ -337,10 +340,20 @@ import {
 import { fetchApprovals, type ApprovalScope } from '@/api/approvals'
 import { type ApprovalInstance } from '@/types/approval'
 import { useUserStore } from '@/stores/user'
+import { useRoute, useRouter } from 'vue-router'
 
 const store = useUserStore()
-const canApprove = computed(() => store.can('approval:approve') || store.can('leave:approve'))
-const canApplyResign = computed(() => store.can('resign:apply'))
+const route = useRoute()
+const router = useRouter()
+const canProcessTodo = computed(() =>
+  store.can('approval:todo:approve') ||
+  store.can('approval:todo:reject') ||
+  store.can('approval:todo:transfer') ||
+  store.can('approval:todo:add-sign')
+)
+const canApplyResign = computed(() => store.can('approval:resign:apply'))
+const canCancelResign = computed(() => store.can('approval:resign:cancel'))
+const canConfirmHandover = computed(() => store.can('approval:handover:confirm'))
 
 type TabKey = 'todo' | 'approved' | 'started' | 'cc' | 'delegated' | 'handover' | 'mine'
 const APPROVAL_TABS: TabKey[] = ['todo', 'approved', 'started', 'cc', 'delegated']
@@ -352,18 +365,33 @@ const SCOPE_BY_TAB: Record<string, ApprovalScope> = {
   delegated: 'delegated'
 }
 /** 下划线页签（与统一账号中心一致）：审批中心 5 个 + EHR 特有的交接/离职申请 */
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'todo', label: '待我审批' },
-  { key: 'approved', label: '已审批' },
-  { key: 'started', label: '我发起的' },
-  { key: 'cc', label: '抄送我' },
-  { key: 'delegated', label: '我委托的' },
-  { key: 'handover', label: '待我交接' },
-  { key: 'mine', label: '离职 / 减员申请' }
+const TABS: { key: TabKey; label: string; permission: string }[] = [
+  { key: 'todo', label: '待我审批', permission: 'approval:todo' },
+  { key: 'approved', label: '已审批', permission: 'approval:approved' },
+  { key: 'started', label: '我发起的', permission: 'approval:started' },
+  { key: 'cc', label: '抄送我', permission: 'approval:cc' },
+  { key: 'delegated', label: '我委托的', permission: 'approval:delegated' },
+  { key: 'handover', label: '待我交接', permission: 'approval:handover' },
+  { key: 'mine', label: '离职 / 减员申请', permission: 'approval:resign' }
 ]
-
-/** 审批权限由审批中心的任务分派决定，不再看本地权限点；所有人默认进「待我审批」 */
-const tab = ref<TabKey>('todo')
+const visibleTabs = computed(() => TABS.filter((t) => store.can(t.permission)))
+function resolveTab(requested: unknown): TabKey {
+  const key = typeof requested === 'string' ? requested : ''
+  return visibleTabs.value.find((t) => t.key === key)?.key || visibleTabs.value[0]?.key || 'todo'
+}
+const tab = ref<TabKey>(resolveTab(route.query.tab))
+let mounted = false
+watch([visibleTabs, () => route.query.tab], ([, requested]) => {
+  const resolved = resolveTab(requested)
+  const changed = resolved !== tab.value
+  tab.value = resolved
+  if (requested !== undefined && requested !== resolved) {
+    const query = { ...route.query }
+    delete query.tab
+    router.replace({ query })
+  }
+  if (mounted && changed) onTabChange()
+}, { immediate: true })
 
 /* ---------------- 审批中心实例（五视图） ---------------- */
 const approvalRows = ref<ApprovalInstance[]>([])
@@ -510,8 +538,8 @@ const mineLoading = ref(false)
 const minePage = ref(1)
 const mineSize = ref(10)
 const statusFilter = ref<number | undefined>(undefined)
-/** 有审批权的人可以切到「全部」，方便跟进已提交单据 */
-const mineScope = computed(() => (canApprove.value || store.can('employee:resign') ? 'all' : 'mine'))
+/** 「全部」只由离职/减员页签的查看全部权限决定，不再借用审批权限 */
+const mineScope = computed(() => (store.can('approval:resign:view-all') ? 'all' : 'mine'))
 
 /** 统一走审批中心后：0 = 待交接或审批中，不再有「待人事中心审批」二级状态 */
 const statusOptions = [
@@ -582,9 +610,9 @@ async function loadMine() {
   }
 }
 
-function reloadMine() {
+async function reloadMine() {
   minePage.value = 1
-  loadMine()
+  await loadMine()
 }
 
 function onMineTableChange(p: any) {
@@ -603,10 +631,11 @@ function approvalStatusColor(s?: number) {
   return ({ 0: 'processing', 1: 'green', 2: 'red', 3: 'default', 4: 'default' } as Record<number, string>)[s ?? -1] || 'default'
 }
 
-function reload() {
-  if (isApprovalTab.value) loadApprovals()
-  else if (tab.value === 'handover') loadHandovers()
-  else reloadMine()
+async function reload() {
+  if (!visibleTabs.value.length) return
+  if (isApprovalTab.value) await loadApprovals()
+  else if (tab.value === 'handover') await loadHandovers()
+  else await reloadMine()
 }
 
 function onTabChange() {
@@ -615,9 +644,9 @@ function onTabChange() {
   reload()
 }
 
-/** 抽屉里完成审批动作后：当前 tab、交接、申请列表一起刷新（业务状态由回调同步） */
+/** 抽屉里完成动作后只刷新激活页签，避免拉取无权限或不可见页签的数据 */
 async function onApprovalDone() {
-  await Promise.all([loadApprovals(), loadHandovers(), loadMine()])
+  await reload()
 }
 
 /* ---------------- 确认交接（业务侧逐项确认，全部完成后自动发起审批中心实例） ---------------- */
@@ -652,7 +681,7 @@ async function doConfirmHandover(itemIds: string[]) {
     } else {
       message.success(`已确认，还剩 ${(res.handoverTotal || 0) - (res.handoverDone || 0)} 项`)
     }
-    await Promise.all([loadHandovers(), loadMine()])
+    await reload()
   } catch (e: any) {
     message.error(e?.message || '确认失败')
   }
@@ -669,9 +698,8 @@ async function doCancel(row: ResignApplyItem) {
 }
 
 onMounted(() => {
-  loadApprovals()
-  loadHandovers()
-  loadMine()
+  mounted = true
+  reload()
 })
 </script>
 
@@ -681,6 +709,9 @@ onMounted(() => {
   --ft-min-width: 1100px;
   /* 全局 .page-root 带 12px gap，这里收掉，让 tabs 与表格只隔 4px */
   gap: 0;
+}
+.no-permission {
+  margin: 80px auto;
 }
 .head {
   display: flex;

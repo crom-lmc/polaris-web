@@ -18,6 +18,10 @@ export const useUserStore = defineStore('user', () => {
     return me.value.superAdmin || permissions.value.includes(code)
   }
 
+  function canAny(...codes: string[]): boolean {
+    return codes.some((code) => can(code))
+  }
+
   function applyMe(info: MeInfo) {
     me.value = info
     ready.value = true
@@ -43,5 +47,5 @@ export const useUserStore = defineStore('user', () => {
     ready.value = false
   }
 
-  return { me, ready, permissions, isSuperAdmin, username, can, applyMe, bootstrap, logout }
+  return { me, ready, permissions, isSuperAdmin, username, can, canAny, applyMe, bootstrap, logout }
 })

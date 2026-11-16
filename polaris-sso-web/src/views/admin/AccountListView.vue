@@ -306,7 +306,7 @@
       v-model:open="scopeOpen"
       :title="`「${scopeTarget?.username || ''}」的数据权限`"
       :confirm-loading="submitting"
-      width="480"
+      :width="480"
       @ok="submitDataScope"
     >
       <a-alert

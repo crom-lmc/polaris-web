@@ -115,8 +115,8 @@
           </div>
         </section>
 
-        <!-- 操作区：只有「审批」模式且当前登录人在本单有待办才出现；点「查看」时整块隐藏 -->
-        <section v-if="props.mode === 'approve' && myTaskId" class="card action-card">
+        <!-- 操作区：审批模式 + 本人待办 + 对应按钮权限；点「查看」时整块隐藏 -->
+        <section v-if="props.mode === 'approve' && myTaskId && canProcessTodo" class="card action-card">
           <div class="card-title">我的处理</div>
           <a-textarea
             v-model:value="note"
@@ -126,14 +126,24 @@
             show-count
           />
           <div class="actions">
-            <a-button type="primary" :loading="submitting" @click="submit(true)">通过</a-button>
-            <a-button danger :loading="submitting" @click="submit(false)">驳回</a-button>
-            <a-dropdown>
+            <a-button
+              v-if="store.can('approval:todo:approve')"
+              type="primary"
+              :loading="submitting"
+              @click="submit(true)"
+            >通过</a-button>
+            <a-button
+              v-if="store.can('approval:todo:reject')"
+              danger
+              :loading="submitting"
+              @click="submit(false)"
+            >驳回</a-button>
+            <a-dropdown v-if="canMoveTask">
               <a-button>更多 <down-outlined /></a-button>
               <template #overlay>
                 <a-menu @click="onMore">
-                  <a-menu-item key="transfer">转办给他人</a-menu-item>
-                  <a-menu-item key="addSign">加签（临时插人）</a-menu-item>
+                  <a-menu-item v-if="store.can('approval:todo:transfer')" key="transfer">转办给他人</a-menu-item>
+                  <a-menu-item v-if="store.can('approval:todo:add-sign')" key="addSign">加签（临时插人）</a-menu-item>
                 </a-menu>
               </template>
             </a-dropdown>
@@ -241,7 +251,7 @@ const pickedUser = ref<{ id: string; name: string } | null>(null)
 const pickerOpen = ref(false)
 const movePosition = ref<'BEFORE' | 'AFTER'>('AFTER')
 
-/** 上下文里的「我的待办」最权威：审批权限由任务分派决定，不看权限点 */
+/** 上下文里的「我的待办」决定任务归属，具体动作再由新按钮权限码控制 */
 const myTaskId = computed(() => ctx.value?.myTaskId || detail.value?.myTaskId || null)
 const values = computed<Record<string, unknown>>(() => ctx.value?.values || detail.value?.formData || {})
 /** 表名 → 定位模式；服务端按实例冻结的绑定算出，老单没有该字段 */
@@ -397,9 +407,18 @@ const taskGroups = computed<TaskGroup[]>(() => {
   return [applicantGroup, ...groups]
 })
 
+const canProcessTodo = computed(() =>
+  store.can('approval:todo:approve') ||
+  store.can('approval:todo:reject') ||
+  store.can('approval:todo:transfer') ||
+  store.can('approval:todo:add-sign')
+)
+const canMoveTask = computed(() =>
+  store.can('approval:todo:transfer') || store.can('approval:todo:add-sign')
+)
 const canWithdraw = computed(() => {
   const inst = detail.value
-  if (!inst || inst.status !== 0) return false
+  if (!inst || inst.status !== 0 || !store.can('approval:started:withdraw')) return false
   return String(inst.applicantId || '') === String(store.me?.accountId || '')
 })
 
