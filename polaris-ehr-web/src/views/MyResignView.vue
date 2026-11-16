@@ -121,23 +121,15 @@
                 待 {{ record.handoverName || '交接人' }} 确认交接
               </div>
               <div v-else-if="!record.approvalInstanceId && record.status === 0" class="muted cell-sub">审批中心流转中</div>
-              <div v-else-if="(record.status === 1 || record.status === 2) && (record.approverName || record.approveNote)" class="muted cell-sub">
-                {{ record.approverName || '—' }}<span v-if="record.approveNote">：{{ record.approveNote }}</span>
-              </div>
             </template>
             <template v-else-if="column.key === 'action'">
               <div class="row-actions">
                 <a class="act" @click="openDetail(record)">详情</a>
                 <a
-                  v-if="runningBriefForRow(record)"
+                  v-if="latestBriefForRow(record)"
                   class="act"
-                  @click="openApprovalDetail(runningBriefForRow(record)!.id)"
+                  @click="openApprovalDetail(latestBriefForRow(record)!.id)"
                 >审批详情</a>
-                <a
-                  v-else-if="rejectedBriefForRow(record)"
-                  class="act"
-                  @click="openApprovalDetail(rejectedBriefForRow(record)!.id)"
-                >审批信息</a>
                 <a-popconfirm
                   v-if="canCancel && record.status === 0 && record.mine"
                   title="撤销后需要重新提交，确定撤销？"
@@ -227,25 +219,13 @@
           <a-descriptions-item label="状态">
             <a-tag :color="statusColor(detail.status)">{{ detail.statusName }}</a-tag>
             <a
-              v-if="runningBriefForRow(detail)"
+              v-if="latestBriefForRow(detail)"
               style="margin-left: 8px"
-              @click="openApprovalDetail(runningBriefForRow(detail)!.id)"
-            >查看审批流程</a>
-            <a
-              v-else-if="rejectedBriefForRow(detail)"
-              style="margin-left: 8px"
-              @click="openApprovalDetail(rejectedBriefForRow(detail)!.id)"
-            >查看审批信息</a>
+              @click="openApprovalDetail(latestBriefForRow(detail)!.id)"
+            >查看审批详情</a>
             <span v-else-if="detail.status === 0" class="muted" style="margin-left: 8px">
               待交接全部确认后自动发起审批
             </span>
-            <span v-else-if="detail.approverName" class="muted" style="margin-left: 8px">
-              {{ detail.approverName }}
-            </span>
-          </a-descriptions-item>
-          <a-descriptions-item v-if="detail.approveNote" label="审批意见">{{ detail.approveNote }}</a-descriptions-item>
-          <a-descriptions-item v-if="detail.hrApproveNote || detail.hrApproverName" label="HR中心意见">
-            {{ detail.hrApproverName || '—' }}<template v-if="detail.hrApproveNote">：{{ detail.hrApproveNote }}</template>
           </a-descriptions-item>
           <a-descriptions-item label="提交时间">{{ detail.createdAt || '—' }}</a-descriptions-item>
         </a-descriptions>
@@ -292,7 +272,7 @@ import {
   buildBizRefs,
   fetchLatestApprovals,
   runningBriefOf,
-  rejectedBriefOf,
+  pickFinalBrief,
   type ApprovalBrief
 } from '@/api/approvals'
 
@@ -366,10 +346,11 @@ function runningBriefForRow(r: ApprovalRowLike | null | undefined) {
   )
 }
 
-/** 审批完成后不再给详情入口，只有被驳回时需要查看驳回意见 */
-function rejectedBriefForRow(r: ApprovalRowLike | null | undefined) {
+/** 所有业务状态统一查看最近一次审批：优先在途，否则取最近终态 */
+function latestBriefForRow(r: ApprovalRowLike | null | undefined) {
   if (!r?.id) return null
-  return rejectedBriefOf(briefsForRow(approvalBriefs.value, r.id))
+  const briefs = briefsForRow(approvalBriefs.value, r.id)
+  return runningBriefForRow(r) || pickFinalBrief(briefs)
 }
 const total = ref(0)
 const loading = ref(false)

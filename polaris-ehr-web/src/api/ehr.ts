@@ -924,17 +924,6 @@ export interface ResignApplyItem {
   status: number
   statusName: string
   applicantAccountId?: string
-  approverAccountId?: string | null
-  approverName?: string
-  /** 审批人所在节点：被办理人本身是负责人时这里是上一级 */
-  approverOrgName?: string
-  approveNote?: string
-  approvedAt?: string
-  /** 二级（集团人力资源中心负责人）审批；null=未走到或系统无该节点（有权限者兜底） */
-  hrApproverAccountId?: string | null
-  hrApproverName?: string
-  hrApproveNote?: string
-  hrApprovedAt?: string
   createdAt?: string
   mine: boolean
   /** 审批中心实例 ID：交接全部确认后发起审批才有值 */
@@ -1038,14 +1027,11 @@ export interface LeaveItem {
   attachments?: LeaveAttachmentRef[]
   status: number
   statusName: string
-  /** 提交时按部门负责人快照的审批人账户ID；为空表示由有审批权的人兜底 */
-  approverAccountId?: string | null
-  approverName?: string
   /** 审批转办人（部门负责人请假时指定）：审批通过后由其在请假期间代审 */
   delegateAccountId?: string | null
   delegateName?: string
+  /** 销假备注（仅已销假状态使用） */
   approveNote?: string
-  approvedAt?: string
   createdAt?: string
   mine: boolean
   /** 审批中心实例 ID；有值即显示「请假审批中」并可点开详情 */

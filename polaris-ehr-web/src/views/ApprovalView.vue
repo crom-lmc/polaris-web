@@ -237,18 +237,13 @@
                 待 {{ record.handoverName }} 确认交接
               </div>
               <div v-else-if="record.status === 0" class="muted">交接完成后自动发起审批</div>
-              <div v-else-if="record.status === 1 || record.status === 2" class="muted">
-                {{ record.approverName || '—' }}<span v-if="record.approveNote">：{{ record.approveNote }}</span>
-              </div>
             </template>
             <template v-else-if="column.key === 'action'">
               <a-space size="small">
                 <a
-                  v-if="record.approvalInstanceId && (record.status === 0 || record.status === 2)"
-                  @click="openApprovalDetail(record.approvalInstanceId)"
-                >
-                  {{ record.status === 2 ? '审批信息' : '审批详情' }}
-                </a>
+                  v-if="latestBriefForRow(record)"
+                  @click="openApprovalDetail(latestBriefForRow(record)!.id)"
+                >审批详情</a>
                 <a v-if="canConfirmHandover && record.handoverMine && record.status === 0 && record.handoverStatus === 0"
                    @click="openHandover(record)">确认交接</a>
                 <a-popconfirm
@@ -261,7 +256,7 @@
                   <a class="danger">撤销</a>
                 </a-popconfirm>
                 <span
-                  v-if="!(record.approvalInstanceId && record.status === 0)
+                  v-if="!latestBriefForRow(record)
                     && !(record.status === 0 && record.mine)
                     && !(record.handoverMine && record.handoverStatus === 0)"
                   class="muted"
@@ -337,7 +332,16 @@ import {
   type HandoverItem,
   type ResignApplyItem
 } from '@/api/ehr'
-import { fetchApprovals, type ApprovalScope } from '@/api/approvals'
+import {
+  briefsForRow,
+  buildBizRefs,
+  fetchApprovals,
+  fetchLatestApprovals,
+  runningBriefOf,
+  pickFinalBrief,
+  type ApprovalBrief,
+  type ApprovalScope
+} from '@/api/approvals'
 import { type ApprovalInstance } from '@/types/approval'
 import { useUserStore } from '@/stores/user'
 import { useRoute, useRouter } from 'vue-router'
@@ -533,6 +537,7 @@ async function loadHandovers() {
 /* ---------------- 我的申请 ---------------- */
 
 const mineRows = ref<ResignApplyItem[]>([])
+const mineApprovalBriefs = ref<ApprovalBrief[]>([])
 const mineTotal = ref(0)
 const mineLoading = ref(false)
 const minePage = ref(1)
@@ -540,6 +545,21 @@ const mineSize = ref(10)
 const statusFilter = ref<number | undefined>(undefined)
 /** 「全部」只由离职/减员页签的查看全部权限决定，不再借用审批权限 */
 const mineScope = computed(() => (store.can('approval:resign:view-all') ? 'all' : 'mine'))
+
+async function loadMineApprovalBriefs(list: ResignApplyItem[]) {
+  const refs = buildBizRefs(list.map((r) => r.id), ['ehr.resign', 'ehr.reduce'])
+  mineApprovalBriefs.value = refs.length ? await fetchLatestApprovals(refs).catch(() => []) : []
+}
+
+/** 所有业务状态统一查看最近一次审批：优先在途，否则取最近终态 */
+function latestBriefForRow(r: ResignApplyItem) {
+  const briefs = briefsForRow(mineApprovalBriefs.value, r.id)
+  return runningBriefOf(
+    briefs,
+    r.status === 0 ? r.approvalInstanceId : null,
+    r.approvalBizType
+  ) || pickFinalBrief(briefs)
+}
 
 /** 统一走审批中心后：0 = 待交接或审批中，不再有「待人事中心审批」二级状态 */
 const statusOptions = [
@@ -603,6 +623,7 @@ async function loadMine() {
     })
     mineRows.value = data.list || []
     mineTotal.value = data.total || 0
+    void loadMineApprovalBriefs(mineRows.value)
   } catch (e: any) {
     message.error(e?.message || '加载失败')
   } finally {

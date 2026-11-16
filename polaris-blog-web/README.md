@@ -1,6 +1,6 @@
 # blog-web — 博客前端（读者端 + 管理端）
 
-`F:\code\sso` 工作区内的博客前端，配套后端为 **`sso-microservices/blog-admin`（端口 9003）**，
+Polaris 工作区内的博客前端，配套后端为 **`polaris-server/polaris-blog/polaris-blog-service`（端口 9003）**，
 经 **SSO 网关（9080）** 统一入口访问，后台登录接入**统一账号中心**。
 
 - **读者端 `packages/web`（5175）免登录**，只访问 `/api/blog/public/**`
@@ -9,16 +9,13 @@
 ## 目录结构
 
 ```
-blog-web
-├─ packages
-│  ├─ shared          # 主题内核：ThemeConfig → CSS 变量、预设、token 派生
-│  │  └─ src/theme    # color.ts css.ts default.ts presets.ts
-│  │     src/mock     # Vite 中间件 Mock（VITE_USE_MOCK=true 时启用，当前关闭）
-│  ├─ web             # 读者端：Vue3 + TS + Pinia，零 UI 框架，端口 5175
-│  └─ admin           # 管理端：Vue3 + TS + Element Plus + ECharts，端口 5176
-└─ tools
-   ├─ cdp-e2e.mjs     # 无头浏览器：跳登录 → 填表 → 回跳 → 换票 → 进后台
-   └─ cdp-web.mjs     # 无头浏览器：读者端免登录渲染冒烟
+polaris-blog-web
+└─ packages
+   ├─ shared          # 主题内核：ThemeConfig → CSS 变量、预设、token 派生
+   │  └─ src/theme    # color.ts css.ts default.ts presets.ts
+   │     src/mock     # Vite 中间件 Mock（VITE_USE_MOCK=true 时启用，当前关闭）
+   ├─ web             # 读者端：Vue3 + TS + Pinia，零 UI 框架，端口 5175
+   └─ admin           # 管理端：Vue3 + TS + Element Plus + ECharts，端口 5176
 ```
 
 ## 快速开始
@@ -33,8 +30,8 @@ npm run typecheck      # 两个包 vue-tsc
 npm run build
 ```
 
-前置依赖（本地七端口）：gateway `9080`、auth `9001`、account `9002`、blog-admin `9003`、
-sso-web `5173`、读者端 `5175`、管理端 `5176`。后端启动方式见 `../sso-microservices/README.md`。
+前置依赖（本地七端口）：gateway `9080`、auth `9001`、account `9002`、blog-service `9003`、
+sso-web `5173`、读者端 `5175`、管理端 `5176`。后端启动方式见 `../../polaris-server/README.md`。
 
 ### 环境变量
 
@@ -57,9 +54,8 @@ VITE_WEB_ORIGIN=http://localhost:5175   # 主题编辑器 iframe 预览
 VITE_SSO_ORIGIN=http://localhost:5173   # 账号中心
 ```
 
-> ⚠️ `VITE_SSO_ORIGIN` 与 `VITE_ADMIN_PORT` 拼出的 origin，**必须等于 `sso_application` 里 blog 应用的 `base_url`**，
-> 否则一次性 ticket 的 origin 校验会拒发。改端口后要跑
-> `python ../sso-microservices/tools/setup-blog-local.py --base-url http://127.0.0.1:<新端口>`。
+> `VITE_SSO_ORIGIN` 与 `VITE_ADMIN_PORT` 拼出的 origin，**必须等于 `sso_application` 里 blog 应用的 `base_url`**，
+> 否则一次性 ticket 的 origin 校验会拒发。修改端口后，需要在账号中心同步更新 blog 应用的 `base_url`。
 
 ## 后台登录（单点，无本地登录）
 
@@ -142,12 +138,3 @@ VITE_SSO_ORIGIN=http://localhost:5173   # 账号中心
 3. 组件样式只允许使用 CSS 变量，硬编码色值只出现在 `shared/src/theme/default.ts` 与 `web/src/styles/base.css` 的兜底变量里。
 4. 后台主题编辑器三栏：左侧配置（预设/颜色/字体/间距/布局/区块拖拽/深色/自定义 CSS），
    中间 iframe 预览真实前台，右侧撤销重做 20 步 / 保存草稿 / 发布 / 导入导出；编辑时经 `postMessage` 实时下发，输入即生效。
-
-## 冒烟脚本
-
-```bash
-node tools/cdp-web.mjs      # 读者端：断言首页/文章/分类渲染，且全程未跳登录
-BLOG_USER=admin BLOG_PWD=... node tools/cdp-e2e.mjs   # 后台：完整单点链路 + 菜单数量
-```
-
-脚本用无头 Edge + CDP（flat session），失败时截图落在临时目录。

@@ -81,23 +81,18 @@
             <template v-else-if="column.key === 'status'">
               <a-tag :color="statusColor(record.status)">{{ record.statusName }}</a-tag>
               <div v-if="!record.approvalInstanceId && record.status === 0" class="muted">审批中心流转中</div>
-              <div v-else-if="record.status === 1 || record.status === 2" class="muted">
-                {{ record.approverName || '—' }}<span v-if="record.approveNote">：{{ record.approveNote }}</span>
+              <div v-else-if="record.status === 4 && record.approveNote" class="muted">
+                销假备注：{{ record.approveNote }}
               </div>
             </template>
             <template v-else-if="column.key === 'action'">
               <div class="row-actions">
                 <a class="act" @click="openDetail(record)">详情</a>
                 <a
-                  v-if="runningBriefForRow(record)"
+                  v-if="latestBriefForRow(record)"
                   class="act"
-                  @click="openApprovalDetail(runningBriefForRow(record)!.id)"
+                  @click="openApprovalDetail(latestBriefForRow(record)!.id)"
                 >审批详情</a>
-                <a
-                  v-else-if="rejectedBriefForRow(record)"
-                  class="act"
-                  @click="openApprovalDetail(rejectedBriefForRow(record)!.id)"
-                >审批信息</a>
                 <a-popconfirm
                   v-if="record.status === 0 && record.mine && canCancel"
                   title="撤销后需要重新提交，确定撤销？"
@@ -323,8 +318,9 @@
             <a-tag :color="statusColor(detailRecord.status)">{{ detailRecord.statusName }}</a-tag>
           </a-descriptions-item>
           <a-descriptions-item label="事由" :span="2">{{ detailRecord.reason || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="审批人">{{ detailRecord.approverName || '—' }}</a-descriptions-item>
-          <a-descriptions-item label="审批意见">{{ detailRecord.approveNote || '—' }}</a-descriptions-item>
+          <a-descriptions-item v-if="detailRecord.status === 4 && detailRecord.approveNote" label="销假备注" :span="2">
+            {{ detailRecord.approveNote }}
+          </a-descriptions-item>
           <a-descriptions-item label="提交时间" :span="2">{{ detailRecord.createdAt || '—' }}</a-descriptions-item>
         </a-descriptions>
         <div class="detail-proof">
@@ -391,7 +387,7 @@ import {
   buildBizRefs,
   fetchLatestApprovals,
   runningBriefOf,
-  rejectedBriefOf,
+  pickFinalBrief,
   type ApprovalBrief
 } from '@/api/approvals'
 
@@ -447,9 +443,10 @@ function runningBriefForRow(r: LeaveItem) {
   )
 }
 
-/** 审批完成后不再给详情入口，只有被驳回时需要查看驳回意见 */
-function rejectedBriefForRow(r: LeaveItem) {
-  return rejectedBriefOf(briefsForRow(approvalBriefs.value, r.id))
+/** 已接入审批中心的记录统一查看最近一次审批：优先在途，否则取最近终态 */
+function latestBriefForRow(r: LeaveItem) {
+  const briefs = briefsForRow(approvalBriefs.value, r.id)
+  return runningBriefForRow(r) || pickFinalBrief(briefs)
 }
 const total = ref(0)
 const loading = ref(false)
@@ -490,7 +487,7 @@ async function load() {
       const list = await teamLeaves({})
       rows.value = list || []
       total.value = rows.value.length
-      approvalBriefs.value = []
+      void loadApprovalBriefs(rows.value)
       return
     }
     const data = await pageLeaves({
