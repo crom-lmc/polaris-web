@@ -55,10 +55,6 @@
               <template #icon><team-outlined /></template>
               人员管理
             </a-menu-item>
-            <a-menu-item v-if="store.canAny('contract:view', 'employee:view', 'attendance:daily')" key="/hr-ledgers">
-              <template #icon><fund-outlined /></template>
-              人力台账
-            </a-menu-item>
             <a-menu-item v-if="store.canAny('leave:mine', 'leave:all', 'leave:team')" key="/leaves">
               <template #icon><calendar-outlined /></template>
               请假管理
@@ -83,6 +79,14 @@
               <template #icon><notification-outlined /></template>
               通知管理
             </a-menu-item>
+            <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
+              <template #icon><file-search-outlined /></template>
+              审计日志
+            </a-menu-item>
+            <a-menu-item v-if="store.canAny('contract:view', 'employee:view', 'attendance:daily')" key="/hr-ledgers">
+              <template #icon><fund-outlined /></template>
+              人力台账
+            </a-menu-item>
             <a-menu-item
               v-if="store.canAny(
                 'attendance:overtime',
@@ -99,10 +103,6 @@
             >
               <template #icon><clock-circle-outlined /></template>
               考勤管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
-              <template #icon><file-search-outlined /></template>
-              审计日志
             </a-menu-item>
           </a-submenu>
         </a-menu>

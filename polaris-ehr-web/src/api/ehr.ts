@@ -1384,6 +1384,54 @@ export const renewContract = (id: string, body: ContractRenewBody) =>
 export const terminateContract = (id: string, reason: string) =>
   request.post<never, ContractItem>(`/api/ehr/contracts/${id}/terminate`, { reason })
 
+/* ---------------- 人力台账 ---------------- */
+
+export interface LedgerOrgOption { id: string; name: string }
+export interface LedgerCountItem { key: string; name: string; value: number }
+export interface LedgerMonthCount { month: string; value: number }
+export interface LedgerDailyCount { date: string; value: number }
+
+export interface ContractLedgerRow {
+  id: string; employeeId: string; name: string; empNo: string; org: string
+  contractNo: string; type: string; startDate: string; endDate: string
+  remainingDays: number; status: string
+}
+export interface ContractLedgerData {
+  page: PageData<ContractLedgerRow>
+  within30: number; within60: number; within90: number; expired: number
+  orgs: LedgerOrgOption[]; monthly: LedgerMonthCount[]; types: LedgerCountItem[]
+}
+
+export interface MovementLedgerRow {
+  id: string; employeeId: string; date: string; name: string; empNo: string
+  org: string; event: string; detail: string
+}
+export interface MovementMonthCount { month: string; hires: number; resigns: number }
+export interface MovementOrgNet { org: string; value: number }
+export interface MovementLedgerData {
+  page: PageData<MovementLedgerRow>
+  hires: number; resigns: number; net: number; turnoverRate: number
+  orgs: LedgerOrgOption[]; monthly: MovementMonthCount[]; orgNet: MovementOrgNet[]
+}
+
+export interface AttendanceLedgerRow {
+  id: string; employeeId: string; date: string; name: string; empNo: string
+  org: string; type: string; value: number; status: string
+}
+export interface AttendanceLedgerData {
+  page: PageData<AttendanceLedgerRow>
+  total: number; late: number; early: number; missing: number; absent: number
+  lateMinutes: number; earlyMinutes: number
+  orgs: LedgerOrgOption[]; daily: LedgerDailyCount[]; types: LedgerCountItem[]
+}
+
+export const getContractLedger = (params: Record<string, unknown>) =>
+  request.get<never, ContractLedgerData>('/api/ehr/hr-ledgers/contracts', { params })
+export const getMovementLedger = (params: Record<string, unknown>) =>
+  request.get<never, MovementLedgerData>('/api/ehr/hr-ledgers/movement', { params })
+export const getAttendanceLedger = (params: Record<string, unknown>) =>
+  request.get<never, AttendanceLedgerData>('/api/ehr/hr-ledgers/attendance', { params })
+
 export interface EhrAttachment {
   id: string
   fileName: string

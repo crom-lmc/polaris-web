@@ -5,13 +5,13 @@
         <div class="ledger-title"><fund-outlined /> 人力台账</div>
         <div class="muted">合同、人员流动与考勤异常的集中分析视图</div>
       </div>
-      <a-tag color="blue">静态原型</a-tag>
+      <a-tag color="green">数据已隔离</a-tag>
     </section>
 
     <a-alert
       type="info"
       show-icon
-      message="当前展示模拟数据，仅用于页面方案演示；正式接口接入后，将由后端按当前账号的组织数据权限返回。"
+      message="汇总、图表和明细均按当前账号的数据权限及筛选条件统计。"
     />
 
     <section class="panel ledger-workbench">
@@ -48,7 +48,7 @@
               <div class="chart-title">合同类型占比</div>
               <div class="donut-layout">
                 <div class="donut" :style="{ background: donutBackground(contractTypeSlices) }">
-                  <div class="donut-center"><b>{{ filteredContracts.length }}</b><span>份合同</span></div>
+                  <div class="donut-center"><b>{{ contractData.page.total }}</b><span>份合同</span></div>
                 </div>
                 <div class="chart-legend">
                   <div v-for="item in contractTypeSlices" :key="item.name" class="legend-row">
@@ -59,7 +59,16 @@
             </div>
           </div>
 
-          <a-table :columns="contractColumns" :data-source="filteredContracts" row-key="id" size="small" :pagination="pagination" :scroll="{ x: 1050 }">
+          <a-table
+            :columns="contractColumns"
+            :data-source="filteredContracts"
+            :loading="loading.contracts"
+            :pagination="tablePagination(contractData.page.total, contractPage)"
+            row-key="id"
+            size="small"
+            :scroll="{ x: 1050 }"
+            @change="onContractPageChange"
+          >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'employee'"><b>{{ record.name }}</b><div class="muted">{{ record.empNo }}</div></template>
               <template v-else-if="column.key === 'type'">{{ contractTypeText(record.type) }}</template>
@@ -115,7 +124,16 @@
             </div>
           </div>
 
-          <a-table :columns="movementColumns" :data-source="filteredMovement" row-key="id" size="small" :pagination="pagination" :scroll="{ x: 900 }">
+          <a-table
+            :columns="movementColumns"
+            :data-source="filteredMovement"
+            :loading="loading.movement"
+            :pagination="tablePagination(movementData.page.total, movementPage)"
+            row-key="id"
+            size="small"
+            :scroll="{ x: 900 }"
+            @change="onMovementPageChange"
+          >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'event'"><a-tag :color="movementEventColor(record.event)">{{ movementEventText(record.event) }}</a-tag></template>
               <template v-else-if="column.key === 'employee'"><b>{{ record.name }}</b><div class="muted">{{ record.empNo }}</div></template>
@@ -156,7 +174,7 @@
               <div class="chart-title">异常类型分布</div>
               <div class="donut-layout">
                 <div class="donut" :style="{ background: donutBackground(attendanceTypeSlices) }">
-                  <div class="donut-center"><b>{{ filteredAttendance.length }}</b><span>条异常</span></div>
+                  <div class="donut-center"><b>{{ attendanceData.total }}</b><span>条异常</span></div>
                 </div>
                 <div class="chart-legend">
                   <div v-for="item in attendanceTypeSlices" :key="item.name" class="legend-row">
@@ -167,7 +185,16 @@
             </div>
           </div>
 
-          <a-table :columns="attendanceColumns" :data-source="filteredAttendance" row-key="id" size="small" :pagination="pagination" :scroll="{ x: 950 }">
+          <a-table
+            :columns="attendanceColumns"
+            :data-source="filteredAttendance"
+            :loading="loading.attendance"
+            :pagination="tablePagination(attendanceData.page.total, attendancePage)"
+            row-key="id"
+            size="small"
+            :scroll="{ x: 950 }"
+            @change="onAttendancePageChange"
+          >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'employee'"><b>{{ record.name }}</b><div class="muted">{{ record.empNo }}</div></template>
               <template v-else-if="column.key === 'type'"><a-tag :color="attendanceTypeColor(record.type)">{{ attendanceTypeText(record.type) }}</a-tag></template>
@@ -182,21 +209,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { FundOutlined } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
+import {
+  getAttendanceLedger,
+  getContractLedger,
+  getMovementLedger,
+  type AttendanceLedgerData,
+  type ContractLedgerData,
+  type LedgerOrgOption,
+  type MovementLedgerData
+} from '@/api/ehr'
 
 const store = useUserStore()
 const canContract = computed(() => store.can('contract:view'))
 const canMovement = computed(() => store.can('employee:view'))
 const canAttendance = computed(() => store.can('attendance:daily'))
 const activeTab = ref(canContract.value ? 'contracts' : canMovement.value ? 'movement' : 'attendance')
-const pagination = { pageSize: 6, showSizeChanger: false, showTotal: (total: number) => `共 ${total} 条` }
+const pageSize = 6
+const contractPage = ref(1)
+const movementPage = ref(1)
+const attendancePage = ref(1)
+const loading = reactive({ contracts: false, movement: false, attendance: false })
+const orgs = ref<LedgerOrgOption[]>([])
+const orgOptions = computed(() => [
+  { value: 'ALL', label: '全部组织' },
+  ...orgs.value.map(org => ({ value: String(org.id), label: org.name }))
+])
 
-const orgOptions = [
-  { value: 'ALL', label: '全部组织' }, { value: '研发中心', label: '研发中心' },
-  { value: '产品中心', label: '产品中心' }, { value: '运营中心', label: '运营中心' }, { value: '职能中心', label: '职能中心' }
-]
 const contractTypeOptions = [
   { value: 'ALL', label: '全部类型' }, { value: 'FIXED', label: '固定期限' },
   { value: 'UNFIXED', label: '无固定期限' }, { value: 'INTERN', label: '实习协议' }, { value: 'LABOR', label: '劳务协议' }
@@ -217,40 +258,36 @@ const attendanceStatusOptions = [
   { value: 'ALL', label: '全部状态' }, { value: 'PENDING', label: '待处理' },
   { value: 'DONE', label: '已处理' }, { value: 'NONE', label: '无需处理' }
 ]
-const attendanceMonthOptions = [{ value: '2026-11', label: '2026 年 11 月' }, { value: '2026-10', label: '2026 年 10 月' }]
+const attendanceMonthOptions = Array.from({ length: 12 }, (_, index) => {
+  const value = monthOffset(-index)
+  return { value, label: `${value.slice(0, 4)} 年 ${Number(value.slice(5))} 月` }
+})
 
-interface ContractRow { id: number; name: string; empNo: string; org: string; contractNo: string; type: string; startDate: string; endDate: string; remainingDays: number; status: string }
-const contracts = ref<ContractRow[]>([
-  { id: 1, name: '陈明', empNo: 'XC0012', org: '研发中心', contractNo: 'HT-2023-012', type: 'FIXED', startDate: '2023-11-20', endDate: '2026-11-20', remainingDays: 4, status: 'ACTIVE' },
-  { id: 2, name: '周洁', empNo: 'XC0028', org: '产品中心', contractNo: 'HT-2023-028', type: 'FIXED', startDate: '2023-11-30', endDate: '2026-11-30', remainingDays: 14, status: 'ACTIVE' },
-  { id: 3, name: '吴迪', empNo: 'XC0036', org: '运营中心', contractNo: 'HT-2024-036', type: 'FIXED', startDate: '2024-12-08', endDate: '2026-12-08', remainingDays: 22, status: 'ACTIVE' },
-  { id: 4, name: '许华', empNo: 'XC0006', org: '职能中心', contractNo: 'HT-2024-006', type: 'FIXED', startDate: '2024-12-16', endDate: '2026-12-16', remainingDays: 30, status: 'ACTIVE' },
-  { id: 5, name: '王浩然', empNo: 'XC0009', org: '研发中心', contractNo: 'HT-2024-009', type: 'FIXED', startDate: '2024-12-28', endDate: '2026-12-28', remainingDays: 42, status: 'ACTIVE' },
-  { id: 6, name: '林悦', empNo: 'XC0041', org: '产品中心', contractNo: 'HT-2025-041', type: 'FIXED', startDate: '2025-01-10', endDate: '2027-01-10', remainingDays: 55, status: 'ACTIVE' },
-  { id: 7, name: '赵雷', empNo: 'XC0031', org: '运营中心', contractNo: 'HT-2025-031', type: 'LABOR', startDate: '2025-01-25', endDate: '2027-01-25', remainingDays: 70, status: 'ACTIVE' },
-  { id: 8, name: '孙倩', empNo: 'XC0048', org: '职能中心', contractNo: 'HT-2025-048', type: 'FIXED', startDate: '2025-02-12', endDate: '2027-02-12', remainingDays: 88, status: 'ACTIVE' },
-  { id: 9, name: '郑宇', empNo: 'XC0052', org: '研发中心', contractNo: 'HT-2026-052', type: 'INTERN', startDate: '2026-03-01', endDate: '2027-03-01', remainingDays: 105, status: 'ACTIVE' },
-  { id: 10, name: '钱宁', empNo: 'XC0018', org: '产品中心', contractNo: 'HT-2022-018', type: 'UNFIXED', startDate: '2022-05-01', endDate: '2027-04-30', remainingDays: 165, status: 'ACTIVE' },
-  { id: 11, name: '冯佳', empNo: 'XC0021', org: '运营中心', contractNo: 'HT-2023-021', type: 'FIXED', startDate: '2023-10-15', endDate: '2026-10-15', remainingDays: -32, status: 'EXPIRED' },
-  { id: 12, name: '蒋鹏', empNo: 'XC0033', org: '研发中心', contractNo: 'HT-2023-033', type: 'FIXED', startDate: '2023-10-28', endDate: '2026-10-28', remainingDays: -19, status: 'EXPIRED' }
-])
 const contractFilters = reactive({ org: 'ALL', expiry: 'ALL', type: 'ALL', keyword: '' })
-const filteredContracts = computed(() => contracts.value.filter(row =>
-  (contractFilters.org === 'ALL' || row.org === contractFilters.org) &&
-  (contractFilters.type === 'ALL' || row.type === contractFilters.type) &&
-  (contractFilters.expiry === 'ALL' || (contractFilters.expiry === 'EXPIRED' ? row.remainingDays < 0 : row.remainingDays >= 0 && row.remainingDays <= Number(contractFilters.expiry) && (contractFilters.expiry === '30' || row.remainingDays > Number(contractFilters.expiry) - 30))) &&
-  (!contractFilters.keyword || `${row.name}${row.empNo}${row.contractNo}`.toLowerCase().includes(contractFilters.keyword.toLowerCase()))
-))
+const movementFilters = reactive({ months: [monthOffset(-5), monthOffset(0)] as string[], org: 'ALL', event: 'ALL' })
+const attendanceFilters = reactive({ month: monthOffset(0), org: 'ALL', type: 'ALL', status: 'ALL', keyword: '' })
+const contractData = ref<ContractLedgerData>({
+  page: { list: [], total: 0 }, within30: 0, within60: 0, within90: 0, expired: 0, orgs: [], monthly: [], types: []
+})
+const movementData = ref<MovementLedgerData>({
+  page: { list: [], total: 0 }, hires: 0, resigns: 0, net: 0, turnoverRate: 0, orgs: [], monthly: [], orgNet: []
+})
+const attendanceData = ref<AttendanceLedgerData>({
+  page: { list: [], total: 0 }, total: 0, late: 0, early: 0, missing: 0, absent: 0,
+  lateMinutes: 0, earlyMinutes: 0, orgs: [], daily: [], types: []
+})
+
+const filteredContracts = computed(() => contractData.value.page.list)
 const contractMetrics = computed(() => [
-  { label: '30 天内到期', value: filteredContracts.value.filter(x => x.remainingDays >= 0 && x.remainingDays <= 30).length, hint: '优先安排续签', tone: 'text-danger' },
-  { label: '31–60 天到期', value: filteredContracts.value.filter(x => x.remainingDays > 30 && x.remainingDays <= 60).length, hint: '提前确认意向', tone: 'text-warning' },
-  { label: '61–90 天到期', value: filteredContracts.value.filter(x => x.remainingDays > 60 && x.remainingDays <= 90).length, hint: '纳入续签计划', tone: 'text-primary' },
-  { label: '已过期', value: filteredContracts.value.filter(x => x.remainingDays < 0).length, hint: '需要立即核查', tone: 'text-danger' }
+  { label: '30 天内到期', value: contractData.value.within30, hint: '优先安排续签', tone: 'text-danger' },
+  { label: '31–60 天到期', value: contractData.value.within60, hint: '提前确认意向', tone: 'text-warning' },
+  { label: '61–90 天到期', value: contractData.value.within90, hint: '纳入续签计划', tone: 'text-primary' },
+  { label: '已过期', value: contractData.value.expired, hint: '需要立即核查', tone: 'text-danger' }
 ])
-const contractMonthNames = ['2026-12', '2027-01', '2027-02', '2027-03', '2027-04', '2027-05']
-const contractMonthly = computed(() => contractMonthNames.map(month => ({ month, value: filteredContracts.value.filter(x => x.endDate.startsWith(month)).length })))
+const contractMonthly = computed(() => contractData.value.monthly)
 const contractMonthMax = computed(() => Math.max(1, ...contractMonthly.value.map(x => x.value)))
-const contractTypeSlices = computed(() => slicesFor(filteredContracts.value.map(x => contractTypeText(x.type)), ['#1677ff', '#13c2c2', '#722ed1', '#faad14']))
+const contractTypeSlices = computed(() => contractData.value.types.filter(x => x.value > 0)
+  .map((x, index) => ({ name: x.name, value: x.value, color: ['#1677ff', '#13c2c2', '#722ed1', '#faad14'][index % 4] })))
 const contractColumns = [
   { title: '员工', key: 'employee', width: 120 }, { title: '组织', dataIndex: 'org', width: 110 },
   { title: '合同编号', dataIndex: 'contractNo', width: 140 }, { title: '类型', key: 'type', width: 100 },
@@ -260,107 +297,114 @@ const contractColumns = [
 function resetContractFilters() { Object.assign(contractFilters, { org: 'ALL', expiry: 'ALL', type: 'ALL', keyword: '' }) }
 function contractTypeText(type: string) { return ({ FIXED: '固定期限', UNFIXED: '无固定期限', INTERN: '实习协议', LABOR: '劳务协议' } as Record<string, string>)[type] || type }
 
-interface MovementRow { id: number; date: string; name: string; empNo: string; org: string; event: string; detail: string }
-const movementRows = ref<MovementRow[]>([
-  { id: 1, date: '2026-11-15', name: '沈溪', empNo: 'XC0062', org: '研发中心', event: 'ONBOARD', detail: '高级前端工程师入职' },
-  { id: 2, date: '2026-11-12', name: '陈明', empNo: 'XC0012', org: '研发中心', event: 'REGULAR', detail: '试用期转正' },
-  { id: 3, date: '2026-11-08', name: '冯佳', empNo: 'XC0021', org: '运营中心', event: 'RESIGN', detail: '个人原因离职' },
-  { id: 4, date: '2026-10-26', name: '罗欣', empNo: 'XC0061', org: '产品中心', event: 'ONBOARD', detail: '产品经理入职' },
-  { id: 5, date: '2026-10-18', name: '郑宇', empNo: 'XC0052', org: '研发中心', event: 'REGULAR', detail: '试用期转正' },
-  { id: 6, date: '2026-10-09', name: '蒋鹏', empNo: 'XC0033', org: '研发中心', event: 'RESIGN', detail: '合同到期离职' },
-  { id: 7, date: '2026-09-22', name: '唐笑', empNo: 'XC0060', org: '职能中心', event: 'ONBOARD', detail: '招聘专员入职' },
-  { id: 8, date: '2026-09-16', name: '许华', empNo: 'XC0006', org: '职能中心', event: 'REGULAR', detail: '试用期转正' },
-  { id: 9, date: '2026-09-05', name: '高翔', empNo: 'XC0044', org: '运营中心', event: 'RESIGN', detail: '个人原因离职' },
-  { id: 10, date: '2026-08-28', name: '林悦', empNo: 'XC0041', org: '产品中心', event: 'REGULAR', detail: '试用期转正' },
-  { id: 11, date: '2026-08-19', name: '杜航', empNo: 'XC0059', org: '研发中心', event: 'ONBOARD', detail: '后端工程师入职' },
-  { id: 12, date: '2026-08-11', name: '韩梅', empNo: 'XC0039', org: '职能中心', event: 'RESIGN', detail: '个人原因离职' },
-  { id: 13, date: '2026-07-24', name: '孙倩', empNo: 'XC0048', org: '职能中心', event: 'REGULAR', detail: '试用期转正' },
-  { id: 14, date: '2026-07-17', name: '周洁', empNo: 'XC0028', org: '产品中心', event: 'REGULAR', detail: '试用期转正' },
-  { id: 15, date: '2026-07-08', name: '吴迪', empNo: 'XC0036', org: '运营中心', event: 'RESIGN', detail: '组织调整离职' },
-  { id: 16, date: '2026-06-20', name: '王浩然', empNo: 'XC0009', org: '研发中心', event: 'REGULAR', detail: '试用期转正' },
-  { id: 17, date: '2026-06-15', name: '赵雷', empNo: 'XC0031', org: '运营中心', event: 'ONBOARD', detail: '运营主管入职' },
-  { id: 18, date: '2026-06-03', name: '钱宁', empNo: 'XC0018', org: '产品中心', event: 'RESIGN', detail: '个人原因离职' }
-])
-const movementFilters = reactive({ months: ['2026-06', '2026-11'] as string[], org: 'ALL', event: 'ALL' })
-const filteredMovement = computed(() => movementRows.value.filter(row =>
-  (!movementFilters.months?.length || (row.date >= `${movementFilters.months[0]}-01` && row.date <= `${movementFilters.months[1]}-31`)) &&
-  (movementFilters.org === 'ALL' || row.org === movementFilters.org) &&
-  (movementFilters.event === 'ALL' || row.event === movementFilters.event)
-))
-const movementHires = computed(() => filteredMovement.value.filter(x => x.event === 'ONBOARD').length)
-const movementResigns = computed(() => filteredMovement.value.filter(x => x.event === 'RESIGN').length)
+const filteredMovement = computed(() => movementData.value.page.list)
 const movementMetrics = computed(() => [
-  { label: '期间入职', value: movementHires.value, hint: '新入职员工', tone: 'text-success' },
-  { label: '期间离职', value: movementResigns.value, hint: '已办理离职', tone: 'text-warning' },
-  { label: '净增人数', value: movementHires.value - movementResigns.value, hint: '入职减离职', tone: 'text-primary' },
-  { label: '模拟离职率', value: `${(movementResigns.value / 18 * 100).toFixed(1)}%`, hint: '按平均在职 18 人', tone: 'text-danger' }
+  { label: '期间入职', value: movementData.value.hires, hint: '新入职员工', tone: 'text-success' },
+  { label: '期间离职', value: movementData.value.resigns, hint: '已办理离职', tone: 'text-warning' },
+  { label: '净增人数', value: movementData.value.net, hint: '入职减离职', tone: 'text-primary' },
+  { label: '离职率', value: `${movementData.value.turnoverRate.toFixed(1)}%`, hint: '按期初与期末平均在职人数', tone: 'text-danger' }
 ])
-const movementMonths = ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']
-const movementMonthly = computed(() => movementMonths.map(month => ({ month, hires: filteredMovement.value.filter(x => x.date.startsWith(month) && x.event === 'ONBOARD').length, resigns: filteredMovement.value.filter(x => x.date.startsWith(month) && x.event === 'RESIGN').length })))
+const movementMonthly = computed(() => movementData.value.monthly)
 const movementMonthMax = computed(() => Math.max(1, ...movementMonthly.value.flatMap(x => [x.hires, x.resigns])))
-const movementOrgNet = computed(() => orgOptions.slice(1).map(org => ({ org: org.value, value: filteredMovement.value.filter(x => x.org === org.value && x.event === 'ONBOARD').length - filteredMovement.value.filter(x => x.org === org.value && x.event === 'RESIGN').length })))
+const movementOrgNet = computed(() => movementData.value.orgNet)
 const movementOrgMax = computed(() => Math.max(1, ...movementOrgNet.value.map(x => Math.abs(x.value))))
 const movementColumns = [
   { title: '日期', dataIndex: 'date', width: 115 }, { title: '员工', key: 'employee', width: 130 },
   { title: '组织', dataIndex: 'org', width: 120 }, { title: '流动类型', key: 'event', width: 100 }, { title: '说明', dataIndex: 'detail' }
 ]
-function resetMovementFilters() { Object.assign(movementFilters, { months: ['2026-06', '2026-11'], org: 'ALL', event: 'ALL' }) }
+function resetMovementFilters() { Object.assign(movementFilters, { months: [monthOffset(-5), monthOffset(0)], org: 'ALL', event: 'ALL' }) }
 function movementEventText(event: string) { return ({ ONBOARD: '入职', REGULAR: '转正', RESIGN: '离职' } as Record<string, string>)[event] || event }
 function movementEventColor(event: string) { return event === 'ONBOARD' ? 'green' : event === 'RESIGN' ? 'orange' : 'blue' }
 
-interface AttendanceRow { id: number; date: string; name: string; empNo: string; org: string; type: string; value: number; status: string }
-const attendanceRows = ref<AttendanceRow[]>([
-  { id: 1, date: '2026-11-15', name: '陈明', empNo: 'XC0012', org: '研发中心', type: 'LATE', value: 12, status: 'NONE' },
-  { id: 2, date: '2026-11-15', name: '周洁', empNo: 'XC0028', org: '产品中心', type: 'MISSING', value: 0, status: 'PENDING' },
-  { id: 3, date: '2026-11-14', name: '吴迪', empNo: 'XC0036', org: '运营中心', type: 'EARLY', value: 18, status: 'NONE' },
-  { id: 4, date: '2026-11-14', name: '王浩然', empNo: 'XC0009', org: '研发中心', type: 'LATE', value: 8, status: 'NONE' },
-  { id: 5, date: '2026-11-13', name: '许华', empNo: 'XC0006', org: '职能中心', type: 'MISSING', value: 0, status: 'DONE' },
-  { id: 6, date: '2026-11-13', name: '林悦', empNo: 'XC0041', org: '产品中心', type: 'ABSENT', value: 2.5, status: 'PENDING' },
-  { id: 7, date: '2026-11-12', name: '赵雷', empNo: 'XC0031', org: '运营中心', type: 'LATE', value: 25, status: 'NONE' },
-  { id: 8, date: '2026-11-12', name: '孙倩', empNo: 'XC0048', org: '职能中心', type: 'EARLY', value: 10, status: 'NONE' },
-  { id: 9, date: '2026-11-11', name: '郑宇', empNo: 'XC0052', org: '研发中心', type: 'MISSING', value: 0, status: 'PENDING' },
-  { id: 10, date: '2026-11-11', name: '钱宁', empNo: 'XC0018', org: '产品中心', type: 'LATE', value: 6, status: 'NONE' },
-  { id: 11, date: '2026-11-10', name: '冯佳', empNo: 'XC0021', org: '运营中心', type: 'ABSENT', value: 4, status: 'DONE' },
-  { id: 12, date: '2026-11-10', name: '蒋鹏', empNo: 'XC0033', org: '研发中心', type: 'LATE', value: 16, status: 'NONE' },
-  { id: 13, date: '2026-11-09', name: '陈明', empNo: 'XC0012', org: '研发中心', type: 'MISSING', value: 0, status: 'DONE' },
-  { id: 14, date: '2026-11-09', name: '周洁', empNo: 'XC0028', org: '产品中心', type: 'EARLY', value: 22, status: 'PENDING' }
-])
-const attendanceFilters = reactive({ month: '2026-11', org: 'ALL', type: 'ALL', status: 'ALL', keyword: '' })
-const filteredAttendance = computed(() => attendanceRows.value.filter(row =>
-  row.date.startsWith(attendanceFilters.month) && (attendanceFilters.org === 'ALL' || row.org === attendanceFilters.org) &&
-  (attendanceFilters.type === 'ALL' || row.type === attendanceFilters.type) &&
-  (attendanceFilters.status === 'ALL' || row.status === attendanceFilters.status) &&
-  (!attendanceFilters.keyword || `${row.name}${row.empNo}`.toLowerCase().includes(attendanceFilters.keyword.toLowerCase()))
-))
+const filteredAttendance = computed(() => attendanceData.value.page.list)
 const attendanceMetrics = computed(() => [
-  { label: '异常记录', value: filteredAttendance.value.length, hint: '当前筛选范围', tone: 'text-primary' },
-  { label: '迟到', value: attendanceCount('LATE'), hint: `${attendanceMinutes('LATE')} 分钟`, tone: 'text-warning' },
-  { label: '早退', value: attendanceCount('EARLY'), hint: `${attendanceMinutes('EARLY')} 分钟`, tone: 'text-warning' },
-  { label: '缺卡', value: attendanceCount('MISSING'), hint: '等待补卡核查', tone: 'text-primary' },
-  { label: '缺勤', value: attendanceCount('ABSENT'), hint: '按实际缺勤统计', tone: 'text-danger' }
+  { label: '异常记录', value: attendanceData.value.total, hint: '当前筛选范围', tone: 'text-primary' },
+  { label: '迟到', value: attendanceData.value.late, hint: `${attendanceData.value.lateMinutes} 分钟`, tone: 'text-warning' },
+  { label: '早退', value: attendanceData.value.early, hint: `${attendanceData.value.earlyMinutes} 分钟`, tone: 'text-warning' },
+  { label: '缺卡', value: attendanceData.value.missing, hint: '等待补卡核查', tone: 'text-primary' },
+  { label: '缺勤', value: attendanceData.value.absent, hint: '按实际缺勤统计', tone: 'text-danger' }
 ])
-const attendanceDays = ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']
-const attendanceDaily = computed(() => attendanceDays.map(date => ({ date, value: filteredAttendance.value.filter(x => x.date === date).length })))
+const attendanceDaily = computed(() => attendanceData.value.daily)
 const attendanceDayMax = computed(() => Math.max(1, ...attendanceDaily.value.map(x => x.value)))
-const attendanceTypeSlices = computed(() => slicesFor(filteredAttendance.value.map(x => attendanceTypeText(x.type)), ['#faad14', '#fa8c16', '#1677ff', '#f5222d']))
+const attendanceTypeSlices = computed(() => attendanceData.value.types.filter(x => x.value > 0)
+  .map((x, index) => ({ name: x.name, value: x.value, color: ['#faad14', '#fa8c16', '#1677ff', '#f5222d'][index % 4] })))
 const attendanceColumns = [
   { title: '日期', dataIndex: 'date', width: 115 }, { title: '员工', key: 'employee', width: 125 },
   { title: '组织', dataIndex: 'org', width: 115 }, { title: '异常类型', key: 'type', width: 100 },
   { title: '异常时长', key: 'value', width: 110 }, { title: '处理状态', key: 'status', width: 100 }
 ]
-function attendanceCount(type: string) { return filteredAttendance.value.filter(x => x.type === type).length }
-function attendanceMinutes(type: string) { return filteredAttendance.value.filter(x => x.type === type).reduce((sum, x) => sum + x.value, 0) }
 function attendanceTypeText(type: string) { return ({ LATE: '迟到', EARLY: '早退', MISSING: '缺卡', ABSENT: '缺勤' } as Record<string, string>)[type] || type }
 function attendanceTypeColor(type: string) { return ({ LATE: 'gold', EARLY: 'orange', MISSING: 'blue', ABSENT: 'red' } as Record<string, string>)[type] || 'default' }
 function attendanceStatusText(status: string) { return ({ PENDING: '待处理', DONE: '已处理', NONE: '无需处理' } as Record<string, string>)[status] || status }
-function resetAttendanceFilters() { Object.assign(attendanceFilters, { month: '2026-11', org: 'ALL', type: 'ALL', status: 'ALL', keyword: '' }) }
+function resetAttendanceFilters() { Object.assign(attendanceFilters, { month: monthOffset(0), org: 'ALL', type: 'ALL', status: 'ALL', keyword: '' }) }
+
+async function loadContracts() {
+  loading.contracts = true
+  try {
+    const data = await getContractLedger({
+      orgId: contractFilters.org === 'ALL' ? undefined : contractFilters.org,
+      expiry: contractFilters.expiry, type: contractFilters.type, keyword: contractFilters.keyword || undefined,
+      page: contractPage.value, size: pageSize
+    })
+    contractData.value = data
+    orgs.value = data.orgs
+  } finally {
+    loading.contracts = false
+  }
+}
+async function loadMovement() {
+  loading.movement = true
+  try {
+    const data = await getMovementLedger({
+      fromMonth: movementFilters.months?.[0], toMonth: movementFilters.months?.[1],
+      orgId: movementFilters.org === 'ALL' ? undefined : movementFilters.org,
+      event: movementFilters.event, page: movementPage.value, size: pageSize
+    })
+    movementData.value = data
+    orgs.value = data.orgs
+  } finally {
+    loading.movement = false
+  }
+}
+async function loadAttendance() {
+  loading.attendance = true
+  try {
+    const data = await getAttendanceLedger({
+      month: attendanceFilters.month,
+      orgId: attendanceFilters.org === 'ALL' ? undefined : attendanceFilters.org,
+      type: attendanceFilters.type, status: attendanceFilters.status, keyword: attendanceFilters.keyword || undefined,
+      page: attendancePage.value, size: pageSize
+    })
+    attendanceData.value = data
+    orgs.value = data.orgs
+  } finally {
+    loading.attendance = false
+  }
+}
+function loadActiveTab() {
+  if (activeTab.value === 'contracts') void loadContracts()
+  else if (activeTab.value === 'movement') void loadMovement()
+  else if (canAttendance.value) void loadAttendance()
+}
+function onContractPageChange(pagination: { current?: number }) { contractPage.value = pagination.current || 1; void loadContracts() }
+function onMovementPageChange(pagination: { current?: number }) { movementPage.value = pagination.current || 1; void loadMovement() }
+function onAttendancePageChange(pagination: { current?: number }) { attendancePage.value = pagination.current || 1; void loadAttendance() }
+function tablePagination(total: number, current: number) {
+  return { current, pageSize, total, showSizeChanger: false, showTotal: (count: number) => `共 ${count} 条` }
+}
+function monthOffset(offset: number) {
+  const date = new Date()
+  date.setDate(1)
+  date.setMonth(date.getMonth() + offset)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+watch(activeTab, loadActiveTab, { immediate: true })
+watch(contractFilters, () => { contractPage.value = 1; if (activeTab.value === 'contracts') void loadContracts() }, { deep: true })
+watch(movementFilters, () => { movementPage.value = 1; if (activeTab.value === 'movement') void loadMovement() }, { deep: true })
+watch(attendanceFilters, () => { attendancePage.value = 1; if (activeTab.value === 'attendance') void loadAttendance() }, { deep: true })
 
 interface Slice { name: string; value: number; color: string }
-function slicesFor(names: string[], colors: string[]): Slice[] {
-  const counts = new Map<string, number>()
-  names.forEach(name => counts.set(name, (counts.get(name) || 0) + 1))
-  return Array.from(counts.entries()).map(([name, value], index) => ({ name, value, color: colors[index % colors.length] }))
-}
 function donutBackground(slices: Slice[]) {
   const total = slices.reduce((sum, item) => sum + item.value, 0)
   if (!total) return 'var(--panel-border)'

@@ -15,11 +15,6 @@ const router = createRouter({
         { path: 'orgs', component: () => import('@/views/OrgView.vue'), meta: { title: '组织架构', perm: 'org:view' } },
         { path: 'employees', component: () => import('@/views/EmployeeView.vue'), meta: { title: '人员管理', perm: 'employee:view' } },
         {
-          path: 'hr-ledgers',
-          component: () => import('@/views/HrLedgerView.vue'),
-          meta: { title: '人力台账', perms: ['contract:view', 'employee:view', 'attendance:daily'] }
-        },
-        {
           path: 'leaves',
           component: () => import('@/views/LeaveView.vue'),
           meta: { title: '请假管理', perms: ['leave:mine', 'leave:all', 'leave:team'] }
@@ -52,6 +47,12 @@ const router = createRouter({
           meta: { title: '招聘管理', perms: ['recruit:board', 'recruit:offers', 'recruit:jobs', 'recruit:interviews'] }
         },
         { path: 'announcements', component: () => import('@/views/AnnouncementView.vue'), meta: { title: '通知管理', perm: 'announcement:view' } },
+        { path: 'audit-logs', component: () => import('@/views/AuditLogView.vue'), meta: { title: '审计日志', perm: 'audit:view' } },
+        {
+          path: 'hr-ledgers',
+          component: () => import('@/views/HrLedgerView.vue'),
+          meta: { title: '人力台账', perms: ['contract:view', 'employee:view', 'attendance:daily'] }
+        },
         {
           path: 'attendance',
           component: () => import('@/views/AttendanceView.vue'),
@@ -70,7 +71,6 @@ const router = createRouter({
             ]
           }
         },
-        { path: 'audit-logs', component: () => import('@/views/AuditLogView.vue'), meta: { title: '审计日志', perm: 'audit:view' } },
         { path: 'no-access', component: () => import('@/views/NoAccessView.vue'), meta: { title: '无权限', public: true } }
       ]
     },
