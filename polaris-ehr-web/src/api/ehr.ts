@@ -1425,12 +1425,110 @@ export interface AttendanceLedgerData {
   orgs: LedgerOrgOption[]; daily: LedgerDailyCount[]; types: LedgerCountItem[]
 }
 
+export interface WorkforceLedgerRow {
+  id: string; employeeId: string; name: string; empNo: string; org: string; position: string
+  status: number; hireDate?: string | null; age?: number | null
+  education: string; educationName: string; seniorityYears?: number | null
+}
+export interface WorkforceLedgerData {
+  page: PageData<WorkforceLedgerRow>
+  active: number; probation: number; pending: number; offboarding: number
+  orgs: LedgerOrgOption[]; byOrg: LedgerCountItem[]; educations: LedgerCountItem[]
+  ageGroups: LedgerCountItem[]; seniorityGroups: LedgerCountItem[]
+}
+
+export interface RegularizationLedgerRow {
+  id: string; employeeId: string; name: string; empNo: string; org: string; position: string
+  hireDate?: string | null; probationMonths?: number | null; expectedRegularizeDate?: string | null
+  remainingDays?: number | null; lastApplyDate?: string | null; approvalStatus: number
+}
+export interface RegularizationOrgStat { org: string; overdue: number; due30: number }
+export interface RegularizationLedgerData {
+  page: PageData<RegularizationLedgerRow>
+  current: number; overdue: number; due30: number; approving: number
+  orgs: LedgerOrgOption[]; monthly: LedgerMonthCount[]; byOrg: RegularizationOrgStat[]
+  approvalStatuses: LedgerCountItem[]
+}
+
+export interface LedgerAmountMonth { month: string; value: number }
+export interface LedgerOrgAmount { org: string; value: number }
+export interface LeaveLedgerRow {
+  id: string; employeeId: string; leaveNo: string; name: string; empNo: string; org: string
+  type: string; typeName: string; startDate: string; endDate: string; days: number
+  dayMode: string; status: number; returnDate?: string | null
+}
+export interface LeaveTypeStat { key: string; name: string; count: number; days: number }
+export interface LeaveLedgerData {
+  page: PageData<LeaveLedgerRow>
+  effectivePeople: number; effectiveDays: number; pendingCount: number; pendingDays: number
+  orgs: LedgerOrgOption[]; monthly: LedgerAmountMonth[]; types: LeaveTypeStat[]; byOrg: LedgerOrgAmount[]
+}
+
+export interface OvertimeLedgerRow {
+  id: string; employeeId: string; overtimeNo: string; name: string; empNo: string; org: string
+  workDate: string; startTime: string; endTime: string; type: string; hours: number
+  effectiveHours?: number | null; status: number; settleStatus?: number | null; settledAt?: string | null
+}
+export interface LedgerTypeAmount { key: string; name: string; value: number }
+export interface OvertimeOrgStat { org: string; hours: number; unsettledHours: number }
+export interface OvertimeLedgerData {
+  page: PageData<OvertimeLedgerRow>
+  approvedHours: number; effectiveHours: number; pendingCount: number; unsettledHours: number
+  orgs: LedgerOrgOption[]; monthly: LedgerAmountMonth[]; types: LedgerTypeAmount[]; byOrg: OvertimeOrgStat[]
+}
+
+export interface RecruitmentLedgerRow {
+  id: string; candidateId: string; candidateNo: string; name: string; org: string; position: string
+  source: string; stage: string; ownerName: string; appliedAt?: string | null; lastStageAt?: string | null
+}
+export interface RecruitmentPositionStat { position: string; candidates: number; confirmedOffers: number }
+export interface RecruitmentLedgerData {
+  page: PageData<RecruitmentLedgerRow>
+  newCandidates: number; interviewedCandidates: number; confirmedOffers: number; recruitedEmployees: number
+  orgs: LedgerOrgOption[]; sources: LedgerCountItem[]; stages: LedgerCountItem[]; positions: RecruitmentPositionStat[]
+}
+
+export interface ProfileQualityLedgerRow {
+  id: string; employeeId: string; name: string; empNo: string; org: string; status: number; issues: string[]
+}
+export interface ProfileQualityLedgerData {
+  page: PageData<ProfileQualityLedgerRow>
+  problemPeople: number; problemItems: number; noAccount: number; incomplete: number; noSeniority: number
+  noContract?: number | null; contractVisible: boolean
+  orgs: LedgerOrgOption[]; issueTypes: LedgerCountItem[]; byOrg: LedgerCountItem[]
+}
+
+export interface EmployeeChangeLedgerRow {
+  id: string; employeeId: string; name: string; empNo: string; org: string; appliedAt?: string | null
+  baseChanges: number; addCount: number; modCount: number; delCount: number; status: number
+}
+export interface EmployeeChangeLedgerData {
+  page: PageData<EmployeeChangeLedgerRow>
+  approving: number; effective: number; rejected: number; canceled: number
+  baseChanges: number; addCount: number; modCount: number; delCount: number
+  orgs: LedgerOrgOption[]; topFields: LedgerCountItem[]; monthly: LedgerMonthCount[]; byOrg: LedgerCountItem[]
+}
+
 export const getContractLedger = (params: Record<string, unknown>) =>
   request.get<never, ContractLedgerData>('/api/ehr/hr-ledgers/contracts', { params })
 export const getMovementLedger = (params: Record<string, unknown>) =>
   request.get<never, MovementLedgerData>('/api/ehr/hr-ledgers/movement', { params })
 export const getAttendanceLedger = (params: Record<string, unknown>) =>
   request.get<never, AttendanceLedgerData>('/api/ehr/hr-ledgers/attendance', { params })
+export const getWorkforceLedger = (params: Record<string, unknown>) =>
+  request.get<never, WorkforceLedgerData>('/api/ehr/hr-ledgers/workforce', { params })
+export const getRegularizationLedger = (params: Record<string, unknown>) =>
+  request.get<never, RegularizationLedgerData>('/api/ehr/hr-ledgers/regularization', { params })
+export const getLeaveLedger = (params: Record<string, unknown>) =>
+  request.get<never, LeaveLedgerData>('/api/ehr/hr-ledgers/leaves', { params })
+export const getOvertimeLedger = (params: Record<string, unknown>) =>
+  request.get<never, OvertimeLedgerData>('/api/ehr/hr-ledgers/overtimes', { params })
+export const getRecruitmentLedger = (params: Record<string, unknown>) =>
+  request.get<never, RecruitmentLedgerData>('/api/ehr/hr-ledgers/recruitment', { params })
+export const getProfileQualityLedger = (params: Record<string, unknown>) =>
+  request.get<never, ProfileQualityLedgerData>('/api/ehr/hr-ledgers/profile-quality', { params })
+export const getEmployeeChangeLedger = (params: Record<string, unknown>) =>
+  request.get<never, EmployeeChangeLedgerData>('/api/ehr/hr-ledgers/employee-changes', { params })
 
 export interface EhrAttachment {
   id: string

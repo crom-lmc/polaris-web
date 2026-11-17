@@ -79,9 +79,16 @@
         :trigger="null"
         @collapse="(v: boolean) => (collapsed = v)"
       >
-        <a-menu mode="inline" :selected-keys="selectedKeys" :open-keys="openKeys" @click="handleMenuClick" @openChange="handleOpenChange">
+        <a-menu
+          mode="inline"
+          :inline-collapsed="collapsed"
+          :selected-keys="selectedKeys"
+          :open-keys="openKeys"
+          @click="handleMenuClick"
+          @openChange="handleOpenChange"
+        >
           <!-- SSO 统一账号中心 -->
-          <a-submenu key="grp-sso">
+          <a-sub-menu key="grp-sso">
             <template #icon><team-outlined /></template>
             <template #title>统一账号中心</template>
             <a-menu-item key="dashboard">
@@ -120,7 +127,7 @@
               <template #icon><audit-outlined /></template>
               登录日志
             </a-menu-item>
-          </a-submenu>
+          </a-sub-menu>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">

@@ -39,8 +39,15 @@
         :trigger="null"
         @collapse="(v: boolean) => (collapsed = v)"
       >
-        <a-menu mode="inline" :selected-keys="selectedKeys" :open-keys="openKeys" @click="handleMenuClick" @openChange="handleOpenChange">
-          <a-submenu key="grp-cms">
+        <a-menu
+          mode="inline"
+          :inline-collapsed="collapsed"
+          :selected-keys="selectedKeys"
+          :open-keys="openKeys"
+          @click="handleMenuClick"
+          @openChange="handleOpenChange"
+        >
+          <a-sub-menu key="grp-cms">
             <template #icon><appstore-outlined /></template>
             <template #title>内容中心</template>
             <a-menu-item key="/dashboard">
@@ -75,7 +82,7 @@
               <template #icon><global-outlined /></template>
               门户设置
             </a-menu-item>
-          </a-submenu>
+          </a-sub-menu>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">

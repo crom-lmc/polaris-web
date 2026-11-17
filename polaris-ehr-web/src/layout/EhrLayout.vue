@@ -39,8 +39,15 @@
         :trigger="null"
         @collapse="(v: boolean) => (collapsed = v)"
       >
-        <a-menu mode="inline" :selected-keys="selectedKeys" :open-keys="openKeys" @click="handleMenuClick" @openChange="handleOpenChange">
-          <a-submenu key="grp-ehr">
+        <a-menu
+          mode="inline"
+          :inline-collapsed="collapsed"
+          :selected-keys="selectedKeys"
+          :open-keys="openKeys"
+          @click="handleMenuClick"
+          @openChange="handleOpenChange"
+        >
+          <a-sub-menu key="grp-ehr">
             <template #icon><team-outlined /></template>
             <template #title>人力中心</template>
             <a-menu-item key="/dashboard">
@@ -83,7 +90,20 @@
               <template #icon><file-search-outlined /></template>
               审计日志
             </a-menu-item>
-            <a-menu-item v-if="store.canAny('ledger:contract', 'ledger:movement', 'ledger:attendance')" key="/hr-ledgers">
+            <a-menu-item
+              v-if="store.canAny(
+                'employee:view',
+                'recruit:board',
+                'leave:all',
+                'leave:team',
+                'attendance:overtime:all',
+                'attendance:overtime:team',
+                'ledger:contract',
+                'ledger:movement',
+                'ledger:attendance'
+              )"
+              key="/hr-ledgers"
+            >
               <template #icon><fund-outlined /></template>
               人力台账
             </a-menu-item>
@@ -104,7 +124,7 @@
               <template #icon><clock-circle-outlined /></template>
               考勤管理
             </a-menu-item>
-          </a-submenu>
+          </a-sub-menu>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">
