@@ -18,7 +18,16 @@
       <a-tabs v-model:active-key="activeTab" class="ledger-tabs">
         <a-tab-pane v-if="canContract" key="contracts" tab="合同到期台账">
           <div class="filter-bar">
-            <a-select v-model:value="contractFilters.org" :options="orgOptions" style="width: 150px" />
+            <a-input
+              :value="orgLabel(contractFilters.org)"
+              readonly
+              class="org-picker-input"
+              style="width: 170px"
+              title="点击选择组织"
+              @click="openOrgPicker('contract')"
+            >
+              <template #suffix><apartment-outlined /></template>
+            </a-input>
             <a-select v-model:value="contractFilters.expiry" :options="expiryOptions" style="width: 140px" />
             <a-select v-model:value="contractFilters.type" :options="contractTypeOptions" style="width: 130px" />
             <a-input v-model:value="contractFilters.keyword" allow-clear placeholder="员工 / 工号 / 合同编号" style="width: 210px" />
@@ -85,7 +94,16 @@
         <a-tab-pane v-if="canMovement" key="movement" tab="人员流动台账">
           <div class="filter-bar">
             <a-range-picker v-model:value="movementFilters.months" picker="month" value-format="YYYY-MM" style="width: 240px" />
-            <a-select v-model:value="movementFilters.org" :options="orgOptions" style="width: 150px" />
+            <a-input
+              :value="orgLabel(movementFilters.org)"
+              readonly
+              class="org-picker-input"
+              style="width: 170px"
+              title="点击选择组织"
+              @click="openOrgPicker('movement')"
+            >
+              <template #suffix><apartment-outlined /></template>
+            </a-input>
             <a-select v-model:value="movementFilters.event" :options="movementEventOptions" style="width: 140px" />
             <a-button @click="resetMovementFilters">重置</a-button>
           </div>
@@ -144,7 +162,16 @@
         <a-tab-pane v-if="canAttendance" key="attendance" tab="考勤异常台账">
           <div class="filter-bar">
             <a-select v-model:value="attendanceFilters.month" :options="attendanceMonthOptions" style="width: 125px" />
-            <a-select v-model:value="attendanceFilters.org" :options="orgOptions" style="width: 150px" />
+            <a-input
+              :value="orgLabel(attendanceFilters.org)"
+              readonly
+              class="org-picker-input"
+              style="width: 170px"
+              title="点击选择组织"
+              @click="openOrgPicker('attendance')"
+            >
+              <template #suffix><apartment-outlined /></template>
+            </a-input>
             <a-select v-model:value="attendanceFilters.type" :options="attendanceTypeOptions" style="width: 130px" />
             <a-select v-model:value="attendanceFilters.status" :options="attendanceStatusOptions" style="width: 130px" />
             <a-input v-model:value="attendanceFilters.keyword" allow-clear placeholder="员工 / 工号" style="width: 170px" />
@@ -205,12 +232,50 @@
         </a-tab-pane>
       </a-tabs>
     </section>
+
+    <a-modal
+      v-model:open="orgPickerOpen"
+      title="选择组织"
+      :width="440"
+      :footer="null"
+      centered
+    >
+      <a-input
+        v-model:value="orgKeyword"
+        allow-clear
+        placeholder="搜索组织名称"
+        class="org-search"
+      />
+      <div class="org-picker-list">
+        <button
+          type="button"
+          class="org-option"
+          :class="{ selected: selectedOrgValue === 'ALL' }"
+          @click="selectOrg('ALL')"
+        >
+          <span class="org-option-name"><apartment-outlined />全部组织</span>
+          <check-outlined v-if="selectedOrgValue === 'ALL'" class="org-option-check" />
+        </button>
+        <button
+          v-for="org in filteredPickerOrgs"
+          :key="org.id"
+          type="button"
+          class="org-option"
+          :class="{ selected: selectedOrgValue === String(org.id) }"
+          @click="selectOrg(String(org.id))"
+        >
+          <span class="org-option-name"><apartment-outlined />{{ org.name }}</span>
+          <check-outlined v-if="selectedOrgValue === String(org.id)" class="org-option-check" />
+        </button>
+      </div>
+      <a-empty v-if="!filteredPickerOrgs.length" description="未找到匹配组织" />
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { FundOutlined } from '@ant-design/icons-vue'
+import { ApartmentOutlined, CheckOutlined, FundOutlined } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
   getAttendanceLedger,
@@ -227,16 +292,12 @@ const canContract = computed(() => store.can('contract:view'))
 const canMovement = computed(() => store.can('employee:view'))
 const canAttendance = computed(() => store.can('attendance:daily'))
 const activeTab = ref(canContract.value ? 'contracts' : canMovement.value ? 'movement' : 'attendance')
-const pageSize = 6
+const pageSize = 10
 const contractPage = ref(1)
 const movementPage = ref(1)
 const attendancePage = ref(1)
 const loading = reactive({ contracts: false, movement: false, attendance: false })
 const orgs = ref<LedgerOrgOption[]>([])
-const orgOptions = computed(() => [
-  { value: 'ALL', label: '全部组织' },
-  ...orgs.value.map(org => ({ value: String(org.id), label: org.name }))
-])
 
 const contractTypeOptions = [
   { value: 'ALL', label: '全部类型' }, { value: 'FIXED', label: '固定期限' },
@@ -264,8 +325,38 @@ const attendanceMonthOptions = Array.from({ length: 12 }, (_, index) => {
 })
 
 const contractFilters = reactive({ org: 'ALL', expiry: 'ALL', type: 'ALL', keyword: '' })
-const movementFilters = reactive({ months: [monthOffset(-5), monthOffset(0)] as string[], org: 'ALL', event: 'ALL' })
+const movementFilters = reactive({ months: [monthOffset(-11), monthOffset(0)] as string[], org: 'ALL', event: 'ALL' })
 const attendanceFilters = reactive({ month: monthOffset(0), org: 'ALL', type: 'ALL', status: 'ALL', keyword: '' })
+
+type OrgPickerTarget = 'contract' | 'movement' | 'attendance'
+const orgPickerOpen = ref(false)
+const orgKeyword = ref('')
+const orgPickerTarget = ref<OrgPickerTarget>('contract')
+const selectedOrgValue = computed(() => {
+  if (orgPickerTarget.value === 'contract') return contractFilters.org
+  if (orgPickerTarget.value === 'movement') return movementFilters.org
+  return attendanceFilters.org
+})
+const filteredPickerOrgs = computed(() => {
+  const keyword = orgKeyword.value.trim().toLowerCase()
+  if (!keyword) return orgs.value
+  return orgs.value.filter(org => org.name.toLowerCase().includes(keyword))
+})
+function orgLabel(value: string) {
+  if (value === 'ALL') return '全部组织'
+  return orgs.value.find(org => String(org.id) === value)?.name || '全部组织'
+}
+function openOrgPicker(target: OrgPickerTarget) {
+  orgPickerTarget.value = target
+  orgKeyword.value = ''
+  orgPickerOpen.value = true
+}
+function selectOrg(value: string) {
+  if (orgPickerTarget.value === 'contract') contractFilters.org = value
+  else if (orgPickerTarget.value === 'movement') movementFilters.org = value
+  else attendanceFilters.org = value
+  orgPickerOpen.value = false
+}
 const contractData = ref<ContractLedgerData>({
   page: { list: [], total: 0 }, within30: 0, within60: 0, within90: 0, expired: 0, orgs: [], monthly: [], types: []
 })
@@ -312,7 +403,7 @@ const movementColumns = [
   { title: '日期', dataIndex: 'date', width: 115 }, { title: '员工', key: 'employee', width: 130 },
   { title: '组织', dataIndex: 'org', width: 120 }, { title: '流动类型', key: 'event', width: 100 }, { title: '说明', dataIndex: 'detail' }
 ]
-function resetMovementFilters() { Object.assign(movementFilters, { months: [monthOffset(-5), monthOffset(0)], org: 'ALL', event: 'ALL' }) }
+function resetMovementFilters() { Object.assign(movementFilters, { months: [monthOffset(-11), monthOffset(0)], org: 'ALL', event: 'ALL' }) }
 function movementEventText(event: string) { return ({ ONBOARD: '入职', REGULAR: '转正', RESIGN: '离职' } as Record<string, string>)[event] || event }
 function movementEventColor(event: string) { return event === 'ONBOARD' ? 'green' : event === 'RESIGN' ? 'orange' : 'blue' }
 
@@ -421,11 +512,19 @@ function barStyle(value: number, max: number) { return { height: `${Math.max(val
 </script>
 
 <style scoped>
-.ledger-page { min-height: 100%; }
+.ledger-page { flex: none; min-height: 100%; }
 .ledger-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .ledger-title { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 20px; font-weight: 600; }
-.ledger-workbench { flex: 1; }
+.ledger-workbench { flex: none; }
 .ledger-tabs { padding: 0 14px 14px; }
+.org-picker-input, .org-picker-input :deep(input) { cursor: pointer; }
+.org-search { margin-bottom: 12px; }
+.org-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: min(420px, 55vh); overflow-y: auto; }
+.org-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 6px; background: var(--panel-bg); color: var(--text-base); text-align: left; cursor: pointer; transition: border-color .2s, background .2s; }
+.org-option:hover { border-color: #1677ff; background: var(--color-fill-quaternary, #fafafa); }
+.org-option.selected { border-color: #1677ff; background: var(--color-primary-bg, #e6f4ff); }
+.org-option-name { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.org-option-check { flex: none; color: #1677ff; }
 .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; padding: 12px; border-radius: 8px; background: var(--color-fill-quaternary, #fafafa); }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .metric-grid.five-columns { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -435,8 +534,8 @@ function barStyle(value: number, max: number) { return { height: `${Math.max(val
 .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .chart-card { min-width: 0; min-height: 250px; padding: 16px; border: 1px solid var(--panel-border); border-radius: 8px; }
 .chart-title { margin-bottom: 18px; font-weight: 600; }
-.bar-chart { display: flex; align-items: flex-end; gap: 14px; height: 185px; padding: 0 8px; }
-.bar-item { display: flex; flex: 1; flex-direction: column; align-items: center; height: 100%; min-width: 32px; }
+.bar-chart { display: flex; align-items: flex-end; gap: 14px; height: 205px; padding: 0 8px; overflow-x: auto; overflow-y: hidden; }
+.bar-item { display: flex; flex: 1 0 36px; flex-direction: column; align-items: center; height: 100%; min-width: 36px; }
 .bar-value { min-height: 18px; color: var(--muted); font-size: 11px; }
 .bar-track { display: flex; align-items: flex-end; width: 28px; height: 140px; border-radius: 4px 4px 0 0; overflow: hidden; }
 .bar-fill { width: 100%; border-radius: 4px 4px 0 0; transition: height .25s; }
@@ -451,8 +550,8 @@ function barStyle(value: number, max: number) { return { height: `${Math.max(val
 .chart-legend { min-width: 130px; }
 .legend-row { display: grid; grid-template-columns: 8px 1fr auto; align-items: center; gap: 8px; margin: 10px 0; font-size: 12px; }
 .legend-row i, .inline-legend i { width: 8px; height: 8px; border-radius: 50%; }
-.grouped-chart { display: flex; align-items: flex-end; gap: 12px; height: 170px; }
-.grouped-item { display: flex; flex: 1; flex-direction: column; align-items: center; height: 100%; }
+.grouped-chart { display: flex; align-items: flex-end; gap: 12px; height: 188px; overflow-x: auto; overflow-y: hidden; }
+.grouped-item { display: flex; flex: 1 0 44px; flex-direction: column; align-items: center; height: 100%; }
 .grouped-bars { display: flex; align-items: flex-end; justify-content: center; gap: 5px; height: 140px; }
 .group-bar-wrap { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 22px; height: 100%; }
 .group-bar-wrap span { color: var(--muted); font-size: 10px; }
