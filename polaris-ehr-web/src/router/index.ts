@@ -51,7 +51,7 @@ const router = createRouter({
         {
           path: 'hr-ledgers',
           component: () => import('@/views/HrLedgerView.vue'),
-          meta: { title: '人力台账', perms: ['contract:view', 'employee:view', 'attendance:daily'] }
+          meta: { title: '人力台账', perms: ['ledger:contract', 'ledger:movement', 'ledger:attendance'] }
         },
         {
           path: 'attendance',

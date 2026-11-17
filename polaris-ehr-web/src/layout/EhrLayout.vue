@@ -83,7 +83,7 @@
               <template #icon><file-search-outlined /></template>
               审计日志
             </a-menu-item>
-            <a-menu-item v-if="store.canAny('contract:view', 'employee:view', 'attendance:daily')" key="/hr-ledgers">
+            <a-menu-item v-if="store.canAny('ledger:contract', 'ledger:movement', 'ledger:attendance')" key="/hr-ledgers">
               <template #icon><fund-outlined /></template>
               人力台账
             </a-menu-item>

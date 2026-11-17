@@ -246,36 +246,24 @@
         placeholder="搜索组织名称"
         class="org-search"
       />
-      <div class="org-picker-list">
-        <button
-          type="button"
-          class="org-option"
-          :class="{ selected: selectedOrgValue === 'ALL' }"
-          @click="selectOrg('ALL')"
-        >
-          <span class="org-option-name"><apartment-outlined />全部组织</span>
-          <check-outlined v-if="selectedOrgValue === 'ALL'" class="org-option-check" />
-        </button>
-        <button
-          v-for="org in filteredPickerOrgs"
-          :key="org.id"
-          type="button"
-          class="org-option"
-          :class="{ selected: selectedOrgValue === String(org.id) }"
-          @click="selectOrg(String(org.id))"
-        >
-          <span class="org-option-name"><apartment-outlined />{{ org.name }}</span>
-          <check-outlined v-if="selectedOrgValue === String(org.id)" class="org-option-check" />
-        </button>
+      <div class="org-picker-tree">
+        <a-tree
+          :tree-data="orgPickerTreeData"
+          :selected-keys="[selectedOrgValue]"
+          :expanded-keys="orgPickerExpanded"
+          block-node
+          @expand="(keys: (string | number)[]) => (orgPickerExpanded = keys.map(String))"
+          @select="onSelectOrg"
+        />
       </div>
-      <a-empty v-if="!filteredPickerOrgs.length" description="未找到匹配组织" />
+      <a-empty v-if="!orgPickerTreeData.length" description="未找到匹配组织" />
     </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { ApartmentOutlined, CheckOutlined, FundOutlined } from '@ant-design/icons-vue'
+import { ApartmentOutlined, FundOutlined } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import {
   getAttendanceLedger,
@@ -288,10 +276,10 @@ import {
 } from '@/api/ehr'
 
 const store = useUserStore()
-const canContract = computed(() => store.can('contract:view'))
-const canMovement = computed(() => store.can('employee:view'))
-const canAttendance = computed(() => store.can('attendance:daily'))
-const activeTab = ref(canContract.value ? 'contracts' : canMovement.value ? 'movement' : 'attendance')
+const canContract = computed(() => store.can('ledger:contract'))
+const canMovement = computed(() => store.can('ledger:movement'))
+const canAttendance = computed(() => store.can('ledger:attendance'))
+const activeTab = ref(canContract.value ? 'contracts' : canMovement.value ? 'movement' : canAttendance.value ? 'attendance' : '')
 const pageSize = 10
 const contractPage = ref(1)
 const movementPage = ref(1)
@@ -329,18 +317,37 @@ const movementFilters = reactive({ months: [monthOffset(-11), monthOffset(0)] as
 const attendanceFilters = reactive({ month: monthOffset(0), org: 'ALL', type: 'ALL', status: 'ALL', keyword: '' })
 
 type OrgPickerTarget = 'contract' | 'movement' | 'attendance'
+interface OrgTreeNode { key: string; title: string; children?: OrgTreeNode[] }
 const orgPickerOpen = ref(false)
 const orgKeyword = ref('')
+const orgPickerExpanded = ref<string[]>([])
 const orgPickerTarget = ref<OrgPickerTarget>('contract')
 const selectedOrgValue = computed(() => {
   if (orgPickerTarget.value === 'contract') return contractFilters.org
   if (orgPickerTarget.value === 'movement') return movementFilters.org
   return attendanceFilters.org
 })
-const filteredPickerOrgs = computed(() => {
+const orgPickerTreeData = computed<OrgTreeNode[]>(() => {
+  const nodes = new Map<string, OrgTreeNode>()
+  const roots: OrgTreeNode[] = []
+  orgs.value.forEach(org => nodes.set(String(org.id), { key: String(org.id), title: org.name, children: [] }))
+  orgs.value.forEach(org => {
+    const node = nodes.get(String(org.id))!
+    const parent = org.parentId ? nodes.get(String(org.parentId)) : undefined
+    if (parent) parent.children!.push(node)
+    else roots.push(node)
+  })
   const keyword = orgKeyword.value.trim().toLowerCase()
-  if (!keyword) return orgs.value
-  return orgs.value.filter(org => org.name.toLowerCase().includes(keyword))
+  const filterNodes = (items: OrgTreeNode[]): OrgTreeNode[] => items.reduce<OrgTreeNode[]>((result, node) => {
+    const children = filterNodes(node.children || [])
+    if (!keyword || node.title.toLowerCase().includes(keyword) || children.length) {
+      result.push({ ...node, children: children.length ? children : undefined })
+    }
+    return result
+  }, [])
+  const tree = filterNodes(roots)
+  if (!keyword || '全部组织'.includes(keyword)) tree.unshift({ key: 'ALL', title: '全部组织' })
+  return tree
 })
 function orgLabel(value: string) {
   if (value === 'ALL') return '全部组织'
@@ -349,7 +356,11 @@ function orgLabel(value: string) {
 function openOrgPicker(target: OrgPickerTarget) {
   orgPickerTarget.value = target
   orgKeyword.value = ''
+  orgPickerExpanded.value = orgs.value.map(org => String(org.id))
   orgPickerOpen.value = true
+}
+function onSelectOrg(keys: (string | number)[]) {
+  if (keys.length) selectOrg(String(keys[0]))
 }
 function selectOrg(value: string) {
   if (orgPickerTarget.value === 'contract') contractFilters.org = value
@@ -473,9 +484,9 @@ async function loadAttendance() {
   }
 }
 function loadActiveTab() {
-  if (activeTab.value === 'contracts') void loadContracts()
-  else if (activeTab.value === 'movement') void loadMovement()
-  else if (canAttendance.value) void loadAttendance()
+  if (activeTab.value === 'contracts' && canContract.value) void loadContracts()
+  else if (activeTab.value === 'movement' && canMovement.value) void loadMovement()
+  else if (activeTab.value === 'attendance' && canAttendance.value) void loadAttendance()
 }
 function onContractPageChange(pagination: { current?: number }) { contractPage.value = pagination.current || 1; void loadContracts() }
 function onMovementPageChange(pagination: { current?: number }) { movementPage.value = pagination.current || 1; void loadMovement() }
@@ -519,12 +530,7 @@ function barStyle(value: number, max: number) { return { height: `${Math.max(val
 .ledger-tabs { padding: 0 14px 14px; }
 .org-picker-input, .org-picker-input :deep(input) { cursor: pointer; }
 .org-search { margin-bottom: 12px; }
-.org-picker-list { display: flex; flex-direction: column; gap: 6px; max-height: min(420px, 55vh); overflow-y: auto; }
-.org-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 6px; background: var(--panel-bg); color: var(--text-base); text-align: left; cursor: pointer; transition: border-color .2s, background .2s; }
-.org-option:hover { border-color: #1677ff; background: var(--color-fill-quaternary, #fafafa); }
-.org-option.selected { border-color: #1677ff; background: var(--color-primary-bg, #e6f4ff); }
-.org-option-name { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
-.org-option-check { flex: none; color: #1677ff; }
+.org-picker-tree { max-height: min(480px, 55vh); overflow: auto; padding: 4px 2px; }
 .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; padding: 12px; border-radius: 8px; background: var(--color-fill-quaternary, #fafafa); }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .metric-grid.five-columns { grid-template-columns: repeat(5, minmax(0, 1fr)); }

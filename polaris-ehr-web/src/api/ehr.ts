@@ -1386,7 +1386,7 @@ export const terminateContract = (id: string, reason: string) =>
 
 /* ---------------- 人力台账 ---------------- */
 
-export interface LedgerOrgOption { id: string; name: string }
+export interface LedgerOrgOption { id: string; parentId?: string | null; name: string }
 export interface LedgerCountItem { key: string; name: string; value: number }
 export interface LedgerMonthCount { month: string; value: number }
 export interface LedgerDailyCount { date: string; value: number }
