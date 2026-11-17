@@ -43,88 +43,81 @@
           mode="inline"
           :inline-collapsed="collapsed"
           :selected-keys="selectedKeys"
-          :open-keys="openKeys"
           @click="handleMenuClick"
-          @openChange="handleOpenChange"
         >
-          <a-sub-menu key="grp-ehr">
+          <a-menu-item key="/dashboard">
+            <template #icon><appstore-outlined /></template>
+            概览
+          </a-menu-item>
+          <a-menu-item v-if="store.can('org:view')" key="/orgs">
+            <template #icon><apartment-outlined /></template>
+            组织架构
+          </a-menu-item>
+          <a-menu-item v-if="store.can('employee:view')" key="/employees">
             <template #icon><team-outlined /></template>
-            <template #title>人力中心</template>
-            <a-menu-item key="/dashboard">
-              <template #icon><appstore-outlined /></template>
-              概览
-            </a-menu-item>
-            <a-menu-item v-if="store.can('org:view')" key="/orgs">
-              <template #icon><apartment-outlined /></template>
-              组织架构
-            </a-menu-item>
-            <a-menu-item v-if="store.can('employee:view')" key="/employees">
-              <template #icon><team-outlined /></template>
-              人员管理
-            </a-menu-item>
-            <a-menu-item v-if="store.canAny('leave:mine', 'leave:all', 'leave:team')" key="/leaves">
-              <template #icon><calendar-outlined /></template>
-              请假管理
-            </a-menu-item>
-            <a-menu-item v-if="store.canAny('resign:apply', 'approval:resign:apply')" key="/my-resign">
-              <template #icon><export-outlined /></template>
-              离职申请
-            </a-menu-item>
-            <a-menu-item v-if="store.can('regularize:apply')" key="/my-regularize">
-              <template #icon><rise-outlined /></template>
-              转正申请
-            </a-menu-item>
-            <a-menu-item v-if="canSeeApproval" key="/approvals">
-              <template #icon><audit-outlined /></template>
-              审批中心
-            </a-menu-item>
-            <a-menu-item v-if="store.canAny('recruit:board', 'recruit:offers', 'recruit:jobs', 'recruit:interviews')" key="/recruit">
-              <template #icon><user-add-outlined /></template>
-              招聘管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('announcement:view')" key="/announcements">
-              <template #icon><notification-outlined /></template>
-              通知管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
-              <template #icon><file-search-outlined /></template>
-              审计日志
-            </a-menu-item>
-            <a-menu-item
-              v-if="store.canAny(
-                'employee:view',
-                'recruit:board',
-                'leave:all',
-                'leave:team',
-                'attendance:overtime:all',
-                'attendance:overtime:team',
-                'ledger:contract',
-                'ledger:movement',
-                'ledger:attendance'
-              )"
-              key="/hr-ledgers"
-            >
-              <template #icon><fund-outlined /></template>
-              人力台账
-            </a-menu-item>
-            <a-menu-item
-              v-if="store.canAny(
-                'attendance:overtime',
-                'attendance:monthly',
-                'attendance:my',
-                'attendance:daily',
-                'attendance:punches',
-                'attendance:corrections',
-                'attendance:rules',
-                'attendance:calendar',
-                'attendance:annual'
-              )"
-              key="/attendance"
-            >
-              <template #icon><clock-circle-outlined /></template>
-              考勤管理
-            </a-menu-item>
-          </a-sub-menu>
+            人员管理
+          </a-menu-item>
+          <a-menu-item v-if="store.canAny('leave:mine', 'leave:all', 'leave:team')" key="/leaves">
+            <template #icon><calendar-outlined /></template>
+            请假管理
+          </a-menu-item>
+          <a-menu-item v-if="store.canAny('resign:apply', 'approval:resign:apply')" key="/my-resign">
+            <template #icon><export-outlined /></template>
+            离职申请
+          </a-menu-item>
+          <a-menu-item v-if="store.can('regularize:apply')" key="/my-regularize">
+            <template #icon><rise-outlined /></template>
+            转正申请
+          </a-menu-item>
+          <a-menu-item v-if="canSeeApproval" key="/approvals">
+            <template #icon><audit-outlined /></template>
+            审批中心
+          </a-menu-item>
+          <a-menu-item v-if="store.canAny('recruit:board', 'recruit:offers', 'recruit:jobs', 'recruit:interviews')" key="/recruit">
+            <template #icon><user-add-outlined /></template>
+            招聘管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('announcement:view')" key="/announcements">
+            <template #icon><notification-outlined /></template>
+            通知管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
+            <template #icon><file-search-outlined /></template>
+            审计日志
+          </a-menu-item>
+          <a-menu-item
+            v-if="store.canAny(
+              'ledger:workforce',
+              'ledger:regularization',
+              'ledger:recruitment',
+              'ledger:contract',
+              'ledger:movement',
+              'ledger:leaves',
+              'ledger:overtimes',
+              'ledger:attendance'
+            )"
+            key="/hr-ledgers"
+          >
+            <template #icon><fund-outlined /></template>
+            人力台账
+          </a-menu-item>
+          <a-menu-item
+            v-if="store.canAny(
+              'attendance:overtime',
+              'attendance:monthly',
+              'attendance:my',
+              'attendance:daily',
+              'attendance:punches',
+              'attendance:corrections',
+              'attendance:rules',
+              'attendance:calendar',
+              'attendance:annual'
+            )"
+            key="/attendance"
+          >
+            <template #icon><clock-circle-outlined /></template>
+            考勤管理
+          </a-menu-item>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">
@@ -177,13 +170,6 @@ function toggleCollapse() {
 }
 
 const selectedKeys = computed(() => [route.path])
-
-// 菜单分组默认展开
-const openKeys = ref<string[]>(['grp-ehr'])
-
-function handleOpenChange(keys: string[]) {
-  openKeys.value = keys
-}
 
 const canSeeApproval = computed(() =>
   store.canAny(

@@ -1488,27 +1488,6 @@ export interface RecruitmentLedgerData {
   orgs: LedgerOrgOption[]; sources: LedgerCountItem[]; stages: LedgerCountItem[]; positions: RecruitmentPositionStat[]
 }
 
-export interface ProfileQualityLedgerRow {
-  id: string; employeeId: string; name: string; empNo: string; org: string; status: number; issues: string[]
-}
-export interface ProfileQualityLedgerData {
-  page: PageData<ProfileQualityLedgerRow>
-  problemPeople: number; problemItems: number; noAccount: number; incomplete: number; noSeniority: number
-  noContract?: number | null; contractVisible: boolean
-  orgs: LedgerOrgOption[]; issueTypes: LedgerCountItem[]; byOrg: LedgerCountItem[]
-}
-
-export interface EmployeeChangeLedgerRow {
-  id: string; employeeId: string; name: string; empNo: string; org: string; appliedAt?: string | null
-  baseChanges: number; addCount: number; modCount: number; delCount: number; status: number
-}
-export interface EmployeeChangeLedgerData {
-  page: PageData<EmployeeChangeLedgerRow>
-  approving: number; effective: number; rejected: number; canceled: number
-  baseChanges: number; addCount: number; modCount: number; delCount: number
-  orgs: LedgerOrgOption[]; topFields: LedgerCountItem[]; monthly: LedgerMonthCount[]; byOrg: LedgerCountItem[]
-}
-
 export const getContractLedger = (params: Record<string, unknown>) =>
   request.get<never, ContractLedgerData>('/api/ehr/hr-ledgers/contracts', { params })
 export const getMovementLedger = (params: Record<string, unknown>) =>
@@ -1525,10 +1504,6 @@ export const getOvertimeLedger = (params: Record<string, unknown>) =>
   request.get<never, OvertimeLedgerData>('/api/ehr/hr-ledgers/overtimes', { params })
 export const getRecruitmentLedger = (params: Record<string, unknown>) =>
   request.get<never, RecruitmentLedgerData>('/api/ehr/hr-ledgers/recruitment', { params })
-export const getProfileQualityLedger = (params: Record<string, unknown>) =>
-  request.get<never, ProfileQualityLedgerData>('/api/ehr/hr-ledgers/profile-quality', { params })
-export const getEmployeeChangeLedger = (params: Record<string, unknown>) =>
-  request.get<never, EmployeeChangeLedgerData>('/api/ehr/hr-ledgers/employee-changes', { params })
 
 export interface EhrAttachment {
   id: string

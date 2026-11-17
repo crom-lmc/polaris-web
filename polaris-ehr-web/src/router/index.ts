@@ -54,14 +54,13 @@ const router = createRouter({
           meta: {
             title: '人力台账',
             perms: [
-              'employee:view',
-              'recruit:board',
-              'leave:all',
-              'leave:team',
-              'attendance:overtime:all',
-              'attendance:overtime:team',
+              'ledger:workforce',
+              'ledger:regularization',
+              'ledger:recruitment',
               'ledger:contract',
               'ledger:movement',
+              'ledger:leaves',
+              'ledger:overtimes',
               'ledger:attendance'
             ]
           }

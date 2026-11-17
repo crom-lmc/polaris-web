@@ -83,51 +83,44 @@
           mode="inline"
           :inline-collapsed="collapsed"
           :selected-keys="selectedKeys"
-          :open-keys="openKeys"
           @click="handleMenuClick"
-          @openChange="handleOpenChange"
         >
-          <!-- SSO 统一账号中心 -->
-          <a-sub-menu key="grp-sso">
-            <template #icon><team-outlined /></template>
-            <template #title>统一账号中心</template>
-            <a-menu-item key="dashboard">
-              <template #icon><dashboard-outlined /></template>
-              概览
-            </a-menu-item>
-            <a-menu-item key="approvals">
-              <template #icon><carry-out-outlined /></template>
-              审批中心
-            </a-menu-item>
-            <a-menu-item key="messages">
-              <template #icon><message-outlined /></template>
-              待办提醒
-            </a-menu-item>
-            <a-menu-item key="notices">
-              <template #icon><notification-outlined /></template>
-              通知中心
-            </a-menu-item>
-            <a-menu-item v-if="store.can('account:list')" key="accounts">
-              <template #icon><user-outlined /></template>
-              账户管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('role:list')" key="roles">
-              <template #icon><safety-certificate-outlined /></template>
-              角色管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('permission:list')" key="permissions">
-              <template #icon><key-outlined /></template>
-              权限管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('app:list')" key="apps">
-              <template #icon><appstore-outlined /></template>
-              应用管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('account:log:view')" key="logs">
-              <template #icon><audit-outlined /></template>
-              登录日志
-            </a-menu-item>
-          </a-sub-menu>
+          <a-menu-item key="dashboard">
+            <template #icon><dashboard-outlined /></template>
+            概览
+          </a-menu-item>
+          <a-menu-item key="approvals">
+            <template #icon><carry-out-outlined /></template>
+            审批中心
+          </a-menu-item>
+          <a-menu-item key="messages">
+            <template #icon><message-outlined /></template>
+            待办提醒
+          </a-menu-item>
+          <a-menu-item key="notices">
+            <template #icon><notification-outlined /></template>
+            通知中心
+          </a-menu-item>
+          <a-menu-item v-if="store.can('account:list')" key="accounts">
+            <template #icon><user-outlined /></template>
+            账户管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('role:list')" key="roles">
+            <template #icon><safety-certificate-outlined /></template>
+            角色管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('permission:list')" key="permissions">
+            <template #icon><key-outlined /></template>
+            权限管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('app:list')" key="apps">
+            <template #icon><appstore-outlined /></template>
+            应用管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('account:log:view')" key="logs">
+            <template #icon><audit-outlined /></template>
+            登录日志
+          </a-menu-item>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">
@@ -154,7 +147,6 @@ import {
   MessageOutlined,
   NotificationOutlined,
   SafetyCertificateOutlined,
-  TeamOutlined,
   UserOutlined
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -178,13 +170,6 @@ const theme = useThemeStore()
 
 // 侧栏可折叠：由顶栏汉堡图标点击切换（底部原生触发器已置 null 隐藏）
 const collapsed = ref(false)
-
-// 菜单分组展开：默认展开 SSO 组
-const openKeys = ref<string[]>(['grp-sso'])
-
-function handleOpenChange(keys: string[]) {
-  openKeys.value = keys
-}
 
 function toggleCollapse() {
   collapsed.value = !collapsed.value

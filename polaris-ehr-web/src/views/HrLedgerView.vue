@@ -270,180 +270,6 @@
           </a-table>
         </a-tab-pane>
 
-        <a-tab-pane v-if="canProfileQuality" key="profileQuality" tab="档案质量台账">
-          <div class="filter-bar">
-            <a-input
-              :value="orgLabel(profileQualityFilters.org)"
-              readonly
-              class="org-picker-input"
-              style="width: 170px"
-              title="点击选择组织"
-              @click="openOrgPicker('profileQuality')"
-            >
-              <template #suffix><apartment-outlined /></template>
-            </a-input>
-            <a-select v-model:value="profileQualityFilters.issue" :options="profileIssueOptions" style="width: 165px" />
-            <a-input v-model:value="profileQualityFilters.keyword" allow-clear placeholder="姓名 / 工号" style="width: 170px" />
-            <a-button @click="resetProfileQualityFilters">重置</a-button>
-          </div>
-
-          <a-alert
-            class="ledger-scope-note"
-            type="info"
-            show-icon
-            message="仅统计当前在职人员；问题人数按员工去重，问题项数按员工的问题类型累计。"
-          />
-
-          <div class="metric-grid" :class="{ 'five-columns': profileQualityData.contractVisible }">
-            <div v-for="item in profileQualityMetrics" :key="item.label" class="metric-card">
-              <div class="metric-label">{{ item.label }}</div>
-              <div class="metric-value" :class="item.tone">{{ item.value }}</div>
-              <div class="muted">{{ item.hint }}</div>
-            </div>
-          </div>
-
-          <div class="chart-grid">
-            <div class="chart-card">
-              <div class="chart-title">问题类型分布</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in profileQualityData.issueTypes" :key="item.key" class="horizontal-row amount-row">
-                  <span class="horizontal-label" :title="item.name">{{ item.name }}</span>
-                  <div class="horizontal-track"><div class="horizontal-bar orange-bar" :style="horizontalStyle(item.value, profileIssueMax)"></div></div>
-                  <b>{{ formatAmount(item.value) }}</b>
-                </div>
-                <a-empty v-if="!profileQualityData.issueTypes.length" :image="false" description="暂无数据" />
-              </div>
-            </div>
-            <div class="chart-card">
-              <div class="chart-title">各组织问题人数</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in profileQualityData.byOrg" :key="item.key" class="horizontal-row amount-row">
-                  <span class="horizontal-label" :title="item.name">{{ item.name }}</span>
-                  <div class="horizontal-track"><div class="horizontal-bar red-bar" :style="horizontalStyle(item.value, profileOrgMax)"></div></div>
-                  <b>{{ formatAmount(item.value) }}</b>
-                </div>
-                <a-empty v-if="!profileQualityData.byOrg.length" :image="false" description="暂无数据" />
-              </div>
-            </div>
-          </div>
-
-          <a-table
-            :columns="profileQualityColumns"
-            :data-source="profileQualityData.page.list"
-            :loading="loading.profileQuality"
-            :pagination="tablePagination(profileQualityData.page.total, profileQualityPage)"
-            row-key="id"
-            size="small"
-            :scroll="{ x: 850 }"
-            @change="onProfileQualityPageChange"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'employee'"><b>{{ record.name }}</b><div class="muted">{{ record.empNo }}</div></template>
-              <template v-else-if="column.key === 'status'"><a-tag :color="employeeStatusColor(record.status)">{{ employeeStatusText(record.status) }}</a-tag></template>
-              <template v-else-if="column.key === 'issues'">
-                <a-space :size="[4, 4]" wrap><a-tag v-for="issue in record.issues" :key="issue" color="orange">{{ issue }}</a-tag></a-space>
-              </template>
-            </template>
-          </a-table>
-        </a-tab-pane>
-
-        <a-tab-pane v-if="canEmployeeChanges" key="employeeChanges" tab="人员信息变更">
-          <div class="filter-bar">
-            <a-range-picker v-model:value="employeeChangeFilters.dates" value-format="YYYY-MM-DD" style="width: 250px" />
-            <a-input
-              :value="orgLabel(employeeChangeFilters.org)"
-              readonly
-              class="org-picker-input"
-              style="width: 170px"
-              title="点击选择组织"
-              @click="openOrgPicker('employeeChanges')"
-            >
-              <template #suffix><apartment-outlined /></template>
-            </a-input>
-            <a-select v-model:value="employeeChangeFilters.status" :options="employeeChangeStatusOptions" style="width: 140px" />
-            <a-input v-model:value="employeeChangeFilters.keyword" allow-clear placeholder="姓名 / 工号 / 变更单 ID" style="width: 200px" />
-            <a-button @click="resetEmployeeChangeFilters">重置</a-button>
-          </div>
-
-          <a-alert
-            class="ledger-scope-note"
-            type="info"
-            show-icon
-            message="仅展示变更单数量与高频字段名称，不展示字段变更前后值或子表内容。"
-          />
-
-          <div class="metric-grid">
-            <div v-for="item in employeeChangeMetrics" :key="item.label" class="metric-card">
-              <div class="metric-label">{{ item.label }}</div>
-              <div class="metric-value" :class="item.tone">{{ item.value }}</div>
-              <div class="muted">{{ item.hint }}</div>
-            </div>
-          </div>
-
-          <div class="chart-grid">
-            <div class="chart-card">
-              <div class="chart-title">月度变更单量</div>
-              <div class="bar-chart">
-                <div v-for="item in employeeChangeData.monthly" :key="item.month" class="bar-item">
-                  <div class="bar-value">{{ item.value || '' }}</div>
-                  <div class="bar-track"><div class="bar-fill purple" :style="barStyle(item.value, employeeChangeMonthMax)"></div></div>
-                  <div class="bar-label">{{ item.month.slice(5) }}月</div>
-                </div>
-                <a-empty v-if="!employeeChangeData.monthly.length" :image="false" description="暂无数据" />
-              </div>
-            </div>
-            <div class="chart-card">
-              <div class="chart-title">高频变更字段</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in employeeChangeData.topFields" :key="item.key" class="horizontal-row amount-row">
-                  <span class="horizontal-label" :title="item.name">{{ item.name }}</span>
-                  <div class="horizontal-track"><div class="horizontal-bar purple-bar" :style="horizontalStyle(item.value, employeeChangeFieldMax)"></div></div>
-                  <b>{{ formatAmount(item.value) }}</b>
-                </div>
-                <a-empty v-if="!employeeChangeData.topFields.length" :image="false" description="暂无数据" />
-              </div>
-            </div>
-            <div class="chart-card">
-              <div class="chart-title">各组织变更单量</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in employeeChangeData.byOrg" :key="item.key" class="horizontal-row amount-row">
-                  <span class="horizontal-label" :title="item.name">{{ item.name }}</span>
-                  <div class="horizontal-track"><div class="horizontal-bar blue-bar" :style="horizontalStyle(item.value, employeeChangeOrgMax)"></div></div>
-                  <b>{{ formatAmount(item.value) }}</b>
-                </div>
-                <a-empty v-if="!employeeChangeData.byOrg.length" :image="false" description="暂无数据" />
-              </div>
-            </div>
-            <div class="chart-card">
-              <div class="chart-title">变更内容数量</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in employeeChangeContentStats" :key="item.label" class="horizontal-row amount-row">
-                  <span class="horizontal-label">{{ item.label }}</span>
-                  <div class="horizontal-track"><div class="horizontal-bar" :class="item.color" :style="horizontalStyle(item.value, employeeChangeContentMax)"></div></div>
-                  <b>{{ formatAmount(item.value) }}</b>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <a-table
-            :columns="employeeChangeColumns"
-            :data-source="employeeChangeData.page.list"
-            :loading="loading.employeeChanges"
-            :pagination="tablePagination(employeeChangeData.page.total, employeeChangePage)"
-            row-key="id"
-            size="small"
-            :scroll="{ x: 1080 }"
-            @change="onEmployeeChangePageChange"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'employee'"><b>{{ record.name }}</b><div class="muted">{{ record.empNo }}</div></template>
-              <template v-else-if="column.key === 'appliedAt'">{{ dateTimeText(record.appliedAt) }}</template>
-              <template v-else-if="column.key === 'status'"><a-tag :color="employeeChangeStatusColor(record.status)">{{ employeeChangeStatusText(record.status) }}</a-tag></template>
-            </template>
-          </a-table>
-        </a-tab-pane>
-
         <a-tab-pane v-if="canContract" key="contracts" tab="合同到期台账">
           <div class="filter-bar">
             <a-input
@@ -878,64 +704,54 @@ import { useUserStore } from '@/stores/user'
 import {
   getAttendanceLedger,
   getContractLedger,
-  getEmployeeChangeLedger,
   getLeaveLedger,
   getMovementLedger,
   getOvertimeLedger,
-  getProfileQualityLedger,
   getRecruitmentLedger,
   getRegularizationLedger,
   getWorkforceLedger,
   type AttendanceLedgerData,
   type ContractLedgerData,
-  type EmployeeChangeLedgerData,
   type LedgerCountItem,
   type LedgerOrgOption,
   type LeaveLedgerData,
   type MovementLedgerData,
   type OvertimeLedgerData,
-  type ProfileQualityLedgerData,
   type RecruitmentLedgerData,
   type RegularizationLedgerData,
   type WorkforceLedgerData
 } from '@/api/ehr'
 
 const store = useUserStore()
-const canWorkforce = computed(() => store.can('employee:view'))
-const canRegularization = computed(() => store.can('employee:view'))
-const canRecruitment = computed(() => store.can('recruit:board'))
-const canProfileQuality = computed(() => store.can('employee:view'))
-const canEmployeeChanges = computed(() => store.can('employee:view'))
+const canWorkforce = computed(() => store.can('ledger:workforce'))
+const canRegularization = computed(() => store.can('ledger:regularization'))
+const canRecruitment = computed(() => store.can('ledger:recruitment'))
 const canContract = computed(() => store.can('ledger:contract'))
 const canMovement = computed(() => store.can('ledger:movement'))
-const canLeaves = computed(() => store.canAny('leave:all', 'leave:team'))
-const canOvertimes = computed(() => store.canAny('attendance:overtime:all', 'attendance:overtime:team'))
+const canLeaves = computed(() => store.can('ledger:leaves'))
+const canOvertimes = computed(() => store.can('ledger:overtimes'))
 const canAttendance = computed(() => store.can('ledger:attendance'))
 const activeTab = ref(
   canWorkforce.value ? 'workforce'
     : canRegularization.value ? 'regularization'
       : canRecruitment.value ? 'recruitment'
-        : canProfileQuality.value ? 'profileQuality'
-          : canEmployeeChanges.value ? 'employeeChanges'
-            : canContract.value ? 'contracts'
-              : canMovement.value ? 'movement'
-                : canLeaves.value ? 'leaves'
-                  : canOvertimes.value ? 'overtimes'
-                    : canAttendance.value ? 'attendance' : ''
+        : canContract.value ? 'contracts'
+          : canMovement.value ? 'movement'
+            : canLeaves.value ? 'leaves'
+              : canOvertimes.value ? 'overtimes'
+                : canAttendance.value ? 'attendance' : ''
 )
 const pageSize = 10
 const workforcePage = ref(1)
 const regularizationPage = ref(1)
 const recruitmentPage = ref(1)
-const profileQualityPage = ref(1)
-const employeeChangePage = ref(1)
 const contractPage = ref(1)
 const movementPage = ref(1)
 const leavePage = ref(1)
 const overtimePage = ref(1)
 const attendancePage = ref(1)
 const loading = reactive({
-  workforce: false, regularization: false, recruitment: false, profileQuality: false, employeeChanges: false,
+  workforce: false, regularization: false, recruitment: false,
   contracts: false, movement: false, leaves: false, overtimes: false, attendance: false
 })
 const orgs = ref<LedgerOrgOption[]>([])
@@ -995,10 +811,6 @@ const recruitmentStageOptions = [
   { value: 'INTERVIEW', label: '面试中' }, { value: 'OFFER', label: 'Offer 阶段' },
   { value: 'REJECTED', label: '已淘汰' }
 ]
-const employeeChangeStatusOptions = [
-  { value: 'ALL', label: '全部变更状态' }, { value: '0', label: '审批中' },
-  { value: '1', label: '已生效' }, { value: '2', label: '已驳回' }, { value: '3', label: '已撤销' }
-]
 const attendanceMonthOptions = Array.from({ length: 12 }, (_, index) => {
   const value = monthOffset(-index)
   return { value, label: `${value.slice(0, 4)} 年 ${Number(value.slice(5))} 月` }
@@ -1007,15 +819,13 @@ const attendanceMonthOptions = Array.from({ length: 12 }, (_, index) => {
 const workforceFilters = reactive({ org: 'ALL', status: 'ALL', position: '', keyword: '' })
 const regularizationFilters = reactive({ org: 'ALL', expiry: 'ALL', approvalStatus: 'ALL', keyword: '' })
 const recruitmentFilters = reactive({ dates: defaultDateRange(), org: 'ALL', stage: 'ALL', source: '', keyword: '' })
-const profileQualityFilters = reactive({ org: 'ALL', issue: 'ALL', keyword: '' })
-const employeeChangeFilters = reactive({ dates: defaultDateRange(), org: 'ALL', status: 'ALL', keyword: '' })
 const contractFilters = reactive({ org: 'ALL', expiry: 'ALL', type: 'ALL', keyword: '' })
 const movementFilters = reactive({ months: [monthOffset(-11), monthOffset(0)] as string[], org: 'ALL', event: 'ALL' })
 const leaveFilters = reactive({ dates: defaultDateRange(), org: 'ALL', type: 'ALL', status: 'ALL', keyword: '' })
 const overtimeFilters = reactive({ dates: defaultDateRange(), org: 'ALL', type: 'ALL', status: 'ALL', settleStatus: 'ALL', keyword: '' })
 const attendanceFilters = reactive({ month: monthOffset(0), org: 'ALL', type: 'ALL', status: 'ALL', keyword: '' })
 
-type OrgPickerTarget = 'workforce' | 'regularization' | 'recruitment' | 'profileQuality' | 'employeeChanges' | 'contract' | 'movement' | 'leaves' | 'overtimes' | 'attendance'
+type OrgPickerTarget = 'workforce' | 'regularization' | 'recruitment' | 'contract' | 'movement' | 'leaves' | 'overtimes' | 'attendance'
 interface OrgTreeNode { key: string; title: string; children?: OrgTreeNode[] }
 const orgPickerOpen = ref(false)
 const orgKeyword = ref('')
@@ -1025,8 +835,6 @@ const selectedOrgValue = computed(() => {
   if (orgPickerTarget.value === 'workforce') return workforceFilters.org
   if (orgPickerTarget.value === 'regularization') return regularizationFilters.org
   if (orgPickerTarget.value === 'recruitment') return recruitmentFilters.org
-  if (orgPickerTarget.value === 'profileQuality') return profileQualityFilters.org
-  if (orgPickerTarget.value === 'employeeChanges') return employeeChangeFilters.org
   if (orgPickerTarget.value === 'contract') return contractFilters.org
   if (orgPickerTarget.value === 'movement') return movementFilters.org
   if (orgPickerTarget.value === 'leaves') return leaveFilters.org
@@ -1072,8 +880,6 @@ function selectOrg(value: string) {
   if (orgPickerTarget.value === 'workforce') workforceFilters.org = value
   else if (orgPickerTarget.value === 'regularization') regularizationFilters.org = value
   else if (orgPickerTarget.value === 'recruitment') recruitmentFilters.org = value
-  else if (orgPickerTarget.value === 'profileQuality') profileQualityFilters.org = value
-  else if (orgPickerTarget.value === 'employeeChanges') employeeChangeFilters.org = value
   else if (orgPickerTarget.value === 'contract') contractFilters.org = value
   else if (orgPickerTarget.value === 'movement') movementFilters.org = value
   else if (orgPickerTarget.value === 'leaves') leaveFilters.org = value
@@ -1093,14 +899,6 @@ const regularizationData = ref<RegularizationLedgerData>({
 const recruitmentData = ref<RecruitmentLedgerData>({
   page: { list: [], total: 0 }, newCandidates: 0, interviewedCandidates: 0, confirmedOffers: 0, recruitedEmployees: 0,
   orgs: [], sources: [], stages: [], positions: []
-})
-const profileQualityData = ref<ProfileQualityLedgerData>({
-  page: { list: [], total: 0 }, problemPeople: 0, problemItems: 0, noAccount: 0, incomplete: 0, noSeniority: 0,
-  noContract: null, contractVisible: false, orgs: [], issueTypes: [], byOrg: []
-})
-const employeeChangeData = ref<EmployeeChangeLedgerData>({
-  page: { list: [], total: 0 }, approving: 0, effective: 0, rejected: 0, canceled: 0,
-  baseChanges: 0, addCount: 0, modCount: 0, delCount: 0, orgs: [], topFields: [], monthly: [], byOrg: []
 })
 const contractData = ref<ContractLedgerData>({
   page: { list: [], total: 0 }, within30: 0, within60: 0, within90: 0, expired: 0, orgs: [], monthly: [], types: []
@@ -1199,59 +997,6 @@ function resetRecruitmentFilters() { Object.assign(recruitmentFilters, { dates: 
 function recruitmentStageText(stage: string) { return recruitmentStageOptions.find(item => item.value === stage)?.label || stage || '未知' }
 function recruitmentStageColor(stage: string) { return ({ RESUME: 'blue', INTERVIEW: 'purple', OFFER: 'green', REJECTED: 'default' } as Record<string, string>)[stage] || 'default' }
 function recruitmentSourceText(source: string) { return !source || source === 'UNKNOWN' ? '未知来源' : source }
-
-const profileIssueOptions = computed(() => {
-  const options = [
-    { value: 'ALL', label: '全部档案问题' }, { value: 'NO_ACCOUNT', label: '在职未开通账号' },
-    { value: 'INCOMPLETE', label: '关键档案不完整' }, { value: 'NO_SENIORITY', label: '司龄起算日缺失' }
-  ]
-  if (profileQualityData.value.contractVisible || store.can('contract:view')) options.push({ value: 'NO_CONTRACT', label: '无有效合同' })
-  return options
-})
-const profileQualityMetrics = computed(() => {
-  const items = [
-    { label: '问题人数', value: formatAmount(profileQualityData.value.problemPeople), hint: `共 ${formatAmount(profileQualityData.value.problemItems)} 个问题项`, tone: 'text-danger' },
-    { label: '在职未开通账号', value: formatAmount(profileQualityData.value.noAccount), hint: '当前在职人员', tone: 'text-warning' },
-    { label: '关键档案不完整', value: formatAmount(profileQualityData.value.incomplete), hint: '组织、职位或入职日期缺失', tone: 'text-warning' },
-    { label: '司龄起算日缺失', value: formatAmount(profileQualityData.value.noSeniority), hint: '影响司龄统计', tone: 'text-primary' }
-  ]
-  if (profileQualityData.value.contractVisible) items.push({ label: '无有效合同', value: formatAmount(profileQualityData.value.noContract), hint: '需具备合同查看权限', tone: 'text-danger' })
-  return items
-})
-const profileIssueMax = computed(() => Math.max(1, ...profileQualityData.value.issueTypes.map(x => x.value)))
-const profileOrgMax = computed(() => Math.max(1, ...profileQualityData.value.byOrg.map(x => x.value)))
-const profileQualityColumns = [
-  { title: '员工', key: 'employee', width: 140 }, { title: '组织', dataIndex: 'org', width: 140 },
-  { title: '人员状态', key: 'status', width: 110 }, { title: '问题项', key: 'issues' }
-]
-function resetProfileQualityFilters() { Object.assign(profileQualityFilters, { org: 'ALL', issue: 'ALL', keyword: '' }) }
-
-const employeeChangeMetrics = computed(() => [
-  { label: '审批中', value: formatAmount(employeeChangeData.value.approving), hint: '等待审批处理', tone: 'text-warning' },
-  { label: '已生效', value: formatAmount(employeeChangeData.value.effective), hint: '期间提交的变更单', tone: 'text-success' },
-  { label: '已驳回', value: formatAmount(employeeChangeData.value.rejected), hint: '审批未通过', tone: 'text-danger' },
-  { label: '已撤销', value: formatAmount(employeeChangeData.value.canceled), hint: '申请人主动撤销', tone: 'text-primary' }
-])
-const employeeChangeMonthMax = computed(() => Math.max(1, ...employeeChangeData.value.monthly.map(x => x.value)))
-const employeeChangeFieldMax = computed(() => Math.max(1, ...employeeChangeData.value.topFields.map(x => x.value)))
-const employeeChangeOrgMax = computed(() => Math.max(1, ...employeeChangeData.value.byOrg.map(x => x.value)))
-const employeeChangeContentStats = computed(() => [
-  { label: '基本信息字段', value: employeeChangeData.value.baseChanges, color: 'purple-bar' },
-  { label: '子表新增行', value: employeeChangeData.value.addCount, color: 'blue-bar' },
-  { label: '子表修改行', value: employeeChangeData.value.modCount, color: 'orange-bar' },
-  { label: '子表删除行', value: employeeChangeData.value.delCount, color: 'red-bar' }
-])
-const employeeChangeContentMax = computed(() => Math.max(1, ...employeeChangeContentStats.value.map(x => x.value)))
-const employeeChangeColumns = [
-  { title: '变更单 ID', dataIndex: 'id', width: 105 }, { title: '员工', key: 'employee', width: 135 },
-  { title: '组织', dataIndex: 'org', width: 125 }, { title: '申请时间', key: 'appliedAt', width: 145 },
-  { title: '基本字段数', dataIndex: 'baseChanges', width: 100 }, { title: '子表新增', dataIndex: 'addCount', width: 90 },
-  { title: '子表修改', dataIndex: 'modCount', width: 90 }, { title: '子表删除', dataIndex: 'delCount', width: 90 },
-  { title: '状态', key: 'status', width: 95 }
-]
-function resetEmployeeChangeFilters() { Object.assign(employeeChangeFilters, { dates: defaultDateRange(), org: 'ALL', status: 'ALL', keyword: '' }) }
-function employeeChangeStatusText(status: number) { return employeeChangeStatusOptions.find(item => item.value === String(status))?.label || '未知' }
-function employeeChangeStatusColor(status: number) { return status === 0 ? 'processing' : status === 1 ? 'green' : status === 2 ? 'red' : 'default' }
 
 const filteredContracts = computed(() => contractData.value.page.list)
 const contractMetrics = computed(() => [
@@ -1408,35 +1153,6 @@ async function loadRecruitment() {
     loading.recruitment = false
   }
 }
-async function loadProfileQuality() {
-  loading.profileQuality = true
-  try {
-    const data = await getProfileQualityLedger({
-      orgId: profileQualityFilters.org === 'ALL' ? undefined : profileQualityFilters.org,
-      issue: profileQualityFilters.issue, keyword: profileQualityFilters.keyword || undefined,
-      page: profileQualityPage.value, size: pageSize
-    })
-    profileQualityData.value = data
-    orgs.value = data.orgs
-  } finally {
-    loading.profileQuality = false
-  }
-}
-async function loadEmployeeChanges() {
-  loading.employeeChanges = true
-  try {
-    const data = await getEmployeeChangeLedger({
-      from: employeeChangeFilters.dates?.[0], to: employeeChangeFilters.dates?.[1],
-      orgId: employeeChangeFilters.org === 'ALL' ? undefined : employeeChangeFilters.org,
-      status: employeeChangeFilters.status, keyword: employeeChangeFilters.keyword || undefined,
-      page: employeeChangePage.value, size: pageSize
-    })
-    employeeChangeData.value = data
-    orgs.value = data.orgs
-  } finally {
-    loading.employeeChanges = false
-  }
-}
 async function loadContracts() {
   loading.contracts = true
   try {
@@ -1514,8 +1230,6 @@ function loadActiveTab() {
   if (activeTab.value === 'workforce' && canWorkforce.value) void loadWorkforce()
   else if (activeTab.value === 'regularization' && canRegularization.value) void loadRegularization()
   else if (activeTab.value === 'recruitment' && canRecruitment.value) void loadRecruitment()
-  else if (activeTab.value === 'profileQuality' && canProfileQuality.value) void loadProfileQuality()
-  else if (activeTab.value === 'employeeChanges' && canEmployeeChanges.value) void loadEmployeeChanges()
   else if (activeTab.value === 'contracts' && canContract.value) void loadContracts()
   else if (activeTab.value === 'movement' && canMovement.value) void loadMovement()
   else if (activeTab.value === 'leaves' && canLeaves.value) void loadLeaves()
@@ -1525,8 +1239,6 @@ function loadActiveTab() {
 function onWorkforcePageChange(pagination: { current?: number }) { workforcePage.value = pagination.current || 1; void loadWorkforce() }
 function onRegularizationPageChange(pagination: { current?: number }) { regularizationPage.value = pagination.current || 1; void loadRegularization() }
 function onRecruitmentPageChange(pagination: { current?: number }) { recruitmentPage.value = pagination.current || 1; void loadRecruitment() }
-function onProfileQualityPageChange(pagination: { current?: number }) { profileQualityPage.value = pagination.current || 1; void loadProfileQuality() }
-function onEmployeeChangePageChange(pagination: { current?: number }) { employeeChangePage.value = pagination.current || 1; void loadEmployeeChanges() }
 function onContractPageChange(pagination: { current?: number }) { contractPage.value = pagination.current || 1; void loadContracts() }
 function onMovementPageChange(pagination: { current?: number }) { movementPage.value = pagination.current || 1; void loadMovement() }
 function onLeavePageChange(pagination: { current?: number }) { leavePage.value = pagination.current || 1; void loadLeaves() }
@@ -1559,8 +1271,6 @@ watch(activeTab, loadActiveTab, { immediate: true })
 watch(workforceFilters, () => { workforcePage.value = 1; if (activeTab.value === 'workforce') void loadWorkforce() }, { deep: true })
 watch(regularizationFilters, () => { regularizationPage.value = 1; if (activeTab.value === 'regularization') void loadRegularization() }, { deep: true })
 watch(recruitmentFilters, () => { recruitmentPage.value = 1; if (activeTab.value === 'recruitment') void loadRecruitment() }, { deep: true })
-watch(profileQualityFilters, () => { profileQualityPage.value = 1; if (activeTab.value === 'profileQuality') void loadProfileQuality() }, { deep: true })
-watch(employeeChangeFilters, () => { employeeChangePage.value = 1; if (activeTab.value === 'employeeChanges') void loadEmployeeChanges() }, { deep: true })
 watch(contractFilters, () => { contractPage.value = 1; if (activeTab.value === 'contracts') void loadContracts() }, { deep: true })
 watch(movementFilters, () => { movementPage.value = 1; if (activeTab.value === 'movement') void loadMovement() }, { deep: true })
 watch(leaveFilters, () => { leavePage.value = 1; if (activeTab.value === 'leaves') void loadLeaves() }, { deep: true })

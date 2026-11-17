@@ -43,46 +43,40 @@
           mode="inline"
           :inline-collapsed="collapsed"
           :selected-keys="selectedKeys"
-          :open-keys="openKeys"
           @click="handleMenuClick"
-          @openChange="handleOpenChange"
         >
-          <a-sub-menu key="grp-cms">
-            <template #icon><appstore-outlined /></template>
-            <template #title>内容中心</template>
-            <a-menu-item key="/dashboard">
-              <template #icon><dashboard-outlined /></template>
-              概览
-            </a-menu-item>
-            <a-menu-item v-if="store.can('article:view')" key="/articles">
-              <template #icon><file-text-outlined /></template>
-              内容管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('category:view')" key="/categories">
-              <template #icon><folder-outlined /></template>
-              分类管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('tag:view')" key="/tags">
-              <template #icon><tags-outlined /></template>
-              标签管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('media:view')" key="/media">
-              <template #icon><picture-outlined /></template>
-              媒体库
-            </a-menu-item>
-            <a-menu-item v-if="store.can('banner:view')" key="/banners">
-              <template #icon><flag-outlined /></template>
-              Banner 管理
-            </a-menu-item>
-            <a-menu-item v-if="store.can('link:view')" key="/links">
-              <template #icon><link-outlined /></template>
-              友情链接
-            </a-menu-item>
-            <a-menu-item v-if="store.can('portal:view')" key="/portal">
-              <template #icon><global-outlined /></template>
-              门户设置
-            </a-menu-item>
-          </a-sub-menu>
+          <a-menu-item key="/dashboard">
+            <template #icon><dashboard-outlined /></template>
+            概览
+          </a-menu-item>
+          <a-menu-item v-if="store.can('article:view')" key="/articles">
+            <template #icon><file-text-outlined /></template>
+            内容管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('category:view')" key="/categories">
+            <template #icon><folder-outlined /></template>
+            分类管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('tag:view')" key="/tags">
+            <template #icon><tags-outlined /></template>
+            标签管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('media:view')" key="/media">
+            <template #icon><picture-outlined /></template>
+            媒体库
+          </a-menu-item>
+          <a-menu-item v-if="store.can('banner:view')" key="/banners">
+            <template #icon><flag-outlined /></template>
+            Banner 管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('link:view')" key="/links">
+            <template #icon><link-outlined /></template>
+            友情链接
+          </a-menu-item>
+          <a-menu-item v-if="store.can('portal:view')" key="/portal">
+            <template #icon><global-outlined /></template>
+            门户设置
+          </a-menu-item>
         </a-menu>
       </a-layout-sider>
       <a-layout-content class="content">
@@ -96,7 +90,6 @@
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
-  AppstoreOutlined,
   DashboardOutlined,
   DownOutlined,
   FileTextOutlined,
@@ -132,11 +125,6 @@ function toggleCollapse() {
 }
 
 const selectedKeys = computed(() => [route.path])
-
-const openKeys = ref<string[]>(['grp-cms'])
-function handleOpenChange(keys: string[]) {
-  openKeys.value = keys
-}
 
 function handleMenuClick({ key }: { key: string }) {
   router.push(key as string)
