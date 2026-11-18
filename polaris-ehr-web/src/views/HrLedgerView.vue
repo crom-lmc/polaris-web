@@ -43,7 +43,7 @@
           </div>
 
           <div class="chart-grid">
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(workforceData.byOrg.length)">
               <div class="chart-title">各直接组织在职人数</div>
               <div class="bar-chart category-chart">
                 <div v-for="item in workforceData.byOrg" :key="item.key" class="bar-item category-item">
@@ -54,7 +54,7 @@
                 <a-empty v-if="!workforceData.byOrg.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(workforceDistributions.reduce((total, group) => total + group.items.length, 0))">
               <div class="chart-title">人员结构分布</div>
               <div class="distribution-chart-scroll">
                 <div class="distribution-chart-groups">
@@ -132,7 +132,7 @@
                 </div>
               </div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(regularizationData.byOrg.length)">
               <div class="chart-title">各组织逾期与 30 天内转正</div>
               <div class="grouped-chart category-chart">
                 <div v-for="item in regularizationData.byOrg" :key="item.org" class="grouped-item category-item">
@@ -223,7 +223,7 @@
           </div>
 
           <div class="chart-grid">
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(recruitmentDistributions.reduce((total, group) => total + group.items.length, 0))">
               <div class="chart-title">候选人来源与当前阶段</div>
               <div class="distribution-chart-scroll">
                 <div class="distribution-chart-groups">
@@ -241,7 +241,7 @@
                 </div>
               </div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(recruitmentData.positions.length)">
               <div class="chart-title">职位投递与 Offer 确认</div>
               <div class="grouped-chart category-chart position-chart">
                 <div v-for="item in recruitmentData.positions" :key="item.position" class="grouped-item category-item">
@@ -392,7 +392,7 @@
               </div>
               <div class="inline-legend"><span><i class="green-bg"></i>入职</span><span><i class="orange-bg"></i>离职</span></div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(movementOrgNet.length)">
               <div class="chart-title">组织净增人数</div>
               <div class="bar-chart category-chart">
                 <div v-for="item in movementOrgNet" :key="item.org" class="bar-item category-item">
@@ -466,7 +466,7 @@
                 </div>
               </div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(leaveTypeSlices.length)">
               <div class="chart-title">请假类型分布</div>
               <div class="bar-chart category-chart leave-type-chart">
                 <div v-for="item in leaveTypeSlices" :key="item.name" class="bar-item category-item">
@@ -477,7 +477,7 @@
                 <a-empty v-if="!leaveTypeSlices.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(leaveData.byOrg.length)">
               <div class="chart-title">各组织有效请假天数</div>
               <div class="bar-chart category-chart">
                 <div v-for="item in leaveData.byOrg" :key="item.org" class="bar-item category-item">
@@ -562,7 +562,7 @@
                 <a-empty v-if="!overtimeData.types.length" :image="false" description="暂无数据" />
               </div>
             </div>
-            <div class="chart-card">
+            <div class="chart-card" :class="chartCardClass(overtimeData.byOrg.length)">
               <div class="chart-title">各组织已审批及未结算小时</div>
               <div class="grouped-chart category-chart">
                 <div v-for="item in overtimeData.byOrg" :key="item.org" class="grouped-item category-item">
@@ -1301,6 +1301,7 @@ function donutBackground(slices: Slice[]) {
   return `conic-gradient(${parts.join(',')})`
 }
 function barStyle(value: number, max: number) { return { height: `${Math.max(value > 0 ? 8 : 0, value / Math.max(max, 1) * 100)}%` } }
+function chartCardClass(columnCount: number) { return { 'chart-card-wide': columnCount > 4 } }
 function horizontalStyle(value: number, max: number) {
   return { width: `${Math.max(value > 0 ? 2 : 0, value / Math.max(max, 1) * 100)}%` }
 }
@@ -1322,8 +1323,9 @@ function horizontalStyle(value: number, max: number) {
 .metric-card { padding: 14px 16px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--panel-bg); }
 .metric-label { color: var(--muted); font-size: 12px; }
 .metric-value { margin: 3px 0; font-size: 26px; font-weight: 600; line-height: 1.4; }
-.chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: dense; gap: 12px; margin-bottom: 14px; }
 .chart-card { min-width: 0; min-height: 250px; padding: 16px; border: 1px solid var(--panel-border); border-radius: 8px; }
+.chart-card-wide { grid-column: 1 / -1; }
 .chart-title { margin-bottom: 18px; font-weight: 600; }
 .bar-chart { display: flex; align-items: flex-end; gap: 14px; height: 205px; padding: 0 8px; overflow-x: auto; overflow-y: hidden; }
 .bar-item { display: flex; flex: 1 0 36px; flex-direction: column; align-items: center; height: 100%; min-width: 36px; }
