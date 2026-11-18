@@ -1013,8 +1013,8 @@ const movementMonthMax = computed(() => Math.max(1, ...movementMonthly.value.fla
 const movementOrgNet = computed(() => movementData.value.orgNet)
 const movementOrgMax = computed(() => Math.max(1, ...movementOrgNet.value.map(x => Math.abs(x.value))))
 const movementColumns = [
-  { title: '日期', dataIndex: 'date', width: 115 }, { title: '员工', key: 'employee', width: 130 },
-  { title: '组织', dataIndex: 'org', width: 120 }, { title: '流动类型', key: 'event', width: 100 }, { title: '说明', dataIndex: 'detail' }
+  { title: '日期', dataIndex: 'date', width: '14%' }, { title: '员工', key: 'employee', width: '20%' },
+  { title: '组织', dataIndex: 'org', width: '24%' }, { title: '流动类型', key: 'event', width: '14%' }, { title: '说明', dataIndex: 'detail', width: '28%' }
 ]
 function resetMovementFilters() { Object.assign(movementFilters, { months: [monthOffset(-11), monthOffset(0)], org: 'ALL', event: 'ALL' }) }
 function movementEventText(event: string) { return ({ ONBOARD: '入职', REGULAR: '转正', RESIGN: '离职' } as Record<string, string>)[event] || event }
