@@ -57,7 +57,7 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'no'">
-              <span class="cell-no">{{ record.announcementNo || '—' }}</span>
+              <span class="cell-no" :title="record.announcementNo || '—'">{{ record.announcementNo || '—' }}</span>
             </template>
             <template v-else-if="column.key === 'title'">
               <div class="cell-title">
@@ -242,14 +242,14 @@ import {
 import RichTextEditor from '@/components/RichTextEditor.vue'
 
 const columns = [
-  { key: 'no', title: '编号', dataIndex: 'announcementNo', width: '12%' },
-  { key: 'title', title: '标题', dataIndex: 'title', width: '24%' },
+  { key: 'no', title: '编号', dataIndex: 'announcementNo', width: '22%' },
+  { key: 'title', title: '标题', dataIndex: 'title', width: '18%' },
   { key: 'category', title: '类型', width: '8%' },
-  { key: 'target', title: '通知目标', width: '14%' },
+  { key: 'target', title: '通知目标', width: '12%' },
   { key: 'status', title: '状态', width: '8%' },
   { key: 'read', title: '阅读 / 应读', width: '8%' },
   { key: 'time', title: '发布时间', width: '14%' },
-  { key: 'action', title: '操作', width: '12%' }
+  { key: 'action', title: '操作', width: '10%' }
 ]
 
 const statusOptions = [
@@ -589,7 +589,10 @@ onMounted(() => {
 }
 
 .cell-no {
+  display: block;
+  overflow: hidden;
   color: #595959;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
