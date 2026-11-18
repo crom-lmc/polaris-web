@@ -132,20 +132,6 @@
                 </div>
               </div>
             </div>
-            <div class="chart-card" :class="chartCardClass(regularizationData.byOrg.length)">
-              <div class="chart-title">各组织逾期与 30 天内转正</div>
-              <div class="grouped-chart category-chart">
-                <div v-for="item in regularizationData.byOrg" :key="item.org" class="grouped-item category-item">
-                  <div class="grouped-bars">
-                    <div class="group-bar-wrap"><span>{{ formatAmount(item.overdue) }}</span><div class="group-bar red" :style="barStyle(item.overdue, regularizationOrgMax)"></div></div>
-                    <div class="group-bar-wrap"><span>{{ formatAmount(item.due30) }}</span><div class="group-bar orange" :style="barStyle(item.due30, regularizationOrgMax)"></div></div>
-                  </div>
-                  <div class="bar-label category-label" :title="item.org">{{ item.org }}</div>
-                </div>
-                <a-empty v-if="!regularizationData.byOrg.length" class="category-empty" :image="false" description="暂无数据" />
-              </div>
-              <div class="inline-legend"><span><i class="red-bg"></i>已逾期</span><span><i class="orange-bg"></i>30 天内</span></div>
-            </div>
             <div class="chart-card">
               <div class="chart-title">审批状态分布</div>
               <div class="donut-layout">
@@ -223,7 +209,7 @@
           </div>
 
           <div class="chart-grid">
-            <div class="chart-card" :class="chartCardClass(recruitmentDistributions.reduce((total, group) => total + group.items.length, 0))">
+            <div class="chart-card chart-card-wide">
               <div class="chart-title">候选人来源与当前阶段</div>
               <div class="distribution-chart-scroll">
                 <div class="distribution-chart-groups">
@@ -379,7 +365,7 @@
           </div>
 
           <div class="chart-grid">
-            <div class="chart-card">
+            <div class="chart-card chart-card-wide">
               <div class="chart-title">月度入职 / 离职趋势</div>
               <div class="grouped-chart">
                 <div v-for="item in movementMonthly" :key="item.month" class="grouped-item">
@@ -456,7 +442,7 @@
           </div>
 
           <div class="chart-grid">
-            <div class="chart-card">
+            <div class="chart-card chart-card-wide">
               <div class="chart-title">月度有效请假天数</div>
               <div class="bar-chart">
                 <div v-for="item in leaveData.monthly" :key="item.month" class="bar-item">
@@ -466,18 +452,7 @@
                 </div>
               </div>
             </div>
-            <div class="chart-card" :class="chartCardClass(leaveTypeSlices.length)">
-              <div class="chart-title">请假类型分布</div>
-              <div class="bar-chart category-chart leave-type-chart">
-                <div v-for="item in leaveTypeSlices" :key="item.name" class="bar-item category-item">
-                  <div class="bar-value leave-type-value"><span>{{ formatAmount(item.days) }} 天</span><small>{{ formatAmount(item.count) }} 单</small></div>
-                  <div class="bar-track"><div class="bar-fill" :style="{ ...barStyle(item.days, leaveTypeMax), background: item.color }"></div></div>
-                  <div class="bar-label category-label" :title="item.name">{{ item.name }}</div>
-                </div>
-                <a-empty v-if="!leaveTypeSlices.length" class="category-empty" :image="false" description="暂无数据" />
-              </div>
-            </div>
-            <div class="chart-card" :class="chartCardClass(leaveData.byOrg.length)">
+            <div class="chart-card chart-card-wide">
               <div class="chart-title">各组织有效请假天数</div>
               <div class="bar-chart category-chart">
                 <div v-for="item in leaveData.byOrg" :key="item.org" class="bar-item category-item">
@@ -960,7 +935,6 @@ const regularizationMetrics = computed(() => [
   { label: '审批中', value: formatAmount(regularizationData.value.approving), hint: '部门或人事审批', tone: 'text-success' }
 ])
 const regularizationMonthMax = computed(() => Math.max(1, ...regularizationData.value.monthly.map(x => x.value)))
-const regularizationOrgMax = computed(() => Math.max(1, ...regularizationData.value.byOrg.flatMap(x => [x.overdue, x.due30])))
 const regularizationStatusSlices = computed(() => regularizationData.value.approvalStatuses.filter(x => x.value > 0)
   .map((x, index) => ({ name: x.name, value: x.value, color: ['#bfbfbf', '#1677ff', '#722ed1', '#f5222d'][index % 4] })))
 const regularizationApprovalTotal = computed(() => formatAmount(regularizationData.value.approvalStatuses.reduce((sum, item) => sum + item.value, 0)))
@@ -1057,9 +1031,6 @@ const leaveMetrics = computed(() => [
   { label: '待审批天数', value: formatAmount(leaveData.value.pendingDays), hint: '待审批申请合计', tone: 'text-danger' }
 ])
 const leaveMonthMax = computed(() => Math.max(1, ...leaveData.value.monthly.map(x => x.value)))
-const leaveTypeSlices = computed(() => leaveData.value.types.filter(x => x.days > 0)
-  .map((x, index) => ({ name: x.name, value: x.days, days: x.days, count: x.count, color: ['#1677ff', '#13c2c2', '#722ed1', '#faad14', '#fa8c16', '#52c41a', '#eb2f96'][index % 7] })))
-const leaveTypeMax = computed(() => Math.max(1, ...leaveTypeSlices.value.map(x => x.days)))
 const leaveOrgMax = computed(() => Math.max(1, ...leaveData.value.byOrg.map(x => x.value)))
 const leaveColumns = [
   { title: '单号', dataIndex: 'leaveNo', width: 145 }, { title: '员工', key: 'employee', width: 125 },
@@ -1370,10 +1341,6 @@ function horizontalStyle(value: number, max: number) {
 .category-chart .category-label { display: -webkit-box; width: 100%; min-height: 32px; margin-top: 6px; overflow: hidden; line-height: 16px; text-align: center; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .category-empty { flex: 1 0 100%; align-self: center; width: 100%; margin: 0; }
 .position-chart .category-item { flex-basis: 112px; min-width: 112px; }
-.leave-type-chart { height: 220px; }
-.leave-type-chart .bar-track { height: 125px; }
-.leave-type-value { display: flex; flex-direction: column; min-height: 32px; }
-.leave-type-value small { color: var(--muted); font-size: 10px; }
 .horizontal-chart { padding-top: 8px; }
 .horizontal-row { display: grid; grid-template-columns: 72px 1fr 34px; align-items: center; gap: 10px; margin: 20px 0; font-size: 12px; }
 .horizontal-row.amount-row { grid-template-columns: 92px 1fr 50px; margin: 16px 0; }
@@ -1389,10 +1356,10 @@ function horizontalStyle(value: number, max: number) {
 .horizontal-bar.red-bar { background: #ff4d4f; }
 .distribution-chart-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; }
 .distribution-chart-groups { display: flex; align-items: flex-start; gap: 24px; width: max-content; min-width: 100%; }
-.distribution-group { flex: none; }
+.distribution-group { flex: 1 0 auto; }
 .distribution-title { margin-bottom: 4px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .distribution-chart { height: 180px; padding: 0; overflow: visible; }
-.distribution-chart .category-item { flex-basis: 72px; min-width: 72px; }
+.distribution-chart .category-item { flex: 1 0 72px; min-width: 72px; }
 .distribution-empty { padding: 8px 0; font-size: 12px; }
 .text-primary { color: #1677ff; }
 .text-success { color: #389e0d; }
