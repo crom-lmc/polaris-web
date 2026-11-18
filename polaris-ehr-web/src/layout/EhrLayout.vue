@@ -69,37 +69,9 @@
             <template #icon><rise-outlined /></template>
             转正申请
           </a-menu-item>
-          <a-menu-item v-if="canSeeApproval" key="/approvals">
-            <template #icon><audit-outlined /></template>
-            审批中心
-          </a-menu-item>
           <a-menu-item v-if="store.canAny('recruit:board', 'recruit:offers', 'recruit:jobs', 'recruit:interviews')" key="/recruit">
             <template #icon><user-add-outlined /></template>
             招聘管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('announcement:view')" key="/announcements">
-            <template #icon><notification-outlined /></template>
-            通知管理
-          </a-menu-item>
-          <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
-            <template #icon><file-search-outlined /></template>
-            审计日志
-          </a-menu-item>
-          <a-menu-item
-            v-if="store.canAny(
-              'ledger:workforce',
-              'ledger:regularization',
-              'ledger:recruitment',
-              'ledger:contract',
-              'ledger:movement',
-              'ledger:leaves',
-              'ledger:overtimes',
-              'ledger:attendance'
-            )"
-            key="/hr-ledgers"
-          >
-            <template #icon><fund-outlined /></template>
-            人力台账
           </a-menu-item>
           <a-menu-item
             v-if="store.canAny(
@@ -117,6 +89,34 @@
           >
             <template #icon><clock-circle-outlined /></template>
             考勤管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('announcement:view')" key="/announcements">
+            <template #icon><notification-outlined /></template>
+            通知管理
+          </a-menu-item>
+          <a-menu-item
+            v-if="store.canAny(
+              'ledger:workforce',
+              'ledger:regularization',
+              'ledger:recruitment',
+              'ledger:contract',
+              'ledger:movement',
+              'ledger:leaves',
+              'ledger:overtimes',
+              'ledger:attendance'
+            )"
+            key="/hr-ledgers"
+          >
+            <template #icon><fund-outlined /></template>
+            人力台账
+          </a-menu-item>
+          <a-menu-item v-if="canSeeApproval" key="/approvals">
+            <template #icon><audit-outlined /></template>
+            审批中心
+          </a-menu-item>
+          <a-menu-item v-if="store.can('audit:view')" key="/audit-logs">
+            <template #icon><file-search-outlined /></template>
+            审计日志
           </a-menu-item>
         </a-menu>
       </a-layout-sider>

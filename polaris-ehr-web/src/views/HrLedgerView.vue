@@ -45,27 +45,31 @@
           <div class="chart-grid">
             <div class="chart-card">
               <div class="chart-title">各直接组织在职人数</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in workforceData.byOrg" :key="item.key" class="horizontal-row amount-row">
-                  <span class="horizontal-label" :title="item.name">{{ item.name }}</span>
-                  <div class="horizontal-track"><div class="horizontal-bar blue-bar" :style="horizontalStyle(item.value, workforceOrgMax)"></div></div>
-                  <b>{{ formatAmount(item.value) }}</b>
+              <div class="bar-chart category-chart">
+                <div v-for="item in workforceData.byOrg" :key="item.key" class="bar-item category-item">
+                  <div class="bar-value">{{ formatAmount(item.value) }}</div>
+                  <div class="bar-track"><div class="bar-fill blue" :style="barStyle(item.value, workforceOrgMax)"></div></div>
+                  <div class="bar-label category-label" :title="item.name">{{ item.name }}</div>
                 </div>
-                <a-empty v-if="!workforceData.byOrg.length" :image="false" description="暂无数据" />
+                <a-empty v-if="!workforceData.byOrg.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
             </div>
             <div class="chart-card">
               <div class="chart-title">人员结构分布</div>
-              <div class="distribution-list chart-scroll">
-                <section v-for="group in workforceDistributions" :key="group.title" class="distribution-group">
-                  <div class="distribution-title">{{ group.title }}</div>
-                  <div v-for="item in group.items" :key="item.key" class="distribution-row">
-                    <span class="horizontal-label" :title="item.name">{{ item.name }}</span>
-                    <div class="horizontal-track"><div class="horizontal-bar" :class="group.color" :style="horizontalStyle(item.value, countMax(group.items))"></div></div>
-                    <b>{{ formatAmount(item.value) }}</b>
-                  </div>
-                  <div v-if="!group.items.length" class="muted distribution-empty">暂无数据</div>
-                </section>
+              <div class="distribution-chart-scroll">
+                <div class="distribution-chart-groups">
+                  <section v-for="group in workforceDistributions" :key="group.title" class="distribution-group">
+                    <div class="distribution-title">{{ group.title }}</div>
+                    <div class="bar-chart category-chart distribution-chart">
+                      <div v-for="item in group.items" :key="item.key" class="bar-item category-item">
+                        <div class="bar-value">{{ formatAmount(item.value) }}</div>
+                        <div class="bar-track"><div class="bar-fill" :class="group.color" :style="barStyle(item.value, countMax(group.items))"></div></div>
+                        <div class="bar-label category-label" :title="item.name">{{ item.name }}</div>
+                      </div>
+                    </div>
+                    <div v-if="!group.items.length" class="muted distribution-empty">暂无数据</div>
+                  </section>
+                </div>
               </div>
             </div>
           </div>
@@ -130,15 +134,15 @@
             </div>
             <div class="chart-card">
               <div class="chart-title">各组织逾期与 30 天内转正</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in regularizationData.byOrg" :key="item.org" class="dual-horizontal-row">
-                  <span class="horizontal-label" :title="item.org">{{ item.org }}</span>
-                  <div class="dual-horizontal-bars">
-                    <div class="mini-horizontal-line"><div class="horizontal-track"><div class="horizontal-bar red-bar" :style="horizontalStyle(item.overdue, regularizationOrgMax)"></div></div><b>{{ formatAmount(item.overdue) }}</b></div>
-                    <div class="mini-horizontal-line"><div class="horizontal-track"><div class="horizontal-bar orange-bar" :style="horizontalStyle(item.due30, regularizationOrgMax)"></div></div><b>{{ formatAmount(item.due30) }}</b></div>
+              <div class="grouped-chart category-chart">
+                <div v-for="item in regularizationData.byOrg" :key="item.org" class="grouped-item category-item">
+                  <div class="grouped-bars">
+                    <div class="group-bar-wrap"><span>{{ formatAmount(item.overdue) }}</span><div class="group-bar red" :style="barStyle(item.overdue, regularizationOrgMax)"></div></div>
+                    <div class="group-bar-wrap"><span>{{ formatAmount(item.due30) }}</span><div class="group-bar orange" :style="barStyle(item.due30, regularizationOrgMax)"></div></div>
                   </div>
+                  <div class="bar-label category-label" :title="item.org">{{ item.org }}</div>
                 </div>
-                <a-empty v-if="!regularizationData.byOrg.length" :image="false" description="暂无数据" />
+                <a-empty v-if="!regularizationData.byOrg.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
               <div class="inline-legend"><span><i class="red-bg"></i>已逾期</span><span><i class="orange-bg"></i>30 天内</span></div>
             </div>
@@ -221,29 +225,33 @@
           <div class="chart-grid">
             <div class="chart-card">
               <div class="chart-title">候选人来源与当前阶段</div>
-              <div class="distribution-list chart-scroll">
-                <section v-for="group in recruitmentDistributions" :key="group.title" class="distribution-group">
-                  <div class="distribution-title">{{ group.title }}</div>
-                  <div v-for="item in group.items" :key="item.key" class="distribution-row">
-                    <span class="horizontal-label" :title="item.name">{{ item.name }}</span>
-                    <div class="horizontal-track"><div class="horizontal-bar" :class="group.color" :style="horizontalStyle(item.value, countMax(group.items))"></div></div>
-                    <b>{{ formatAmount(item.value) }}</b>
-                  </div>
-                  <div v-if="!group.items.length" class="muted distribution-empty">暂无数据</div>
-                </section>
+              <div class="distribution-chart-scroll">
+                <div class="distribution-chart-groups">
+                  <section v-for="group in recruitmentDistributions" :key="group.title" class="distribution-group">
+                    <div class="distribution-title">{{ group.title }}</div>
+                    <div class="bar-chart category-chart distribution-chart">
+                      <div v-for="item in group.items" :key="item.key" class="bar-item category-item">
+                        <div class="bar-value">{{ formatAmount(item.value) }}</div>
+                        <div class="bar-track"><div class="bar-fill" :class="group.color" :style="barStyle(item.value, countMax(group.items))"></div></div>
+                        <div class="bar-label category-label" :title="item.name">{{ item.name }}</div>
+                      </div>
+                    </div>
+                    <div v-if="!group.items.length" class="muted distribution-empty">暂无数据</div>
+                  </section>
+                </div>
               </div>
             </div>
             <div class="chart-card">
               <div class="chart-title">职位投递与 Offer 确认</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in recruitmentData.positions" :key="item.position" class="dual-horizontal-row">
-                  <span class="horizontal-label" :title="item.position">{{ item.position }}</span>
-                  <div class="dual-horizontal-bars">
-                    <div class="mini-horizontal-line"><div class="horizontal-track"><div class="horizontal-bar blue-bar" :style="horizontalStyle(item.candidates, recruitmentPositionMax)"></div></div><b>{{ formatAmount(item.candidates) }}</b></div>
-                    <div class="mini-horizontal-line"><div class="horizontal-track"><div class="horizontal-bar cyan-bar" :style="horizontalStyle(item.confirmedOffers, recruitmentPositionMax)"></div></div><b>{{ formatAmount(item.confirmedOffers) }}</b></div>
+              <div class="grouped-chart category-chart position-chart">
+                <div v-for="item in recruitmentData.positions" :key="item.position" class="grouped-item category-item">
+                  <div class="grouped-bars">
+                    <div class="group-bar-wrap"><span>{{ formatAmount(item.candidates) }}</span><div class="group-bar blue" :style="barStyle(item.candidates, recruitmentPositionMax)"></div></div>
+                    <div class="group-bar-wrap"><span>{{ formatAmount(item.confirmedOffers) }}</span><div class="group-bar cyan" :style="barStyle(item.confirmedOffers, recruitmentPositionMax)"></div></div>
                   </div>
+                  <div class="bar-label category-label" :title="item.position">{{ item.position }}</div>
                 </div>
-                <a-empty v-if="!recruitmentData.positions.length" :image="false" description="暂无数据" />
+                <a-empty v-if="!recruitmentData.positions.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
               <div class="inline-legend"><span><i class="blue-bg"></i>当前候选人</span><span><i class="cyan-bg"></i>期间确认 Offer</span></div>
             </div>
@@ -386,12 +394,13 @@
             </div>
             <div class="chart-card">
               <div class="chart-title">组织净增人数</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in movementOrgNet" :key="item.org" class="horizontal-row">
-                  <span class="horizontal-label">{{ item.org }}</span>
-                  <div class="horizontal-track"><div :class="item.value < 0 ? 'horizontal-bar negative' : 'horizontal-bar'" :style="{ width: `${movementOrgMax ? Math.abs(item.value) / movementOrgMax * 100 : 0}%` }"></div></div>
-                  <b :class="item.value < 0 ? 'text-danger' : 'text-success'">{{ item.value > 0 ? '+' : '' }}{{ item.value }}</b>
+              <div class="bar-chart category-chart">
+                <div v-for="item in movementOrgNet" :key="item.org" class="bar-item category-item">
+                  <div class="bar-value" :class="item.value < 0 ? 'text-danger' : 'text-success'">{{ item.value > 0 ? '+' : '' }}{{ item.value }}</div>
+                  <div class="bar-track"><div class="bar-fill" :class="item.value < 0 ? 'red' : 'green'" :style="barStyle(Math.abs(item.value), movementOrgMax)"></div></div>
+                  <div class="bar-label category-label" :title="item.org">{{ item.org }}</div>
                 </div>
+                <a-empty v-if="!movementOrgNet.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
             </div>
           </div>
@@ -459,26 +468,24 @@
             </div>
             <div class="chart-card">
               <div class="chart-title">请假类型分布</div>
-              <div class="donut-layout">
-                <div class="donut" :style="{ background: donutBackground(leaveTypeSlices) }">
-                  <div class="donut-center"><b>{{ formatAmount(leaveData.effectiveDays) }}</b><span>有效天数</span></div>
+              <div class="bar-chart category-chart leave-type-chart">
+                <div v-for="item in leaveTypeSlices" :key="item.name" class="bar-item category-item">
+                  <div class="bar-value leave-type-value"><span>{{ formatAmount(item.days) }} 天</span><small>{{ formatAmount(item.count) }} 单</small></div>
+                  <div class="bar-track"><div class="bar-fill" :style="{ ...barStyle(item.days, leaveTypeMax), background: item.color }"></div></div>
+                  <div class="bar-label category-label" :title="item.name">{{ item.name }}</div>
                 </div>
-                <div class="chart-legend chart-scroll">
-                  <div v-for="item in leaveTypeSlices" :key="item.name" class="legend-row leave-legend-row">
-                    <i :style="{ background: item.color }"></i><span>{{ item.name }}</span><b>{{ formatAmount(item.days) }} 天 / {{ formatAmount(item.count) }} 单</b>
-                  </div>
-                </div>
+                <a-empty v-if="!leaveTypeSlices.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
             </div>
             <div class="chart-card">
               <div class="chart-title">各组织有效请假天数</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in leaveData.byOrg" :key="item.org" class="horizontal-row amount-row">
-                  <span class="horizontal-label" :title="item.org">{{ item.org }}</span>
-                  <div class="horizontal-track"><div class="horizontal-bar cyan-bar" :style="horizontalStyle(item.value, leaveOrgMax)"></div></div>
-                  <b>{{ formatAmount(item.value) }}</b>
+              <div class="bar-chart category-chart">
+                <div v-for="item in leaveData.byOrg" :key="item.org" class="bar-item category-item">
+                  <div class="bar-value">{{ formatAmount(item.value) }}</div>
+                  <div class="bar-track"><div class="bar-fill cyan" :style="barStyle(item.value, leaveOrgMax)"></div></div>
+                  <div class="bar-label category-label" :title="item.org">{{ item.org }}</div>
                 </div>
-                <a-empty v-if="!leaveData.byOrg.length" :image="false" description="暂无数据" />
+                <a-empty v-if="!leaveData.byOrg.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
             </div>
           </div>
@@ -557,15 +564,15 @@
             </div>
             <div class="chart-card">
               <div class="chart-title">各组织已审批及未结算小时</div>
-              <div class="horizontal-chart chart-scroll">
-                <div v-for="item in overtimeData.byOrg" :key="item.org" class="dual-horizontal-row">
-                  <span class="horizontal-label" :title="item.org">{{ item.org }}</span>
-                  <div class="dual-horizontal-bars">
-                    <div class="mini-horizontal-line"><div class="horizontal-track"><div class="horizontal-bar blue-bar" :style="horizontalStyle(item.hours, overtimeOrgMax)"></div></div><b>{{ formatAmount(item.hours) }}</b></div>
-                    <div class="mini-horizontal-line"><div class="horizontal-track"><div class="horizontal-bar orange-bar" :style="horizontalStyle(item.unsettledHours, overtimeOrgMax)"></div></div><b>{{ formatAmount(item.unsettledHours) }}</b></div>
+              <div class="grouped-chart category-chart">
+                <div v-for="item in overtimeData.byOrg" :key="item.org" class="grouped-item category-item">
+                  <div class="grouped-bars">
+                    <div class="group-bar-wrap"><span>{{ formatAmount(item.hours) }}</span><div class="group-bar blue" :style="barStyle(item.hours, overtimeOrgMax)"></div></div>
+                    <div class="group-bar-wrap"><span>{{ formatAmount(item.unsettledHours) }}</span><div class="group-bar orange" :style="barStyle(item.unsettledHours, overtimeOrgMax)"></div></div>
                   </div>
+                  <div class="bar-label category-label" :title="item.org">{{ item.org }}</div>
                 </div>
-                <a-empty v-if="!overtimeData.byOrg.length" :image="false" description="暂无数据" />
+                <a-empty v-if="!overtimeData.byOrg.length" class="category-empty" :image="false" description="暂无数据" />
               </div>
               <div class="inline-legend"><span><i class="blue-bg"></i>已审批</span><span><i class="orange-bg"></i>未结算</span></div>
             </div>
@@ -927,9 +934,9 @@ const workforceMetrics = computed(() => [
 ])
 const workforceOrgMax = computed(() => Math.max(1, ...workforceData.value.byOrg.map(x => x.value)))
 const workforceDistributions = computed(() => [
-  { title: '学历分布', items: workforceData.value.educations, color: 'blue-bar' },
-  { title: '年龄分布', items: workforceData.value.ageGroups, color: 'cyan-bar' },
-  { title: '司龄分布', items: workforceData.value.seniorityGroups, color: 'purple-bar' }
+  { title: '学历分布', items: workforceData.value.educations, color: 'blue' },
+  { title: '年龄分布', items: workforceData.value.ageGroups, color: 'cyan' },
+  { title: '司龄分布', items: workforceData.value.seniorityGroups, color: 'purple' }
 ])
 const workforceColumns = [
   { title: '员工', key: 'employee', width: 130 }, { title: '组织', dataIndex: 'org', width: 120 },
@@ -974,7 +981,7 @@ function regularizationStatusColor(status: number) {
 
 const recruitmentSourceOptions = computed(() => [
   { value: '', label: '全部来源' },
-  ...recruitmentData.value.sources.map(item => ({ value: item.key, label: item.name }))
+  ...recruitmentData.value.sources.map(item => ({ value: item.key, label: recruitmentSourceText(item.key) }))
 ])
 const recruitmentMetrics = computed(() => [
   { label: '期间新增候选人', value: formatAmount(recruitmentData.value.newCandidates), hint: '按候选人创建时间', tone: 'text-primary' },
@@ -983,8 +990,8 @@ const recruitmentMetrics = computed(() => [
   { label: '期间招聘入职', value: formatAmount(recruitmentData.value.recruitedEmployees), hint: '仅计来源 Offer 的入职', tone: 'text-success' }
 ])
 const recruitmentDistributions = computed(() => [
-  { title: '来源分布', items: recruitmentData.value.sources, color: 'cyan-bar' },
-  { title: '当前阶段', items: recruitmentData.value.stages, color: 'blue-bar' }
+  { title: '来源分布', items: recruitmentData.value.sources.map(item => ({ ...item, name: recruitmentSourceText(item.key) })), color: 'cyan' },
+  { title: '当前阶段', items: recruitmentData.value.stages, color: 'blue' }
 ])
 const recruitmentPositionMax = computed(() => Math.max(1, ...recruitmentData.value.positions.flatMap(x => [x.candidates, x.confirmedOffers])))
 const recruitmentColumns = [
@@ -996,7 +1003,9 @@ const recruitmentColumns = [
 function resetRecruitmentFilters() { Object.assign(recruitmentFilters, { dates: defaultDateRange(), org: 'ALL', stage: 'ALL', source: '', keyword: '' }) }
 function recruitmentStageText(stage: string) { return recruitmentStageOptions.find(item => item.value === stage)?.label || stage || '未知' }
 function recruitmentStageColor(stage: string) { return ({ RESUME: 'blue', INTERVIEW: 'purple', OFFER: 'green', REJECTED: 'default' } as Record<string, string>)[stage] || 'default' }
-function recruitmentSourceText(source: string) { return !source || source === 'UNKNOWN' ? '未知来源' : source }
+function recruitmentSourceText(source: string) {
+  return ({ PORTAL: '门户网站', REFERRAL: '内推', HEADHUNTER: '猎头', WEBSITE: '官网', JOB_BOARD: '招聘网站', OTHER: '其他', UNKNOWN: '未知来源' } as Record<string, string>)[source] || source || '未知来源'
+}
 
 const filteredContracts = computed(() => contractData.value.page.list)
 const contractMetrics = computed(() => [
@@ -1050,6 +1059,7 @@ const leaveMetrics = computed(() => [
 const leaveMonthMax = computed(() => Math.max(1, ...leaveData.value.monthly.map(x => x.value)))
 const leaveTypeSlices = computed(() => leaveData.value.types.filter(x => x.days > 0)
   .map((x, index) => ({ name: x.name, value: x.days, days: x.days, count: x.count, color: ['#1677ff', '#13c2c2', '#722ed1', '#faad14', '#fa8c16', '#52c41a', '#eb2f96'][index % 7] })))
+const leaveTypeMax = computed(() => Math.max(1, ...leaveTypeSlices.value.map(x => x.days)))
 const leaveOrgMax = computed(() => Math.max(1, ...leaveData.value.byOrg.map(x => x.value)))
 const leaveColumns = [
   { title: '单号', dataIndex: 'leaveNo', width: 145 }, { title: '员工', key: 'employee', width: 125 },
@@ -1321,7 +1331,11 @@ function horizontalStyle(value: number, max: number) {
 .bar-track { display: flex; align-items: flex-end; width: 28px; height: 140px; border-radius: 4px 4px 0 0; overflow: hidden; }
 .bar-fill { width: 100%; border-radius: 4px 4px 0 0; transition: height .25s; }
 .bar-fill.blue { background: #1677ff; }
+.bar-fill.cyan { background: #13c2c2; }
 .bar-fill.purple { background: #722ed1; }
+.bar-fill.green { background: #52c41a; }
+.bar-fill.orange { background: #fa8c16; }
+.bar-fill.red { background: #ff4d4f; }
 .bar-label { margin-top: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .donut-layout { display: flex; align-items: center; justify-content: center; gap: 32px; min-height: 180px; }
 .donut { display: flex; align-items: center; justify-content: center; width: 136px; height: 136px; flex: none; border-radius: 50%; }
@@ -1331,7 +1345,6 @@ function horizontalStyle(value: number, max: number) {
 .chart-legend { min-width: 130px; max-height: 190px; }
 .legend-row { display: grid; grid-template-columns: 8px 1fr auto; align-items: center; gap: 8px; margin: 10px 0; font-size: 12px; }
 .legend-row i, .inline-legend i { width: 8px; height: 8px; border-radius: 50%; }
-.leave-legend-row { grid-template-columns: 8px minmax(50px, 1fr) auto; }
 .grouped-chart { display: flex; align-items: flex-end; gap: 12px; height: 188px; overflow-x: auto; overflow-y: hidden; }
 .grouped-item { display: flex; flex: 1 0 44px; flex-direction: column; align-items: center; height: 100%; }
 .grouped-bars { display: flex; align-items: flex-end; justify-content: center; gap: 5px; height: 140px; }
@@ -1340,6 +1353,9 @@ function horizontalStyle(value: number, max: number) {
 .group-bar { width: 16px; min-height: 0; border-radius: 3px 3px 0 0; }
 .group-bar.green { background: #52c41a; }
 .group-bar.orange { background: #fa8c16; }
+.group-bar.blue { background: #1677ff; }
+.group-bar.cyan { background: #13c2c2; }
+.group-bar.red { background: #ff4d4f; }
 .inline-legend { display: flex; justify-content: center; gap: 18px; color: var(--muted); font-size: 12px; }
 .inline-legend span { display: flex; align-items: center; gap: 6px; }
 .green-bg { background: #52c41a; }
@@ -1347,8 +1363,16 @@ function horizontalStyle(value: number, max: number) {
 .red-bg { background: #ff4d4f; }
 .blue-bg { background: #1677ff; }
 .cyan-bg { background: #13c2c2; }
+.category-chart { gap: 10px; padding: 0 4px 6px; }
+.category-chart .category-item { flex: 0 0 92px; min-width: 92px; }
+.category-chart .category-label { display: -webkit-box; width: 100%; min-height: 32px; margin-top: 6px; overflow: hidden; line-height: 16px; text-align: center; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.category-empty { flex: 1 0 100%; align-self: center; width: 100%; margin: 0; }
+.position-chart .category-item { flex-basis: 112px; min-width: 112px; }
+.leave-type-chart { height: 220px; }
+.leave-type-chart .bar-track { height: 125px; }
+.leave-type-value { display: flex; flex-direction: column; min-height: 32px; }
+.leave-type-value small { color: var(--muted); font-size: 10px; }
 .horizontal-chart { padding-top: 8px; }
-.chart-scroll { max-height: 195px; overflow-y: auto; padding-right: 4px; }
 .horizontal-row { display: grid; grid-template-columns: 72px 1fr 34px; align-items: center; gap: 10px; margin: 20px 0; font-size: 12px; }
 .horizontal-row.amount-row { grid-template-columns: 92px 1fr 50px; margin: 16px 0; }
 .horizontal-row.amount-row b { text-align: right; }
@@ -1361,16 +1385,13 @@ function horizontalStyle(value: number, max: number) {
 .horizontal-bar.purple-bar { background: #722ed1; }
 .horizontal-bar.orange-bar { background: #fa8c16; }
 .horizontal-bar.red-bar { background: #ff4d4f; }
-.distribution-list { padding-top: 2px; }
-.distribution-group + .distribution-group { margin-top: 16px; }
+.distribution-chart-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; }
+.distribution-chart-groups { display: flex; align-items: flex-start; gap: 24px; width: max-content; min-width: 100%; }
+.distribution-group { flex: none; }
 .distribution-title { margin-bottom: 4px; color: var(--muted); font-size: 12px; font-weight: 600; }
-.distribution-row { display: grid; grid-template-columns: 78px 1fr 34px; align-items: center; gap: 8px; margin: 9px 0; font-size: 12px; }
-.distribution-row b { text-align: right; }
+.distribution-chart { height: 180px; padding: 0; overflow: visible; }
+.distribution-chart .category-item { flex-basis: 72px; min-width: 72px; }
 .distribution-empty { padding: 8px 0; font-size: 12px; }
-.dual-horizontal-row { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 10px; margin: 15px 0; font-size: 12px; }
-.dual-horizontal-bars { display: grid; gap: 7px; }
-.mini-horizontal-line { display: grid; grid-template-columns: 1fr 50px; align-items: center; gap: 8px; }
-.mini-horizontal-line b { text-align: right; }
 .text-primary { color: #1677ff; }
 .text-success { color: #389e0d; }
 .text-warning { color: #d48806; }
