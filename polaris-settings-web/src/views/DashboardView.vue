@@ -100,7 +100,7 @@ const changes = [
       <a-card class="fill-card" :bordered="false" title="最近变更" :body-style="{ padding: '0 16px' }">
         <template #extra><span class="panel-extra">近期操作</span></template>
         <div class="change-list">
-          <div v-for="item in changes" :key="item.title" class="change-row">
+          <div v-for="item in changes.slice(0, 5)" :key="item.title" class="change-row">
             <div class="change-content">
               <div class="change-title">{{ item.title }}</div>
               <div class="change-meta">{{ item.operator }} · {{ item.time }}</div>
@@ -267,6 +267,10 @@ const changes = [
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.change-list {
+  overflow-y: auto;
 }
 
 .app-row {
