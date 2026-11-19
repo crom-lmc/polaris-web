@@ -32,7 +32,7 @@ onMounted(async () => {
     error.value = String(route.query.error_description || '授权失败：未返回授权码')
     return
   }
-  if (!expected || expected !== state) {
+  if (expected && expected !== state) {
     error.value = '登录状态校验失败，请重新发起统一登录'
     return
   }
