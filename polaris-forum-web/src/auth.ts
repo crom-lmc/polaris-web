@@ -6,8 +6,6 @@ export const currentUser = ref<MeInfo | null>(null)
 export const authReady = ref(false)
 export const isLoggedIn = computed(() => Boolean(currentUser.value))
 export const unreadCount = ref(0)
-export const canManageForum = computed(() => Boolean(currentUser.value?.superAdmin
-  || currentUser.value?.permissions?.some(permission => ['forum:admin', 'forum:content', 'forum:sensitive', 'forum:exchange', 'forum:badge'].includes(permission))))
 
 export function getAccessToken() {
   return localStorage.getItem('forum_access_token') || ''
