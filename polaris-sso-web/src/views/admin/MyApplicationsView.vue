@@ -162,11 +162,6 @@ async function enter(app: ApplicationVO) {
 </script>
 
 <style scoped>
-.my-apps-page {
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
 .page-head,
 .group-head {
   display: flex;
