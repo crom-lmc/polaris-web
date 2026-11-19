@@ -182,6 +182,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import {
+  APPLICATION_TYPE_FALLBACK,
   createApplication,
   deleteApplication,
   fetchApplications,
@@ -210,7 +211,7 @@ const statusOptions = [
   { label: '启用', value: 1 },
   { label: '停用', value: 2 }
 ]
-const typeOptions = ref<DictOption[]>([])
+const typeOptions = ref<DictOption[]>(APPLICATION_TYPE_FALLBACK)
 const typeLoading = ref(false)
 
 const records = ref<ApplicationVO[]>([])
@@ -244,7 +245,7 @@ async function loadTypeOptions() {
   typeLoading.value = true
   try {
     const res = await dictOptions('sso.application_type')
-    typeOptions.value = res.data || []
+    typeOptions.value = res.data?.length ? res.data : APPLICATION_TYPE_FALLBACK
   } catch (e: any) {
     message.error(e?.message || '应用类型字典加载失败')
   } finally {

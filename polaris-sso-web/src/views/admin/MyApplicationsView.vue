@@ -5,6 +5,14 @@
       <span>共 {{ store.appList.length }} 个应用</span>
     </div>
 
+    <a-alert
+      v-if="enterError"
+      type="error"
+      show-icon
+      style="margin-bottom: 16px"
+      :message="enterError"
+    />
+
     <a-spin :spinning="typeLoading">
       <a-empty v-if="!store.appList.length" class="empty" description="还没有被授权任何应用" />
 
@@ -15,7 +23,17 @@
         </div>
         <a-row :gutter="[16, 16]">
           <a-col v-for="app in group.apps" :key="app.id" :xs="24" :sm="12" :lg="8" :xl="6">
-            <a-card size="small" class="app-card">
+            <a-card
+              size="small"
+              class="app-card"
+              :class="{ 'is-clickable': !isBuiltin(app) }"
+              :hoverable="!isBuiltin(app)"
+              :role="isBuiltin(app) ? undefined : 'link'"
+              :tabindex="isBuiltin(app) ? undefined : 0"
+              @click="enter(app)"
+              @keydown.enter="enter(app)"
+              @keydown.space.prevent="enter(app)"
+            >
               <div class="app-main">
                 <img class="app-logo" :src="logoOf(app)" :alt="app.name" />
                 <div class="app-text">
@@ -37,11 +55,15 @@ import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { dictOptions, type DictOption } from '@/api/announcement'
 import { useUserStore } from '@/stores/user'
+import { oauthAuthorize } from '@/api/oauth'
+import { APPLICATION_TYPE_FALLBACK } from '@/api/apps'
 import type { ApplicationVO } from '@/types'
 
 const store = useUserStore()
-const typeOptions = ref<DictOption[]>([])
+const typeOptions = ref<DictOption[]>(APPLICATION_TYPE_FALLBACK)
 const typeLoading = ref(false)
+const entering = ref('')
+const enterError = ref('')
 
 const typeOrder = computed(() => new Map(typeOptions.value.map((item, index) => [item.value, index])))
 
@@ -73,7 +95,7 @@ async function loadTypes() {
   typeLoading.value = true
   try {
     const res = await dictOptions('sso.application_type')
-    typeOptions.value = res.data || []
+    typeOptions.value = res.data?.length ? res.data : APPLICATION_TYPE_FALLBACK
   } catch (e: any) {
     message.error(e?.message || '应用类型字典加载失败')
   } finally {
@@ -83,6 +105,59 @@ async function loadTypes() {
 
 function logoOf(app: ApplicationVO) {
   return app.icon || `/icons/${app.code}.svg`
+}
+
+function isBuiltin(app: ApplicationVO) {
+  return app.code === 'sso-center' || !!app.builtIn
+}
+
+function randomState(): string {
+  const buf = new Uint8Array(12)
+  crypto.getRandomValues(buf)
+  return Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function enter(app: ApplicationVO) {
+  if (isBuiltin(app) || entering.value) return
+  enterError.value = ''
+  const target = (app.redirectUri && app.redirectUri.trim()) || (app.baseUrl || '').trim()
+  if (!target) {
+    enterError.value = '该应用未配置访问地址'
+    return
+  }
+
+  // 异步签码前先打开页签，避免浏览器拦截弹窗。
+  const tab = window.open('about:blank', '_blank')
+  entering.value = app.code
+  try {
+    const res = await oauthAuthorize({
+      responseType: 'code',
+      clientId: app.code,
+      redirectUri: target,
+      state: randomState()
+    })
+    const url = res.data.redirectTo
+    if (tab) {
+      tab.location.href = url
+      try {
+        tab.opener = null
+      } catch {
+        /* 跨源后不可写，忽略 */
+      }
+    } else {
+      const fallback = window.open(url, '_blank')
+      if (!fallback) window.location.href = url
+    }
+  } catch (e: any) {
+    try {
+      tab?.close()
+    } catch {
+      /* ignore */
+    }
+    enterError.value = e?.message || '跳转失败'
+  } finally {
+    entering.value = ''
+  }
 }
 </script>
 
@@ -142,6 +217,18 @@ function logoOf(app: ApplicationVO) {
   height: 100%;
   border-color: var(--border-subtle);
   border-radius: 10px;
+}
+
+.app-card.is-clickable {
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.app-card.is-clickable:hover,
+.app-card.is-clickable:focus-visible {
+  border-color: rgba(47, 84, 235, 0.7);
+  box-shadow: 0 4px 16px rgba(47, 84, 235, 0.16);
+  outline: none;
 }
 
 .app-main {

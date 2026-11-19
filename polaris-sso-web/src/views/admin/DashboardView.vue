@@ -37,7 +37,7 @@
       <a-col :span="16">
         <a-card title="我的应用" size="small" class="equal-card">
           <template #extra>
-            <a-button type="link" size="small" @click="goMyApps">查看全部</a-button>
+            <a-button v-if="store.can('my-apps')" type="link" size="small" @click="goMyApps">查看全部</a-button>
           </template>
 
           <a-empty v-if="!store.appList.length" description="还没有被授权任何应用" />
@@ -237,7 +237,7 @@ const route = useRoute()
 const store = useUserStore()
 
 const denied = computed(() => (route.query.denied as string) || '')
-const overviewApps = computed(() => store.appList.slice(0, 4))
+const overviewApps = computed(() => store.appList.slice(0, 5))
 const entering = ref('')
 const enterError = ref('')
 

@@ -41,7 +41,7 @@ const router = createRouter({
           path: 'my-apps',
           name: 'my-apps',
           component: () => import('@/views/admin/MyApplicationsView.vue'),
-          meta: { title: '我的应用' }
+          meta: { title: '我的应用', perm: 'my-apps' }
         },
         {
           path: 'approvals',

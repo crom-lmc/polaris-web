@@ -3,6 +3,15 @@ import type { ApplicationVO } from '@/types'
 
 /** 应用注册（SSO 保护的下游系统） */
 
+/** 字典加载完成前或异常时使用，页面始终展示中文类型。 */
+export const APPLICATION_TYPE_FALLBACK = [
+  { value: 'SYSTEM', label: '平台系统' },
+  { value: 'MANAGEMENT', label: '管理应用' },
+  { value: 'PORTAL', label: '门户应用' },
+  { value: 'COMMUNITY', label: '社区应用' },
+  { value: 'OTHER', label: '其他应用' }
+]
+
 export interface ApplicationPayload {
   code?: string
   name?: string
