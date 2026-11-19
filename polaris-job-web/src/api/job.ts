@@ -86,3 +86,13 @@ export function runJob(id: string | number) {
 export function previewCron(cron: string) {
   return request.post<never, string[]>('/api/jobs/cron/preview', { cron })
 }
+
+/** 当前账号可访问应用里指定编码的应用名（供布局标题用；取不到返回空串由调用方回退） */
+export async function fetchAppName(appCode: string): Promise<string> {
+  try {
+    const apps = await request.get<never, Array<{ code: string; name: string }>>('/api/accounts/me/apps')
+    return apps.find((a) => a.code === appCode)?.name || ''
+  } catch {
+    return ''
+  }
+}

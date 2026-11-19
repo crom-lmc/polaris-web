@@ -10,12 +10,16 @@ import {
   type SensitiveWord
 } from '@/api/forum'
 import { confirmAction } from '@/utils/confirm'
+import { useTablePagination } from '@/composables/useTablePagination'
 
+import { useUserStore } from '@/stores/user'
 const words = ref<SensitiveWord[]>([])
+const store = useUserStore()
 const newWord = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const savingId = ref('')
+const { pagination, pagedSource: pagedWords, reset: resetPage, onChange: onTableChange } = useTablePagination(words)
 const columns = [
   { title: '敏感词', dataIndex: 'word' },
   { title: '状态', key: 'status', width: 120 },
@@ -34,6 +38,11 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function reload() {
+  resetPage()
+  void load()
 }
 
 async function addWord() {
@@ -96,19 +105,22 @@ function removeWord(word: SensitiveWord) {
     <a-card class="filter-card" :bordered="false">
       <div class="filters">
         <a-input v-model:value="newWord" class="filter-input" :maxlength="100" placeholder="输入敏感词" @press-enter="addWord" />
-        <a-button type="primary" :loading="saving" @click="addWord"><PlusOutlined />新增敏感词</a-button>
-        <a-button @click="load"><ReloadOutlined />刷新</a-button>
+        <a-button v-if="store.can('forum:sensitive:add')" type="primary" :loading="saving" @click="addWord"><PlusOutlined />新增敏感词</a-button>
+        <a-button v-if="store.can('forum:sensitive:view')" @click="reload"><ReloadOutlined />刷新</a-button>
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
       <div class="table-scroll">
-        <a-table :columns="columns" :data-source="words" :loading="loading" :pagination="false" :scroll="{ x: 760 }" row-key="id">
+        <a-table :columns="columns" :data-source="pagedWords" :loading="loading" :pagination="pagination" :scroll="{ x: 760 }" row-key="id" size="middle" @change="onTableChange">
+          <template #emptyText>
+            <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'"><a-tag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用中' : '已停用' }}</a-tag></template>
             <template v-else-if="column.key === 'action'">
               <a-space class="action-group" :size="0">
-                <a-button type="link" size="small" :loading="savingId === record.id" @click="toggleWord(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
-                <a-button type="link" size="small" danger @click="removeWord(record)"><DeleteOutlined />删除</a-button>
+                <a-button v-if="store.can('forum:sensitive:toggle')" type="link" size="small" :loading="savingId === record.id" @click="toggleWord(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
+                <a-button v-if="store.can('forum:sensitive:delete')" type="link" size="small" danger @click="removeWord(record)"><DeleteOutlined />删除</a-button>
               </a-space>
             </template>
           </template>

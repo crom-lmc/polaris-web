@@ -2,6 +2,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { useTablePagination } from '@/composables/useTablePagination'
+import { useUserStore } from '@/stores/user'
 import {
   createAdminFriendLink,
   fetchAdminFriendLinks,
@@ -15,6 +17,7 @@ import {
 
 const siteForm = reactive<SiteConfig>({ aboutContent: '', footerText: '' })
 const links = ref<FriendLink[]>([])
+const store = useUserStore()
 const siteLoading = ref(false)
 const siteSaving = ref(false)
 const linkLoading = ref(false)
@@ -23,6 +26,7 @@ const savingLinkId = ref('')
 const linkModalOpen = ref(false)
 const editingLinkId = ref<string | null>(null)
 const linkForm = reactive<FriendLinkInput>({ name: '', url: '', sortNo: 0, enabled: true })
+const { pagination: linkPagination, pagedSource: pagedLinks, reset: resetLinkPage, onChange: onLinkTableChange } = useTablePagination(links)
 const linkColumns = [
   { title: '名称', dataIndex: 'name', width: 180 },
   { title: '链接地址', key: 'url', width: 340 },
@@ -72,6 +76,11 @@ async function loadLinks() {
   } finally {
     linkLoading.value = false
   }
+}
+
+function reloadLinks() {
+  resetLinkPage()
+  void loadLinks()
 }
 
 function openLinkCreate() {
@@ -152,7 +161,7 @@ async function toggleLink(link: FriendLink) {
 
     <a-card class="site-card" :bordered="false" :loading="siteLoading">
       <template #title>站点信息</template>
-      <template #extra><a-button type="primary" :loading="siteSaving" @click="saveSite">保存站点信息</a-button></template>
+      <template #extra><a-button v-if="store.can('forum:site:edit')" type="primary" :loading="siteSaving" @click="saveSite">保存站点信息</a-button></template>
       <a-form layout="vertical">
         <a-form-item label="关于页面内容">
           <a-textarea v-model:value="siteForm.aboutContent" :maxlength="50000" :rows="10" show-count placeholder="请输入关于页面的展示内容" />
@@ -167,12 +176,15 @@ async function toggleLink(link: FriendLink) {
       <template #title>友情链接</template>
       <template #extra>
         <a-space>
-          <a-button @click="loadLinks"><ReloadOutlined />刷新</a-button>
-          <a-button type="primary" @click="openLinkCreate"><PlusOutlined />新增友链</a-button>
+          <a-button v-if="store.can('forum:site:view')" @click="reloadLinks"><ReloadOutlined />刷新</a-button>
+          <a-button v-if="store.can('forum:site:link:manage')" type="primary" @click="openLinkCreate"><PlusOutlined />新增友链</a-button>
         </a-space>
       </template>
       <div class="table-scroll">
-        <a-table :columns="linkColumns" :data-source="links" :loading="linkLoading" :pagination="false" :scroll="{ x: 1020 }" row-key="id">
+        <a-table :columns="linkColumns" :data-source="pagedLinks" :loading="linkLoading" :pagination="linkPagination" :scroll="{ x: 1020 }" row-key="id" size="middle" @change="onLinkTableChange">
+          <template #emptyText>
+            <a-empty v-if="!linkLoading" class="table-empty" description="暂无数据" />
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'url'">
               <a class="link-url" :href="record.url" target="_blank" rel="noopener noreferrer">{{ record.url }}</a>
@@ -183,8 +195,8 @@ async function toggleLink(link: FriendLink) {
             <template v-else-if="column.key === 'updatedAt'">{{ record.updatedAt || '-' }}</template>
             <template v-else-if="column.key === 'action'">
               <a-space class="action-group" :size="0">
-                <a-button type="link" size="small" @click="openLinkEdit(record)">编辑</a-button>
-                <a-button type="link" size="small" :loading="savingLinkId === record.id" @click="toggleLink(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
+                <a-button v-if="store.can('forum:site:link:manage')" type="link" size="small" @click="openLinkEdit(record)">编辑</a-button>
+                <a-button v-if="store.can('forum:site:link:manage')" type="link" size="small" :loading="savingLinkId === record.id" @click="toggleLink(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
               </a-space>
             </template>
           </template>

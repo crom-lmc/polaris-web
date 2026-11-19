@@ -9,6 +9,7 @@ html, body, #app { height: 100%; margin: 0; }
   --header-border: #e8e8e8;
   --header-hover: rgba(0, 0, 0, 0.04);
   --panel-bg: #ffffff;
+  --panel-border: #eef0f4;
   --muted: #8a9099;
 }
 :root[data-theme='dark'] {
@@ -20,6 +21,7 @@ html, body, #app { height: 100%; margin: 0; }
   --header-border: rgba(255, 255, 255, 0.08);
   --header-hover: rgba(255, 255, 255, 0.12);
   --panel-bg: #161a22;
+  --panel-border: rgba(255, 255, 255, 0.08);
   --muted: #9aa6b2;
 }
 body {
@@ -27,25 +29,102 @@ body {
   background: var(--bg-page);
   color: var(--text-base);
 }
-.admin-page { max-width: 1600px; margin: 0 auto; }
-.page-heading { margin-bottom: 16px; }
-.page-heading h1 { margin: 0 0 6px; font-size: 22px; line-height: 1.4; }
-.page-heading p { margin: 0; color: var(--muted); }
-.filter-card { margin-bottom: 16px; }
-.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.filters .filter-input { width: 240px; }
-.filters .filter-select { width: 150px; }
-.table-card :where(.ant-card-body) { padding: 0; }
-.table-scroll { overflow-x: auto; }
+
+/* 后台页面统一固定外壳：标题/工具栏不滚，只有表格区域滚动 */
+.admin-page {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.page-heading {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+.page-heading h1 { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; }
+.page-heading p { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 18px; }
+
+.filter-card,
+.table-card,
+.site-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.filter-card { flex: 0 0 auto; }
+.table-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.site-card { flex: 0 0 auto; }
+.filter-card > .ant-card-body { padding: 10px 14px; }
+.site-card > .ant-card-body { padding: 14px; }
+.table-card > .ant-card-body { flex: 1; min-height: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.filter-card > .ant-card-head,
+.table-card > .ant-card-head,
+.site-card > .ant-card-head { padding: 0 14px; min-height: 40px; }
+.filter-card > .ant-card-head-title,
+.table-card > .ant-card-head-title,
+.site-card > .ant-card-head-title { padding: 10px 0; font-size: 13px; }
+.table-card > .ant-card-head { flex: 0 0 auto; border-bottom: 1px solid var(--panel-border); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filters .filter-input { width: 220px; }
+.filters .filter-select { width: 140px; }
 .secondary-text { color: var(--muted); font-size: 12px; }
 .content-cell { max-width: 440px; white-space: pre-wrap; word-break: break-word; }
 .title-cell { min-width: 240px; }
 .title-cell small { display: block; margin-top: 4px; color: var(--muted); }
 .action-group { white-space: nowrap; }
+.action-group .ant-btn-link { padding-inline: 4px; }
 .issue-controls { display: flex; gap: 8px; min-width: 300px; }
 .issue-detail { display: flex; flex-direction: column; gap: 4px; }
+
+/* 表格区域是唯一滚动容器；分页条 sticky 贴底，内容不足一屏时也贴底 */
+.table-scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.table-scroll > .ant-table-wrapper,
+.table-scroll > .ant-table-wrapper > .ant-spin-nested-loading,
+.table-scroll > .ant-table-wrapper .ant-spin-container,
+.table-scroll > .ant-table-wrapper .ant-table {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.table-scroll .ant-table-thead > tr > th,
+.table-scroll .ant-table-tbody > tr > td { padding: 8px 10px !important; }
+.table-scroll .ant-table-pagination {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: auto 0 0;
+  padding: 10px 14px;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--panel-border);
+}
+.table-scroll .ant-table-placeholder > td { height: calc(100vh - 280px); padding: 0 !important; vertical-align: middle; }
+.table-empty.ant-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 280px);
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .filters { align-items: stretch; }
   .filters .filter-input, .filters .filter-select { width: 100%; }
-  .page-heading h1 { font-size: 20px; }
+  .page-heading { align-items: flex-start; }
+  .page-heading h1 { font-size: 14px; }
 }

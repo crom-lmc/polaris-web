@@ -14,8 +14,11 @@ import {
   type BadgeStatus
 } from '@/api/forum'
 import { confirmAction } from '@/utils/confirm'
+import { useTablePagination } from '@/composables/useTablePagination'
 
+import { useUserStore } from '@/stores/user'
 const badges = ref<Badge[]>([])
+const store = useUserStore()
 const status = ref('')
 const loading = ref(false)
 const saving = ref(false)
@@ -48,6 +51,7 @@ const ruleOptions = (Object.keys(ruleNames) as BadgeRuleType[]).map((value) => (
 const statusNames: Record<BadgeStatus, string> = { DRAFT: '草稿', PUBLISHED: '已发布', OFFLINE: '已下线' }
 const statusColors: Record<BadgeStatus, string> = { DRAFT: 'default', PUBLISHED: 'green', OFFLINE: 'orange' }
 const currentRuleText = computed(() => `${ruleNames[form.ruleType]}达到 ${form.threshold || 0} ${ruleUnits[form.ruleType]}时自动发放`)
+const { pagination, pagedSource: pagedBadges, reset: resetPage, onChange: onTableChange } = useTablePagination(badges)
 const columns = [
   { title: '勋章', key: 'badge', width: 240 },
   { title: '规则', key: 'rule', width: 230 },
@@ -69,6 +73,11 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function reload() {
+  resetPage()
+  void load()
 }
 
 function openCreate() {
@@ -169,23 +178,26 @@ function offline(badge: Badge) {
         <h1>勋章管理</h1>
         <p>配置单指标阈值规则，管理勋章草稿、发布和下线。</p>
       </div>
-      <a-button type="primary" @click="openCreate"><PlusOutlined />新建勋章</a-button>
+      <a-button v-if="store.can('forum:badge:create')" type="primary" @click="openCreate"><PlusOutlined />新建勋章</a-button>
     </header>
     <a-alert class="rule-alert" type="info" show-icon message="发布后不可原地修改规则；发布时为历史达标用户补发，下线后停止发放但保留已获得记录。" />
     <a-card class="filter-card" :bordered="false">
       <div class="filters">
-        <a-select v-model:value="status" class="filter-select" @change="load">
+        <a-select v-model:value="status" class="filter-select" @change="reload">
           <a-select-option value="">全部状态</a-select-option>
           <a-select-option value="DRAFT">草稿</a-select-option>
           <a-select-option value="PUBLISHED">已发布</a-select-option>
           <a-select-option value="OFFLINE">已下线</a-select-option>
         </a-select>
-        <a-button @click="load"><ReloadOutlined />刷新</a-button>
+        <a-button v-if="store.can('forum:badge:view')" @click="reload"><ReloadOutlined />刷新</a-button>
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
       <div class="table-scroll">
-        <a-table :columns="columns" :data-source="badges" :loading="loading" :pagination="false" :scroll="{ x: 1190 }" row-key="id">
+        <a-table :columns="columns" :data-source="pagedBadges" :loading="loading" :pagination="pagination" :scroll="{ x: 1190 }" row-key="id" size="middle" @change="onTableChange">
+          <template #emptyText>
+            <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'badge'">
               <div class="badge-info">
@@ -201,9 +213,9 @@ function offline(badge: Badge) {
             <template v-else-if="column.key === 'publishedAt'">{{ record.publishedAt || '-' }}</template>
             <template v-else-if="column.key === 'action'">
               <a-space class="action-group" :size="0">
-                <a-button v-if="record.status === 'DRAFT'" type="link" size="small" @click="openEdit(record)">编辑</a-button>
-                <a-button v-if="record.status === 'DRAFT'" type="link" size="small" @click="publish(record)">发布</a-button>
-                <a-button v-if="record.status === 'PUBLISHED'" type="link" size="small" danger @click="offline(record)">下线</a-button>
+                <a-button v-if="store.can('forum:badge:edit') && record.status === 'DRAFT'" type="link" size="small" @click="openEdit(record)">编辑</a-button>
+                <a-button v-if="store.can('forum:badge:publish') && record.status === 'DRAFT'" type="link" size="small" @click="publish(record)">发布</a-button>
+                <a-button v-if="store.can('forum:badge:offline') && record.status === 'PUBLISHED'" type="link" size="small" danger @click="offline(record)">下线</a-button>
                 <span v-if="record.status === 'OFFLINE'" class="secondary-text">仅保留记录</span>
               </a-space>
             </template>

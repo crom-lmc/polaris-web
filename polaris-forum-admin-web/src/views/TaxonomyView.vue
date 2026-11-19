@@ -2,6 +2,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { useTablePagination } from '@/composables/useTablePagination'
+import { useUserStore } from '@/stores/user'
 import {
   createAdminBoard,
   createAdminTag,
@@ -15,6 +17,7 @@ import {
   type AdminTagInput
 } from '@/api/forum'
 
+const store = useUserStore()
 const activeKey = ref('boards')
 const boards = ref<AdminBoard[]>([])
 const tags = ref<AdminTag[]>([])
@@ -38,6 +41,18 @@ const boardForm = reactive<AdminBoardInput & { key: string }>({
   enabled: true
 })
 const tagForm = reactive<AdminTagInput>({ board: '', name: '', sortNo: 0, enabled: true })
+const {
+  pagination: boardPagination,
+  pagedSource: pagedBoards,
+  reset: resetBoardPage,
+  onChange: onBoardTableChange
+} = useTablePagination(boards)
+const {
+  pagination: tagPagination,
+  pagedSource: pagedTags,
+  reset: resetTagPage,
+  onChange: onTagTableChange
+} = useTablePagination(tags)
 const boardNames = computed(() => Object.fromEntries(boards.value.map((board) => [board.key, board.name])))
 const boardColumns = [
   { title: '板块', key: 'board', width: 280 },
@@ -82,6 +97,16 @@ async function loadTags() {
   } finally {
     tagLoading.value = false
   }
+}
+
+function reloadBoards() {
+  resetBoardPage()
+  void loadBoards()
+}
+
+function reloadTags() {
+  resetTagPage()
+  void loadTags()
 }
 
 function openBoardCreate() {
@@ -226,20 +251,23 @@ async function toggleTag(tag: AdminTag) {
         <h1>板块与标签</h1>
         <p>维护板块和标签的展示顺序与启停状态；标签创建后不可改名，均不提供删除操作。</p>
       </div>
-      <a-button v-if="activeKey === 'boards'" type="primary" @click="openBoardCreate"><PlusOutlined />新增板块</a-button>
-      <a-button v-else type="primary" @click="openTagCreate"><PlusOutlined />新增标签</a-button>
+      <a-button v-if="activeKey === 'boards' && store.can('forum:taxonomy:board:manage')" type="primary" @click="openBoardCreate"><PlusOutlined />新增板块</a-button>
+      <a-button v-else-if="store.can('forum:taxonomy:tag:manage')" type="primary" @click="openTagCreate"><PlusOutlined />新增标签</a-button>
     </header>
 
     <a-tabs v-model:active-key="activeKey">
       <a-tab-pane key="boards" tab="板块管理">
         <a-card class="filter-card" :bordered="false">
           <div class="filters">
-            <a-button @click="loadBoards"><ReloadOutlined />刷新</a-button>
+            <a-button v-if="store.can('forum:taxonomy:view')" @click="reloadBoards"><ReloadOutlined />刷新</a-button>
           </div>
         </a-card>
         <a-card class="table-card" :bordered="false">
           <div class="table-scroll">
-            <a-table :columns="boardColumns" :data-source="boards" :loading="boardLoading" :pagination="false" :scroll="{ x: 1010 }" row-key="key">
+            <a-table :columns="boardColumns" :data-source="pagedBoards" :loading="boardLoading" :pagination="boardPagination" :scroll="{ x: 1010 }" row-key="key" size="middle" @change="onBoardTableChange">
+              <template #emptyText>
+                <a-empty v-if="!boardLoading" class="table-empty" description="暂无数据" />
+              </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'board'">
                   <div class="board-info">
@@ -257,8 +285,8 @@ async function toggleTag(tag: AdminTag) {
                 <template v-else-if="column.key === 'updatedAt'">{{ record.updatedAt || '-' }}</template>
                 <template v-else-if="column.key === 'action'">
                   <a-space class="action-group" :size="0">
-                    <a-button type="link" size="small" @click="openBoardEdit(record)">编辑</a-button>
-                    <a-button type="link" size="small" :loading="savingBoardKey === record.key" @click="toggleBoard(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
+                    <a-button v-if="store.can('forum:taxonomy:board:manage')" type="link" size="small" @click="openBoardEdit(record)">编辑</a-button>
+                    <a-button v-if="store.can('forum:taxonomy:board:manage')" type="link" size="small" :loading="savingBoardKey === record.key" @click="toggleBoard(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
                   </a-space>
                 </template>
               </template>
@@ -270,16 +298,19 @@ async function toggleTag(tag: AdminTag) {
       <a-tab-pane key="tags" tab="标签管理">
         <a-card class="filter-card" :bordered="false">
           <div class="filters">
-            <a-select v-model:value="boardFilter" class="filter-select" placeholder="全部板块" @change="loadTags">
+            <a-select v-model:value="boardFilter" class="filter-select" placeholder="全部板块" @change="reloadTags">
               <a-select-option value="">全部板块</a-select-option>
               <a-select-option v-for="board in boards" :key="board.key" :value="board.key">{{ board.name }}{{ board.enabled ? '' : '（已停用）' }}</a-select-option>
             </a-select>
-            <a-button @click="loadTags"><ReloadOutlined />刷新</a-button>
+            <a-button v-if="store.can('forum:taxonomy:view')" @click="reloadTags"><ReloadOutlined />刷新</a-button>
           </div>
         </a-card>
         <a-card class="table-card" :bordered="false">
           <div class="table-scroll">
-            <a-table :columns="tagColumns" :data-source="tags" :loading="tagLoading" :pagination="false" :scroll="{ x: 830 }" row-key="id">
+            <a-table :columns="tagColumns" :data-source="pagedTags" :loading="tagLoading" :pagination="tagPagination" :scroll="{ x: 830 }" row-key="id" size="middle" @change="onTagTableChange">
+              <template #emptyText>
+                <a-empty v-if="!tagLoading" class="table-empty" description="暂无数据" />
+              </template>
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'board'">{{ boardNames[record.boardKey] || record.boardKey }}</template>
                 <template v-else-if="column.key === 'count'">{{ record.count ?? 0 }}</template>
@@ -288,8 +319,8 @@ async function toggleTag(tag: AdminTag) {
                 </template>
                 <template v-else-if="column.key === 'action'">
                   <a-space class="action-group" :size="0">
-                    <a-button type="link" size="small" @click="openTagSort(record)">排序</a-button>
-                    <a-button type="link" size="small" :loading="savingTagId === record.id" @click="toggleTag(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
+                    <a-button v-if="store.can('forum:taxonomy:tag:manage')" type="link" size="small" @click="openTagSort(record)">排序</a-button>
+                    <a-button v-if="store.can('forum:taxonomy:tag:manage')" type="link" size="small" :loading="savingTagId === record.id" @click="toggleTag(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
                   </a-space>
                 </template>
               </template>

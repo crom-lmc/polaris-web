@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   BellOutlined,
@@ -10,6 +10,7 @@ import {
   LogoutOutlined,
   MenuOutlined
 } from '@ant-design/icons-vue'
+import { fetchAppName } from '@/api/job'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
@@ -20,6 +21,12 @@ const user = useUserStore()
 const theme = useThemeStore()
 
 const collapsed = ref(false)
+const appName = ref('调度中心')
+
+onMounted(async () => {
+  const name = await fetchAppName('job')
+  if (name) appName.value = name
+})
 
 const currentPath = computed(() => {
   const seg = route.path.split('/')[1] || 'jobs'
@@ -46,7 +53,7 @@ function onUserMenuClick({ key }: { key: string }) {
           :title="collapsed ? '展开菜单' : '收起菜单'"
           @click="collapsed = !collapsed"
         />
-        <span>调度中心</span>
+        <span>{{ appName }}</span>
       </div>
       <div class="right">
         <a-tag color="blue">本地环境</a-tag>

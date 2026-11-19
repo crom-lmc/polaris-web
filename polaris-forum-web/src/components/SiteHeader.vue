@@ -28,7 +28,6 @@
             <RouterLink to="/new?type=question" @click="publishOpen = false"><question-circle-outlined /><span><b>问答</b><small>提问并设置悬赏</small></span></RouterLink>
             <RouterLink to="/new?type=article" @click="publishOpen = false"><file-text-outlined /><span><b>文章</b><small>沉淀完整的内容</small></span></RouterLink>
             <RouterLink v-if="currentUser" to="/drafts" @click="publishOpen = false"><save-outlined /><span><b>我的草稿</b><small>恢复服务端保存的内容</small></span></RouterLink>
-            <a v-if="canManageForum" :href="adminOrigin" @click="publishOpen = false"><setting-outlined /><span><b>论坛管理后台</b><small>前往独立管理端</small></span></a>
           </div>
         </div>
         <template v-if="currentUser">
@@ -58,9 +57,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BellOutlined, BulbFilled, BulbOutlined, CommentOutlined, DownOutlined, FileTextOutlined, HeartOutlined, IdcardOutlined, LogoutOutlined, MessageOutlined, PlusOutlined, QuestionCircleOutlined, SaveOutlined, SearchOutlined, SettingOutlined, TrophyOutlined, UserOutlined } from '@ant-design/icons-vue'
+import { BellOutlined, BulbFilled, BulbOutlined, CommentOutlined, DownOutlined, FileTextOutlined, HeartOutlined, IdcardOutlined, LogoutOutlined, MessageOutlined, PlusOutlined, QuestionCircleOutlined, SaveOutlined, SearchOutlined, TrophyOutlined, UserOutlined } from '@ant-design/icons-vue'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { canManageForum, currentUser, forumAdminOrigin, isLoggedIn, logout, refreshUnreadCount, requireLogin, unreadCount } from '@/auth'
+import { currentUser, isLoggedIn, logout, refreshUnreadCount, requireLogin, unreadCount } from '@/auth'
 import { isDark, toggleTheme } from '@/theme'
 
 const keyword = ref('')
@@ -69,7 +68,6 @@ const userOpen = ref(false)
 const publishMenu = ref<HTMLElement>()
 const userMenu = ref<HTMLElement>()
 const router = useRouter()
-const adminOrigin = forumAdminOrigin()
 const displayName = computed(() => currentUser.value?.member?.displayName || currentUser.value?.member?.nickname || currentUser.value?.username || '')
 const headerAvatar = computed(() => currentUser.value?.member?.avatarUrl || (currentUser.value?.member?.avatarAttachmentId ? `/api/forum/public/attachments/${currentUser.value.member.avatarAttachmentId}` : ''))
 function search() {

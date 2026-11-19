@@ -10,8 +10,11 @@ import {
   type ReportStatus,
   type ReportTargetType
 } from '@/api/forum'
+import { useTablePagination } from '@/composables/useTablePagination'
+import { useUserStore } from '@/stores/user'
 
 const reports = ref<ForumReport[]>([])
+const store = useUserStore()
 const status = ref('')
 const targetType = ref('')
 const loading = ref(false)
@@ -19,6 +22,7 @@ const processing = ref(false)
 const open = ref(false)
 const currentReport = ref<ForumReport | null>(null)
 const processForm = reactive<{ status: 'RESOLVED' | 'REJECTED'; remark: string }>({ status: 'RESOLVED', remark: '' })
+const { pagination, pagedSource: pagedReports, reset: resetPage, onChange: onTableChange } = useTablePagination(reports)
 const statusNames: Record<ReportStatus, string> = { PENDING: '待处理', RESOLVED: '已解决', REJECTED: '已驳回' }
 const statusColors: Record<ReportStatus, string> = { PENDING: 'orange', RESOLVED: 'green', REJECTED: 'default' }
 const targetNames: Record<ReportTargetType, string> = { thread: '帖子', comment: '评论' }
@@ -47,6 +51,11 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function reload() {
+  resetPage()
+  void load()
 }
 
 function openProcess(report: ForumReport) {
@@ -85,23 +94,26 @@ async function submitProcess() {
     </header>
     <a-card class="filter-card" :bordered="false">
       <div class="filters">
-        <a-select v-model:value="status" class="filter-select" @change="load">
+        <a-select v-model:value="status" class="filter-select" @change="reload">
           <a-select-option value="">全部状态</a-select-option>
           <a-select-option value="PENDING">待处理</a-select-option>
           <a-select-option value="RESOLVED">已解决</a-select-option>
           <a-select-option value="REJECTED">已驳回</a-select-option>
         </a-select>
-        <a-select v-model:value="targetType" class="filter-select" @change="load">
+        <a-select v-model:value="targetType" class="filter-select" @change="reload">
           <a-select-option value="">全部目标</a-select-option>
           <a-select-option value="thread">帖子</a-select-option>
           <a-select-option value="comment">评论</a-select-option>
         </a-select>
-        <a-button @click="load"><ReloadOutlined />刷新</a-button>
+        <a-button v-if="store.can('forum:report:view')" @click="reload"><ReloadOutlined />刷新</a-button>
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
       <div class="table-scroll">
-        <a-table :columns="columns" :data-source="reports" :loading="loading" :pagination="false" :scroll="{ x: 1640 }" row-key="id">
+        <a-table :columns="columns" :data-source="pagedReports" :loading="loading" :pagination="pagination" :scroll="{ x: 1640 }" row-key="id" size="middle" @change="onTableChange">
+          <template #emptyText>
+            <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'reporter'">
               <div class="stacked-text">
@@ -140,7 +152,7 @@ async function submitProcess() {
               <span v-else class="secondary-text">尚未处理</span>
             </template>
             <template v-else-if="column.key === 'action'">
-              <a-button v-if="record.status === 'PENDING'" type="link" size="small" @click="openProcess(record)">处理</a-button>
+              <a-button v-if="store.can('forum:report:process') && record.status === 'PENDING'" type="link" size="small" @click="openProcess(record)">处理</a-button>
               <span v-else class="secondary-text">已处理</span>
             </template>
           </template>

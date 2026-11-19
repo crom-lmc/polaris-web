@@ -3,12 +3,16 @@ import { onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { fetchAdminComments, publicThreadUrl, updateAdminComment, type ForumComment } from '@/api/forum'
+import { useTablePagination } from '@/composables/useTablePagination'
+import { useUserStore } from '@/stores/user'
 
+const store = useUserStore()
 const comments = ref<ForumComment[]>([])
 const deleted = ref('')
 const keyword = ref('')
 const loading = ref(false)
 const savingId = ref('')
+const { pagination, pagedSource: pagedComments, reset: resetPage, onChange: onTableChange } = useTablePagination(comments)
 const columns = [
   { title: '评论内容', key: 'content', width: 380 },
   { title: '帖子', key: 'thread', width: 100 },
@@ -34,6 +38,11 @@ async function load() {
   }
 }
 
+function reload() {
+  resetPage()
+  void load()
+}
+
 async function changeComment(comment: ForumComment) {
   savingId.value = comment.id
   try {
@@ -56,19 +65,22 @@ async function changeComment(comment: ForumComment) {
     </header>
     <a-card class="filter-card" :bordered="false">
       <div class="filters">
-        <a-select v-model:value="deleted" class="filter-select" @change="load">
+        <a-select v-model:value="deleted" class="filter-select" @change="reload">
           <a-select-option value="">全部状态</a-select-option>
           <a-select-option value="false">公开展示</a-select-option>
           <a-select-option value="true">已删除</a-select-option>
         </a-select>
-        <a-input v-model:value="keyword" class="filter-input" allow-clear placeholder="搜索评论内容" @press-enter="load" />
-        <a-button type="primary" @click="load"><SearchOutlined />查询</a-button>
-        <a-button @click="load"><ReloadOutlined />刷新</a-button>
+        <a-input v-model:value="keyword" class="filter-input" allow-clear placeholder="搜索评论内容" @press-enter="reload" />
+        <a-button v-if="store.can('forum:comment:view')" type="primary" @click="reload"><SearchOutlined />查询</a-button>
+        <a-button v-if="store.can('forum:comment:view')" @click="reload"><ReloadOutlined />刷新</a-button>
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
       <div class="table-scroll">
-        <a-table :columns="columns" :data-source="comments" :loading="loading" :pagination="false" :scroll="{ x: 990 }" row-key="id">
+        <a-table :columns="columns" :data-source="pagedComments" :loading="loading" :pagination="pagination" :scroll="{ x: 990 }" row-key="id" size="middle" @change="onTableChange">
+          <template #emptyText>
+            <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'content'"><div class="content-cell">{{ record.content }}</div></template>
             <template v-else-if="column.key === 'thread'">
@@ -79,7 +91,7 @@ async function changeComment(comment: ForumComment) {
             <template v-else-if="column.key === 'status'"><a-tag :color="record.deleted ? 'red' : 'green'">{{ record.deleted ? '已删除' : '公开' }}</a-tag></template>
             <template v-else-if="column.key === 'time'">{{ record.createdAt || record.time }}</template>
             <template v-else-if="column.key === 'action'">
-              <a-button type="link" size="small" :danger="!record.deleted" :loading="savingId === record.id" @click="changeComment(record)">{{ record.deleted ? '恢复' : '删除' }}</a-button>
+              <a-button v-if="store.can('forum:comment:delete')" type="link" size="small" :danger="!record.deleted" :loading="savingId === record.id" @click="changeComment(record)">{{ record.deleted ? '恢复' : '删除' }}</a-button>
             </template>
           </template>
         </a-table>

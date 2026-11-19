@@ -4,13 +4,17 @@ import { message } from 'ant-design-vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { fetchAdminExchanges, issueExchange, shipExchange, type ExchangeRecord } from '@/api/forum'
 import { confirmAction } from '@/utils/confirm'
+import { useTablePagination } from '@/composables/useTablePagination'
 
+import { useUserStore } from '@/stores/user'
 const records = ref<ExchangeRecord[]>([])
+const store = useUserStore()
 const status = ref('')
 const trackingNumbers = ref<Record<string, string>>({})
 const issueRemarks = ref<Record<string, string>>({})
 const loading = ref(false)
 const processingId = ref('')
+const { pagination, pagedSource: pagedRecords, reset: resetPage, onChange: onTableChange } = useTablePagination(records)
 const statusNames: Record<ExchangeRecord['status'], string> = {
   PENDING_ISSUE: '待发放',
   SHIPPING: '物流运输中',
@@ -41,6 +45,11 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function reload() {
+  resetPage()
+  void load()
 }
 
 function ship(record: ExchangeRecord) {
@@ -95,18 +104,21 @@ function issue(record: ExchangeRecord) {
     </header>
     <a-card class="filter-card" :bordered="false">
       <div class="filters">
-        <a-select v-model:value="status" class="filter-select" @change="load">
+        <a-select v-model:value="status" class="filter-select" @change="reload">
           <a-select-option value="">全部状态</a-select-option>
           <a-select-option value="PENDING_ISSUE">待发放</a-select-option>
           <a-select-option value="SHIPPING">物流运输中</a-select-option>
           <a-select-option value="ISSUED">已发放</a-select-option>
         </a-select>
-        <a-button @click="load"><ReloadOutlined />刷新</a-button>
+        <a-button v-if="store.can('forum:exchange:view')" @click="reload"><ReloadOutlined />刷新</a-button>
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
       <div class="table-scroll">
-        <a-table :columns="columns" :data-source="records" :loading="loading" :pagination="false" :scroll="{ x: 1150 }" row-key="id">
+        <a-table :columns="columns" :data-source="pagedRecords" :loading="loading" :pagination="pagination" :scroll="{ x: 1150 }" row-key="id" size="middle" @change="onTableChange">
+          <template #emptyText>
+            <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
+          </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'user'">{{ record.username || record.accountId }}</template>
             <template v-else-if="column.key === 'status'"><a-tag :color="statusColors[record.status as ExchangeRecord['status']]">{{ statusNames[record.status as ExchangeRecord['status']] }}</a-tag></template>
@@ -114,7 +126,7 @@ function issue(record: ExchangeRecord) {
               <div v-if="record.status === 'PENDING_ISSUE'" class="issue-detail">
                 <div class="issue-controls">
                   <a-input v-model:value="trackingNumbers[record.id]" :maxlength="100" placeholder="输入快递单号" @press-enter="ship(record)" />
-                  <a-button type="primary" :loading="processingId === record.id" @click="ship(record)">登记物流</a-button>
+                  <a-button v-if="store.can('forum:exchange:ship')" type="primary" :loading="processingId === record.id" @click="ship(record)">登记物流</a-button>
                 </div>
                 <a-input v-model:value="issueRemarks[record.id]" :maxlength="500" placeholder="发放备注（选填）" />
               </div>
@@ -122,7 +134,7 @@ function issue(record: ExchangeRecord) {
                 <span>快递单号：{{ record.trackingNo }}</span>
                 <div class="issue-controls">
                   <a-input v-model:value="issueRemarks[record.id]" :maxlength="500" placeholder="签收备注（选填）" />
-                  <a-button type="primary" :loading="processingId === record.id" @click="issue(record)">确认签收</a-button>
+                  <a-button v-if="store.can('forum:exchange:issue')" type="primary" :loading="processingId === record.id" @click="issue(record)">确认签收</a-button>
                 </div>
                 <span class="secondary-text">请线下核实签收后再操作</span>
               </div>

@@ -3,7 +3,7 @@
     <a-layout-header class="header">
       <div class="logo" :class="{ 'is-collapsed': collapsed }">
         <menu-outlined class="menu-toggle" :title="collapsed ? '展开菜单' : '收起菜单'" @click="toggleCollapse" />
-        <span class="logo-text">配置中心</span>
+        <span class="logo-text">{{ appName }}</span>
       </div>
       <div class="right">
         <a-button
@@ -109,7 +109,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { Modal } from 'ant-design-vue'
-import { gotoAuthorize, listBizCategories, logoutSso, type BizCategory } from '@/api/settings'
+import { fetchAppName, gotoAuthorize, listBizCategories, logoutSso, type BizCategory } from '@/api/settings'
 import { getRefreshToken } from '@/utils/token'
 import { useSessionGuard } from '@/composables/useSessionGuard'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
@@ -120,6 +120,7 @@ const store = useUserStore()
 const theme = useThemeStore()
 
 const collapsed = ref(false)
+const appName = ref('配置中心')
 
 /* ---------------- 主数据子菜单 ---------------- */
 
@@ -139,6 +140,11 @@ const bizMenu = ref<Pick<BizCategory, 'type' | 'name'>[]>(BIZ_FALLBACK)
 useSessionGuard()
 
 onMounted(async () => {
+  const code = store.me?.appCode
+  if (code) {
+    const name = await fetchAppName(code)
+    if (name) appName.value = name
+  }
   if (!store.can('biz:view')) return
   try {
     const list = await listBizCategories()

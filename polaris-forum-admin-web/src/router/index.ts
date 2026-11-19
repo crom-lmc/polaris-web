@@ -12,7 +12,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'home', component: () => import('@/views/HomeRedirectView.vue'), meta: { title: '论坛管理' } },
         { path: 'threads', component: () => import('@/views/ThreadsView.vue'), meta: { title: '内容管理', perm: 'forum:content' } },
-        { path: 'comments', component: () => import('@/views/CommentsView.vue'), meta: { title: '评论管理', perm: 'forum:content' } },
+        { path: 'comments', component: () => import('@/views/CommentsView.vue'), meta: { title: '评论管理', perm: 'forum:comment' } },
         { path: 'reports', component: () => import('@/views/ReportsView.vue'), meta: { title: '举报管理', perm: 'forum:report' } },
         { path: 'taxonomy', component: () => import('@/views/TaxonomyView.vue'), meta: { title: '板块与标签', perm: 'forum:taxonomy' } },
         { path: 'site', component: () => import('@/views/SiteView.vue'), meta: { title: '站点管理', perm: 'forum:site' } },

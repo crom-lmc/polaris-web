@@ -3,7 +3,7 @@
     <a-layout-header class="header">
       <div class="logo" :class="{ 'is-collapsed': collapsed }">
         <menu-outlined class="menu-toggle" :title="collapsed ? '展开菜单' : '收起菜单'" @click="toggleCollapse" />
-        <span class="logo-text">论坛管理端</span>
+        <span class="logo-text">{{ appName }}</span>
       </div>
       <div class="right">
         <a-button type="text" class="theme-toggle" :title="theme.mode === 'dark' ? '切换到白天模式' : '切换到黑夜模式'" @click="theme.toggle()">
@@ -25,7 +25,7 @@
           <a-menu-item v-if="store.can('forum:content')" key="/threads">
             <template #icon><file-text-outlined /></template>内容管理
           </a-menu-item>
-          <a-menu-item v-if="store.can('forum:content')" key="/comments">
+          <a-menu-item v-if="store.can('forum:comment')" key="/comments">
             <template #icon><comment-outlined /></template>评论管理
           </a-menu-item>
           <a-menu-item v-if="store.can('forum:report')" key="/reports">
@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal } from 'ant-design-vue'
 import {
@@ -70,7 +70,7 @@ import {
   SettingOutlined,
   TrophyOutlined
 } from '@ant-design/icons-vue'
-import { gotoAuthorize, logoutSso } from '@/api/forum'
+import { fetchAppName, gotoAuthorize, logoutSso } from '@/api/forum'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
 import { useSessionGuard } from '@/composables/useSessionGuard'
 import { useThemeStore } from '@/stores/theme'
@@ -83,8 +83,16 @@ const store = useUserStore()
 const theme = useThemeStore()
 const collapsed = ref(false)
 const selectedKeys = computed(() => [route.path])
+const appName = ref('论坛管理端')
 
 useSessionGuard()
+
+onMounted(async () => {
+  const code = store.me?.appCode
+  if (!code) return
+  const name = await fetchAppName(code)
+  if (name) appName.value = name
+})
 
 function toggleCollapse() {
   collapsed.value = !collapsed.value
@@ -179,7 +187,14 @@ function onUserMenuClick({ key }: { key: string }) {
 .sider :deep(.ant-menu) { background: transparent !important; }
 .sider :deep(.ant-menu-item:not(.ant-menu-item-selected):not(:hover)) { background: transparent !important; }
 .sider :deep(.ant-layout-sider-children) { height: 100%; overflow-y: auto; }
-.content { padding: 20px; overflow-y: auto; overflow-x: hidden; }
+.content {
+  padding: 16px;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  /* 让页面根节点（.admin-page）撑满可视高度，滚动只发生在表格容器内 */
+  display: flex;
+  flex-direction: column;
+}
 @media (max-width: 640px) {
   .content { padding: 12px; }
   .logo { padding-left: 14px; }

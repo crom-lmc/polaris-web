@@ -3,7 +3,7 @@
     <a-layout-header class="header">
       <div class="logo" :class="{ 'is-collapsed': collapsed }">
         <menu-outlined class="menu-toggle" :title="collapsed ? '展开菜单' : '收起菜单'" @click="toggleCollapse" />
-        <span class="logo-text">内容中心</span>
+        <span class="logo-text">{{ appName }}</span>
       </div>
       <div class="right">
         <a-button
@@ -87,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   DashboardOutlined,
@@ -105,7 +105,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { Modal } from 'ant-design-vue'
-import { gotoAuthorize, logoutSso } from '@/api/cms'
+import { fetchAppName, gotoAuthorize, logoutSso } from '@/api/cms'
 import { getRefreshToken } from '@/utils/token'
 import { useSessionGuard } from '@/composables/useSessionGuard'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
@@ -119,6 +119,14 @@ useSessionGuard()
 const theme = useThemeStore()
 
 const collapsed = ref(false)
+const appName = ref('内容中心')
+
+onMounted(async () => {
+  const code = store.me?.appCode
+  if (!code) return
+  const name = await fetchAppName(code)
+  if (name) appName.value = name
+})
 
 function toggleCollapse() {
   collapsed.value = !collapsed.value

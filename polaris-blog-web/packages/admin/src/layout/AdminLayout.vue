@@ -4,13 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import http from '@/api/http'
-import { redirectToSsoLogout } from '@/api/sso'
+import { fetchAppName, redirectToSsoLogout } from '@/api/sso'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
 const collapsed = ref(false)
+const appName = ref('博客后台')
 
 /** 站点 logo（公开接口，无需管理员权限）；为空时回退为字母块 */
 const apiOrigin = (import.meta.env.VITE_API_TARGET as string) || ''
@@ -24,6 +25,8 @@ function resolveAssetUrl(rawUrl: string) {
 }
 
 onMounted(async () => {
+  const name = await fetchAppName('blog', auth.token)
+  if (name) appName.value = name
   try {
     const data: any = await http.get('/public/settings')
     siteLogo.value = resolveAssetUrl(data?.settings?.site_logo || '')
@@ -93,7 +96,7 @@ function onCommand(command: string) {
       <div class="brand" :class="{ collapsed }">
         <img v-if="siteLogo" :src="siteLogo" class="brand-logo" alt="logo" />
         <span v-else class="brand-logo brand-fallback">B</span>
-        <span v-if="!collapsed" class="brand-text">博客后台</span>
+        <span v-if="!collapsed" class="brand-text">{{ appName }}</span>
       </div>
       <el-menu :default-active="activeMenu" :collapse="collapsed" router unique-opened>
         <el-menu-item v-for="m in menus" :key="m.path" :index="m.path">

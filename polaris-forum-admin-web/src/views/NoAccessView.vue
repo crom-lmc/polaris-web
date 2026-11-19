@@ -6,7 +6,7 @@ const store = useUserStore()
 const target = computed(() => {
   const pages = [
     { path: '/threads', perm: 'forum:content' },
-    { path: '/comments', perm: 'forum:content' },
+    { path: '/comments', perm: 'forum:comment' },
     { path: '/sensitive-words', perm: 'forum:sensitive' },
     { path: '/exchanges', perm: 'forum:exchange' },
     { path: '/badges', perm: 'forum:badge' }

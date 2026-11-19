@@ -9,7 +9,7 @@ const store = useUserStore()
 onMounted(() => {
   const pages = [
     { path: '/threads', perm: 'forum:content' },
-    { path: '/comments', perm: 'forum:content' },
+    { path: '/comments', perm: 'forum:comment' },
     { path: '/reports', perm: 'forum:report' },
     { path: '/taxonomy', perm: 'forum:taxonomy' },
     { path: '/site', perm: 'forum:site' },

@@ -64,6 +64,20 @@ export async function fetchMe(token: string): Promise<SsoUser> {
   return unwrap(res)
 }
 
+/** 当前账号可访问应用里指定编码的应用名（供布局标题用；取不到返回空串由调用方回退） */
+export async function fetchAppName(appCode: string, token: string): Promise<string> {
+  if (!token) return ''
+  try {
+    const res = await ssoHttp.get<R<Array<{ code: string; name: string }>>>('/api/accounts/me/apps', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const apps = unwrap(res)
+    return apps.find((a) => a.code === appCode)?.name || ''
+  } catch {
+    return ''
+  }
+}
+
 /** 中心会话是否存在（靠 cookie；401 属正常探测，调用方自行 catch） */
 export async function probeSession(): Promise<boolean> {
   try {
