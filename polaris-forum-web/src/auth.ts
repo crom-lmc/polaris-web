@@ -41,10 +41,14 @@ export async function refreshUnreadCount() {
  * SSO 侧若也没有登录态，会由它自己的路由守卫落到统一登录页（带 redirect 回跳）。
  * 返回 true 表示已登录，调用方可以继续执行；false 表示已发起跳转。
  * 首参保留给调用点表达业务语义（日志/排查用），当前不再展示在弹窗里。
+ *
+ * <p>判断依据是**已验证过的登录态**：localStorage 里还留着一枚失效令牌时，
+ * 旧逻辑会误判成"已登录"，于是请求打到后端才 401，用户看到的是"点了没反应"。
  */
 export function requireLogin(_action: string, redirect = window.location.pathname + window.location.search + window.location.hash) {
-  if (getAccessToken()) return true
+  if (authReady.value ? isLoggedIn.value : Boolean(getAccessToken())) return true
   pendingLoginRedirect.value = redirect
+  clearAuth()
   redirectToSsoLogin()
   return false
 }

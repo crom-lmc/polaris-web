@@ -21,7 +21,8 @@
           <bulb-filled v-if="isDark" /><bulb-outlined v-else />
         </button>
         <div ref="publishMenu" class="publish-menu">
-          <button class="primary-button create-button" @click.stop="publishOpen = !publishOpen"><plus-outlined />发布<down-outlined /></button>
+          <!-- 未登录点「发布」直接走单点：下拉里的内容都要登录才能用，先展开再被踢走反而多一次点击 -->
+          <button class="primary-button create-button" @click.stop="openPublishMenu"><plus-outlined />发布<down-outlined /></button>
           <div v-if="publishOpen" class="publish-dropdown">
             <RouterLink to="/new?type=feed" @click="publishOpen = false"><comment-outlined /><span><b>动态</b><small>分享此刻的想法</small></span></RouterLink>
             <RouterLink to="/new?type=topic" @click="publishOpen = false"><message-outlined /><span><b>话题</b><small>发起社区讨论</small></span></RouterLink>
@@ -72,6 +73,15 @@ const displayName = computed(() => currentUser.value?.member?.displayName || cur
 const headerAvatar = computed(() => currentUser.value?.member?.avatarUrl || (currentUser.value?.member?.avatarAttachmentId ? `/api/forum/public/attachments/${currentUser.value.member.avatarAttachmentId}` : ''))
 function search() {
   router.push({ path: '/', query: keyword.value ? { q: keyword.value } : {} })
+}
+/** 未登录时不展开下拉，直接把人送去统一登录 */
+function openPublishMenu() {
+  if (!isLoggedIn.value) {
+    publishOpen.value = false
+    requireLogin('发布内容')
+    return
+  }
+  publishOpen.value = !publishOpen.value
 }
 async function handleLogout() {
   userOpen.value = false

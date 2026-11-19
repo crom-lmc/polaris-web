@@ -1,7 +1,8 @@
 <template>
   <aside class="community-sidebar">
     <section class="panel member-card">
-      <RouterLink :to="isLoggedIn ? '/me' : '/badges'" class="member-profile">
+      <!-- 我的中心整卡都要登录：未登录点进来由路由守卫直接送统一登录 -->
+      <RouterLink to="/me" class="member-profile">
         <UserAvatar :name="displayName" :avatar-url="memberAvatar" :size="45" />
         <div><b>{{ isLoggedIn ? displayName : '社区游客' }}</b><span>{{ isLoggedIn ? `Lv.${currentUser?.member?.level || 1} · 社区成员` : '登录后参与互动并累积积分' }}</span></div>
         <crown-outlined />

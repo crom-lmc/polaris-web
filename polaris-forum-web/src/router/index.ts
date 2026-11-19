@@ -23,13 +23,14 @@ const router = createRouter({
   scrollBehavior: to => to.hash ? { el: to.hash, top: 90 } : { top: 0 },
   routes: [
     { path: '/', name: 'home', component: HomeView },
-    { path: '/feed', name: 'feed', component: ContentFeedView, meta: { kind: 'feed' } },
-    { path: '/topics', name: 'topics', component: ContentFeedView, meta: { kind: 'topic' } },
-    { path: '/questions', name: 'questions', component: ContentFeedView, meta: { kind: 'question' } },
-    { path: '/articles', name: 'articles', component: ContentFeedView, meta: { kind: 'article' } },
+    // 四类内容聚合页只展示"我的/关注的"内容，未登录没有可看的东西，直接走单点
+    { path: '/feed', name: 'feed', component: ContentFeedView, meta: { kind: 'feed', requiresAuth: true } },
+    { path: '/topics', name: 'topics', component: ContentFeedView, meta: { kind: 'topic', requiresAuth: true } },
+    { path: '/questions', name: 'questions', component: ContentFeedView, meta: { kind: 'question', requiresAuth: true } },
+    { path: '/articles', name: 'articles', component: ContentFeedView, meta: { kind: 'article', requiresAuth: true } },
     { path: '/boards/:key', name: 'board', component: BoardView },
     { path: '/threads/:id', name: 'thread', component: ThreadView },
-    { path: '/new', name: 'new-thread', component: NewThreadView },
+    { path: '/new', name: 'new-thread', component: NewThreadView, meta: { requiresAuth: true } },
     { path: '/drafts', name: 'drafts', component: DraftsView, meta: { requiresAuth: true } },
     { path: '/members/:accountId', name: 'member', component: MemberView },
     { path: '/me', name: 'profile', component: ProfileView, meta: { requiresAuth: true } },
@@ -46,9 +47,9 @@ const router = createRouter({
         return false
       }
     },
-    { path: '/points', name: 'points', component: PointsView },
-    { path: '/lottery', name: 'lottery', component: LotteryView },
-    { path: '/gifts', name: 'gifts', component: GiftsView },
+    { path: '/points', name: 'points', component: PointsView, meta: { requiresAuth: true } },
+    { path: '/lottery', name: 'lottery', component: LotteryView, meta: { requiresAuth: true } },
+    { path: '/gifts', name: 'gifts', component: GiftsView, meta: { requiresAuth: true } },
     { path: '/about', name: 'about', component: AboutView },
     { path: '/auth/callback', name: 'auth-callback', component: CallbackView },
     { path: '/:pathMatch(.*)*', redirect: '/' }
