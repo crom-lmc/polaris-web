@@ -1,8 +1,8 @@
 <template>
   <div class="container home-container">
-    <div class="forum-layout">
-      <BoardNav />
+    <div class="forum-layout forum-layout--tags">
       <section class="thread-section panel">
+        <CategoryTabs />
         <div class="thread-list-header">
           <div><h2>{{ keyword ? `“${keyword}”的搜索结果` : '社区讨论' }}</h2><span>{{ threads.length }} 条内容</span></div>
           <div class="sort-tabs">
@@ -24,7 +24,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { SearchOutlined } from '@ant-design/icons-vue'
-import BoardNav from '@/components/BoardNav.vue'
+import CategoryTabs from '@/components/CategoryTabs.vue'
 import CommunitySidebar from '@/components/CommunitySidebar.vue'
 import ThreadCard from '@/components/ThreadCard.vue'
 import { fetchThreads } from '@/api/forum'

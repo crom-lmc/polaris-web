@@ -1,7 +1,6 @@
 <template>
   <div class="container home-container">
-    <div class="forum-layout">
-      <BoardNav />
+    <div class="forum-layout forum-layout--tags">
       <section class="thread-section panel">
         <div class="content-type-hero">
           <span class="content-type-icon"><component :is="currentConfig.icon" /></span>
@@ -12,6 +11,7 @@
           <RouterLink v-for="item in contentConfigs" :key="item.key" :to="item.path" :class="{ active: contentType === item.key }"><component :is="item.icon" />{{ item.nav }}</RouterLink>
           <div class="sort-tabs"><button :class="{ active: sort === 'latest' }" @click="setSort('latest')">最新</button><button :class="{ active: sort === 'recommended' }" @click="setSort('recommended')">推荐</button><button :class="{ active: sort === 'following' }" @click="setSort('following')">关注</button></div>
         </div>
+        <CategoryTabs />
         <div v-if="loading" class="empty-state"><h3>正在加载{{ currentConfig.nav }}…</h3></div>
         <div v-else-if="error" class="empty-state"><h3>内容加载失败</h3><p>{{ error }}</p><button class="secondary-button" @click="load">重新加载</button></div>
         <div v-else-if="threads.length"><ThreadCard v-for="thread in threads" :key="thread.id" :thread="thread" /></div>
@@ -26,7 +26,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { FileTextOutlined, CommentOutlined, MessageOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons-vue'
-import BoardNav from '@/components/BoardNav.vue'
+import CategoryTabs from '@/components/CategoryTabs.vue'
 import CommunitySidebar from '@/components/CommunitySidebar.vue'
 import ThreadCard from '@/components/ThreadCard.vue'
 import { fetchThreads } from '@/api/forum'
@@ -54,6 +54,7 @@ const contentType = computed(() => {
   return contentConfigs[kind] ? kind : 'topic'
 })
 const currentConfig = computed(() => contentConfigs[contentType.value])
+const keyword = computed(() => String(route.query.q || ''))
 async function load() {
   if (sort.value === 'following' && !authReady.value) return
   if (sort.value === 'following' && !currentUser.value) {
@@ -62,16 +63,16 @@ async function load() {
   }
   loading.value = true
   error.value = ''
-  try { threads.value = await fetchThreads({ kind: contentType.value, sort: sort.value }) }
+  try { threads.value = await fetchThreads({ kind: contentType.value, sort: sort.value, q: keyword.value }) }
   catch (e) { error.value = e instanceof Error ? e.message : '请稍后重试' }
   finally { loading.value = false }
 }
 function setSort(value: FeedSort) {
   if (value === 'following' && !currentUser.value && !requireLogin('查看关注内容', `${route.path}?sort=following`)) return
   sort.value = value
-  router.replace({ path: route.path, query: value === 'latest' ? {} : { sort: value } })
+  router.replace({ path: route.path, query: { ...(keyword.value ? { q: keyword.value } : {}), ...(value === 'latest' ? {} : { sort: value }) } })
 }
-watch([contentType, sort, authReady, currentUser], load, { immediate: true })
+watch([contentType, sort, keyword, authReady, currentUser], load, { immediate: true })
 watch(() => route.query.sort, value => {
   const next = String(value || 'latest')
   if (['latest', 'recommended', 'following'].includes(next)) sort.value = next as FeedSort

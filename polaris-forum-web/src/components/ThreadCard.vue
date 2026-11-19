@@ -5,7 +5,7 @@
     <div class="thread-content">
       <div class="thread-topline">
         <span class="content-kind-tag" :class="contentKind">{{ kindName }}</span>
-        <RouterLink :to="`/boards/${thread.board}`" class="board-name">{{ boardName }}</RouterLink>
+        <RouterLink v-if="primaryTag" :to="`/?q=${encodeURIComponent(primaryTag)}`" class="board-name">#{{ primaryTag }}</RouterLink>
         <span v-if="thread.reward" class="status-tag reward-tag">悬赏 {{ thread.reward }} 积分</span>
         <span v-if="thread.pinned" class="status-tag pinned">置顶</span>
         <span v-if="thread.solved" class="status-tag solved"><check-circle-outlined />已解决</span>
@@ -29,11 +29,11 @@
 import { computed } from 'vue'
 import { CheckCircleOutlined, EyeOutlined, LikeOutlined, MessageOutlined } from '@ant-design/icons-vue'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { boards, formatTime } from '@/data/forum'
+import { formatTime } from '@/data/forum'
 import type { Thread } from '@/types'
 
 const props = defineProps<{ thread: Thread }>()
-const boardName = computed(() => boards.find(item => item.key === props.thread.board)?.name || props.thread.board)
+const primaryTag = computed(() => props.thread.tags?.[0] || '')
 const authorAccountId = computed(() => props.thread.author.accountId || props.thread.authorAccountId)
 const contentKind = computed(() => props.thread.kind || 'topic')
 const kindName = computed(() => ({ feed: '动态', topic: '话题', question: '问答', article: '文章' })[contentKind.value])

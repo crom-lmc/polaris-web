@@ -9,8 +9,6 @@
       <section class="panel editor-card">
         <p v-if="loadingDraft" class="form-hint">正在恢复服务端草稿…</p>
         <template v-if="!preview">
-          <label class="form-label">内容板块<span>选择合适的讨论方向</span></label>
-          <div class="editor-board-tabs"><button v-for="item in boards" :key="item.key" :class="{ active: board === item.key }" @click="board = item.key">{{ item.name }}</button></div>
           <template v-if="contentType !== 'feed'">
             <label class="form-label">{{ contentType === 'question' ? '问题标题' : contentType === 'article' ? '文章标题' : '话题标题' }}<span>{{ title.length }} / 80</span></label>
             <input v-model="title" class="form-control" maxlength="80" :placeholder="config.titlePlaceholder" />
@@ -27,8 +25,18 @@
             <div><thunderbolt-outlined /><input v-model.number="reward" type="number" min="0" max="10000" class="form-control" /><span>积分</span></div>
           </div>
 
-          <label class="form-label">内容标签<span>使用逗号分隔，最多 5 个，每个不超过 20 字</span></label>
-          <input v-model="tags" class="form-control" placeholder="例如：Vue 3，工程化，性能优化" />
+          <label class="form-label">内容标签<span>可选择后台预设标签，也可自行输入，逗号分隔，最多 5 个，每个不超过 20 字</span></label>
+          <div v-if="presetTags.length" class="preset-tags">
+            <button
+              v-for="tag in presetTags"
+              :key="tag.name"
+              type="button"
+              class="preset-tag"
+              :class="{ selected: tagList().includes(tag.name) }"
+              @click="toggleTag(tag.name)"
+            >{{ tag.name }}</button>
+          </div>
+          <input v-model="tags" class="form-control" placeholder="输入自定义标签，例如：Vue 3，工程化，性能优化" />
 
           <label class="form-label">附件<span>附件随草稿保存，发布后可公开下载</span></label>
           <AttachmentUploader v-model="attachments" :disabled="submitting || savingDraft" @error="error = $event" />
@@ -39,7 +47,7 @@
           </template>
         </template>
         <div v-else class="post-preview">
-          <span class="board-name">{{ boards.find(item => item.key === board)?.name }} · {{ config.nav }}</span>
+          <span class="board-name">{{ config.nav }}</span>
           <h1 v-if="contentType !== 'feed'">{{ title || config.titlePlaceholder }}</h1>
           <RichTextView class="article-body" :content="content" />
           <p v-if="!contentText" class="muted">正文预览将在这里显示。</p>
@@ -66,11 +74,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { EditOutlined, SafetyCertificateOutlined, SaveOutlined, SendOutlined, ThunderboltOutlined } from '@ant-design/icons-vue'
 import { createDraft, createThread, fetchDraft, publishDraft, updateDraft, type ThreadInput } from '@/api/forum'
-import { boards, loadBoards } from '@/data/forum'
+import { loadBoards, collectAllTags } from '@/data/forum'
+import type { ForumTag } from '@/types'
 import { currentUser, refreshCurrentUser, requireLogin } from '@/auth'
 import AttachmentUploader from '@/components/AttachmentUploader.vue'
 import PollEditor from '@/components/PollEditor.vue'
@@ -93,7 +102,9 @@ const contentType = computed<ContentKind>(() => {
   return Object.prototype.hasOwnProperty.call(contentConfigs, value) ? value : 'topic'
 })
 const config = computed(() => contentConfigs[contentType.value])
+// 社区板块概念已移除，所有新内容统一归入默认板块，分类完全交给标签
 const board = ref('general')
+const presetTags = ref<ForumTag[]>([])
 const title = ref('')
 const content = ref('')
 const tags = ref('')
@@ -118,8 +129,27 @@ watch(contentType, () => {
 })
 watch(() => route.query.draftId, loadDraft, { immediate: true })
 
+onMounted(async () => {
+  // 预设标签由后台维护，前台只负责聚合展示供发帖时点选
+  try {
+    presetTags.value = await collectAllTags()
+  } catch {
+    presetTags.value = []
+  }
+})
+
 function tagList() {
   return [...new Set(tags.value.split(/[,，]/).map(item => item.trim().replace(/^#/, '')).filter(Boolean))]
+}
+
+/** 点选预设标签：已选则移除，未选则追加，超过 5 个时保持原样（与提交校验一致） */
+function toggleTag(name: string) {
+  const current = tagList()
+  if (current.includes(name)) {
+    tags.value = current.filter(item => item !== name).join('，')
+  } else if (current.length < 5) {
+    tags.value = [...current, name].join('，')
+  }
 }
 
 function payload(): ThreadInput {
@@ -169,7 +199,6 @@ async function loadDraft() {
     }
     draftId.value = draft.id
     if (route.query.type !== draft.kind) await router.replace({ query: { ...route.query, type: draft.kind } })
-    board.value = draft.board
     title.value = draft.title || ''
     content.value = draft.content || ''
     tags.value = (draft.tags || []).join('，')
