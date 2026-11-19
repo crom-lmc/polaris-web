@@ -37,13 +37,13 @@
       <a-col :span="16">
         <a-card title="我的应用" size="small" class="equal-card">
           <template #extra>
-            <span class="tip">点「进入」在新页签打开，沿用当前登录态，无需再次输密码</span>
+            <a-button type="link" size="small" @click="goMyApps">查看全部</a-button>
           </template>
 
           <a-empty v-if="!store.appList.length" description="还没有被授权任何应用" />
 
           <div v-else class="app-grid">
-            <div v-for="app in store.appList" :key="app.id" class="app-tile">
+            <div v-for="app in overviewApps" :key="app.id" class="app-tile">
               <img class="app-logo" :src="logoOf(app)" :alt="app.name" />
               <div class="app-name">{{ app.name }}</div>
               <div class="app-code">{{ app.code }}</div>
@@ -237,6 +237,7 @@ const route = useRoute()
 const store = useUserStore()
 
 const denied = computed(() => (route.query.denied as string) || '')
+const overviewApps = computed(() => store.appList.slice(0, 4))
 const entering = ref('')
 const enterError = ref('')
 
@@ -377,6 +378,10 @@ function formatTime(value?: string) {
 
 function goNotices() {
   router.push('/notices')
+}
+
+function goMyApps() {
+  router.push({ name: 'my-apps' })
 }
 
 /* 数字卡片点击：待审批进「待我审批」，待办/未读消息进待办提醒页 */

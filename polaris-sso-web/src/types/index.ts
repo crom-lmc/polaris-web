@@ -59,6 +59,8 @@ export interface ApplicationVO {
   id: string
   code: string
   name: string
+  /** 应用类型，取值来自配置中心字典 sso.application_type */
+  appType?: string
   baseUrl?: string
   /** OAuth2 回调地址（授权码回跳点），「进入」按钮构造 /authorize 用 */
   redirectUri?: string

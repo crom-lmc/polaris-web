@@ -39,6 +39,10 @@
             </div>
           </template>
 
+          <template v-else-if="column.key === 'appType'">
+            <a-tag>{{ typeLabel(record.appType) }}</a-tag>
+          </template>
+
           <template v-else-if="column.key === 'baseUrl'">
             <a v-if="record.baseUrl" :href="record.baseUrl" target="_blank" rel="noopener">
               {{ record.baseUrl }}
@@ -125,6 +129,19 @@
         </a-form-item>
 
         <a-form-item
+          label="应用类型"
+          name="appType"
+          :rules="[{ required: true, message: '请选择应用类型' }]"
+        >
+          <a-select
+            v-model:value="editForm.appType"
+            :options="typeOptions"
+            :loading="typeLoading"
+            placeholder="请选择应用类型"
+          />
+        </a-form-item>
+
+        <a-form-item
           label="访问地址"
           name="baseUrl"
           :rules="[{ type: 'url', message: '需为完整 URL，如 https://blog.example.com' }]"
@@ -171,6 +188,7 @@ import {
   resetApplicationSecret,
   updateApplication
 } from '@/api/apps'
+import { dictOptions, type DictOption } from '@/api/announcement'
 import { useUserStore } from '@/stores/user'
 import type { ApplicationVO } from '@/types'
 import { message } from 'ant-design-vue'
@@ -180,6 +198,7 @@ const store = useUserStore()
 
 const columns = [
   { title: '应用', key: 'name', width: 200 },
+  { title: '类型', key: 'appType', width: 120 },
   { title: '访问地址', key: 'baseUrl' },
   { title: '密钥', key: 'secret', width: 170 },
   { title: '状态', key: 'status', width: 90 },
@@ -191,6 +210,8 @@ const statusOptions = [
   { label: '启用', value: 1 },
   { label: '停用', value: 2 }
 ]
+const typeOptions = ref<DictOption[]>([])
+const typeLoading = ref(false)
 
 const records = ref<ApplicationVO[]>([])
 const loading = ref(false)
@@ -205,6 +226,7 @@ const editFormRef = ref()
 const editForm = reactive({
   code: '',
   name: '',
+  appType: 'OTHER',
   baseUrl: '',
   remark: '',
   sort: 0
@@ -213,7 +235,27 @@ const editForm = reactive({
 const secretOpen = ref(false)
 const newSecret = ref('')
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadTypeOptions()
+})
+
+async function loadTypeOptions() {
+  typeLoading.value = true
+  try {
+    const res = await dictOptions('sso.application_type')
+    typeOptions.value = res.data || []
+  } catch (e: any) {
+    message.error(e?.message || '应用类型字典加载失败')
+  } finally {
+    typeLoading.value = false
+  }
+}
+
+function typeLabel(value?: string) {
+  if (!value) return '未分类'
+  return typeOptions.value.find((item) => item.value === value)?.label || value
+}
 
 async function load() {
   loading.value = true
@@ -233,7 +275,7 @@ async function load() {
 
 function openCreate() {
   editing.value = null
-  Object.assign(editForm, { code: '', name: '', baseUrl: '', remark: '', sort: 0 })
+  Object.assign(editForm, { code: '', name: '', appType: 'OTHER', baseUrl: '', remark: '', sort: 0 })
   editOpen.value = true
 }
 
@@ -242,6 +284,7 @@ function openEdit(record: ApplicationVO) {
   Object.assign(editForm, {
     code: record.code,
     name: record.name,
+    appType: record.appType || 'OTHER',
     baseUrl: record.baseUrl || '',
     remark: record.remark || '',
     sort: record.sort ?? 0
@@ -260,6 +303,7 @@ async function submitEdit() {
     if (editing.value) {
       await updateApplication(editing.value.id, {
         name: editForm.name,
+        appType: editForm.appType,
         baseUrl: editForm.baseUrl,
         remark: editForm.remark,
         sort: editForm.sort
@@ -269,6 +313,7 @@ async function submitEdit() {
       const res = await createApplication({
         code: editForm.code,
         name: editForm.name,
+        appType: editForm.appType,
         baseUrl: editForm.baseUrl,
         remark: editForm.remark,
         sort: editForm.sort,
@@ -365,9 +410,9 @@ async function copySecret() {
 </script>
 
 <style scoped>
-/* 固定列宽合计约 720px + 访问地址列，窄窗口下留一点横向滚动让操作列 sticky 生效 */
+/* 固定列宽合计约 840px + 访问地址列，窄窗口下留一点横向滚动让操作列 sticky 生效 */
 .ft-page {
-  --ft-min-width: 1000px;
+  --ft-min-width: 1120px;
 }
 
 .toolbar {

@@ -1,0 +1,51 @@
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+:root, :root[data-theme='light'] {
+  --bg-page: #f5f6f8;
+  --text-base: #1f2329;
+  --header-bg: #ffffff;
+  --sider-bg: #ffffff;
+  --header-text: #1f2329;
+  --header-border: #e8e8e8;
+  --header-hover: rgba(0, 0, 0, 0.04);
+  --panel-bg: #ffffff;
+  --muted: #8a9099;
+}
+:root[data-theme='dark'] {
+  --bg-page: #0f1115;
+  --text-base: rgba(255, 255, 255, 0.85);
+  --header-bg: #0f1115;
+  --sider-bg: #0f1115;
+  --header-text: rgba(255, 255, 255, 0.85);
+  --header-border: rgba(255, 255, 255, 0.08);
+  --header-hover: rgba(255, 255, 255, 0.12);
+  --panel-bg: #161a22;
+  --muted: #9aa6b2;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-page);
+  color: var(--text-base);
+}
+.admin-page { max-width: 1600px; margin: 0 auto; }
+.page-heading { margin-bottom: 16px; }
+.page-heading h1 { margin: 0 0 6px; font-size: 22px; line-height: 1.4; }
+.page-heading p { margin: 0; color: var(--muted); }
+.filter-card { margin-bottom: 16px; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.filters .filter-input { width: 240px; }
+.filters .filter-select { width: 150px; }
+.table-card :where(.ant-card-body) { padding: 0; }
+.table-scroll { overflow-x: auto; }
+.secondary-text { color: var(--muted); font-size: 12px; }
+.content-cell { max-width: 440px; white-space: pre-wrap; word-break: break-word; }
+.title-cell { min-width: 240px; }
+.title-cell small { display: block; margin-top: 4px; color: var(--muted); }
+.action-group { white-space: nowrap; }
+.issue-controls { display: flex; gap: 8px; min-width: 300px; }
+.issue-detail { display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 640px) {
+  .filters { align-items: stretch; }
+  .filters .filter-input, .filters .filter-select { width: 100%; }
+  .page-heading h1 { font-size: 20px; }
+}

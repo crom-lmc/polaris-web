@@ -6,6 +6,7 @@ import type { ApplicationVO } from '@/types'
 export interface ApplicationPayload {
   code?: string
   name?: string
+  appType?: string
   baseUrl?: string
   icon?: string
   remark?: string

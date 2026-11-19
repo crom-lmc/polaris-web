@@ -89,6 +89,10 @@
             <template #icon><dashboard-outlined /></template>
             概览
           </a-menu-item>
+          <a-menu-item key="my-apps">
+            <template #icon><appstore-outlined /></template>
+            我的应用
+          </a-menu-item>
           <a-menu-item key="approvals">
             <template #icon><carry-out-outlined /></template>
             审批中心

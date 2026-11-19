@@ -38,6 +38,12 @@ const router = createRouter({
           meta: { title: '概览' }
         },
         {
+          path: 'my-apps',
+          name: 'my-apps',
+          component: () => import('@/views/admin/MyApplicationsView.vue'),
+          meta: { title: '我的应用' }
+        },
+        {
           path: 'approvals',
           name: 'approvals',
           component: () => import('@/views/admin/ApprovalListView.vue'),

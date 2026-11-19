@@ -1,0 +1,119 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { message } from 'ant-design-vue'
+import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import {
+  createSensitiveWord,
+  deleteSensitiveWord,
+  fetchSensitiveWords,
+  updateSensitiveWord,
+  type SensitiveWord
+} from '@/api/forum'
+import { confirmAction } from '@/utils/confirm'
+
+const words = ref<SensitiveWord[]>([])
+const newWord = ref('')
+const loading = ref(false)
+const saving = ref(false)
+const savingId = ref('')
+const columns = [
+  { title: '敏感词', dataIndex: 'word' },
+  { title: '状态', key: 'status', width: 120 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 180 },
+  { title: '操作', key: 'action', width: 180, fixed: 'right' }
+]
+
+onMounted(load)
+
+async function load() {
+  loading.value = true
+  try {
+    words.value = await fetchSensitiveWords()
+  } catch (cause) {
+    message.error(cause instanceof Error ? cause.message : '敏感词加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function addWord() {
+  const value = newWord.value.trim()
+  if (!value) {
+    message.warning('请输入敏感词')
+    return
+  }
+  saving.value = true
+  try {
+    await createSensitiveWord(value)
+    newWord.value = ''
+    message.success('敏感词已新增并启用')
+    await load()
+  } catch (cause) {
+    message.error(cause instanceof Error ? cause.message : '新增失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function toggleWord(word: SensitiveWord) {
+  savingId.value = word.id
+  try {
+    await updateSensitiveWord(word.id, !word.enabled)
+    word.enabled = !word.enabled
+    message.success('敏感词状态已更新')
+  } catch (cause) {
+    message.error(cause instanceof Error ? cause.message : '操作失败')
+  } finally {
+    savingId.value = ''
+  }
+}
+
+function removeWord(word: SensitiveWord) {
+  confirmAction({
+    title: '删除敏感词',
+    content: `确认删除敏感词“${word.word}”吗？`,
+    okText: '删除',
+    okType: 'danger',
+    onOk: async () => {
+      try {
+        await deleteSensitiveWord(word.id)
+        words.value = words.value.filter((item) => item.id !== word.id)
+        message.success('敏感词已删除')
+      } catch (cause) {
+        message.error(cause instanceof Error ? cause.message : '删除失败')
+      }
+    }
+  })
+}
+</script>
+
+<template>
+  <div class="admin-page">
+    <header class="page-heading">
+      <h1>敏感词管理</h1>
+      <p>启用后立即用于发布和评论检查，不回溯处理历史内容。</p>
+    </header>
+    <a-card class="filter-card" :bordered="false">
+      <div class="filters">
+        <a-input v-model:value="newWord" class="filter-input" :maxlength="100" placeholder="输入敏感词" @press-enter="addWord" />
+        <a-button type="primary" :loading="saving" @click="addWord"><PlusOutlined />新增敏感词</a-button>
+        <a-button @click="load"><ReloadOutlined />刷新</a-button>
+      </div>
+    </a-card>
+    <a-card class="table-card" :bordered="false">
+      <div class="table-scroll">
+        <a-table :columns="columns" :data-source="words" :loading="loading" :pagination="false" :scroll="{ x: 760 }" row-key="id">
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'status'"><a-tag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用中' : '已停用' }}</a-tag></template>
+            <template v-else-if="column.key === 'action'">
+              <a-space class="action-group" :size="0">
+                <a-button type="link" size="small" :loading="savingId === record.id" @click="toggleWord(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
+                <a-button type="link" size="small" danger @click="removeWord(record)"><DeleteOutlined />删除</a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+      </div>
+    </a-card>
+  </div>
+</template>
