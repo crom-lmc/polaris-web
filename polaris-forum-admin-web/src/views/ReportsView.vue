@@ -34,7 +34,7 @@ const columns = [
   { title: '状态', key: 'status', width: 100 },
   { title: '举报时间', dataIndex: 'createdAt', width: 170 },
   { title: '处理信息', key: 'handling', width: 300 },
-  { title: '操作', key: 'action', width: 90, fixed: 'right' }
+  { title: '操作', key: 'action', width: 90 }
 ]
 
 onMounted(load)
@@ -109,8 +109,8 @@ async function submitProcess() {
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
-      <div class="table-scroll">
-        <a-table :columns="columns" :data-source="pagedReports" :loading="loading" :pagination="pagination" :scroll="{ x: 1640 }" row-key="id" size="middle" @change="onTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !loading && !pagedReports.length }">
+        <a-table :columns="columns" :data-source="pagedReports" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
           <template #emptyText>
             <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
           </template>

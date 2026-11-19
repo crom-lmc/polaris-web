@@ -66,6 +66,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .header-inner { height: 100%; display: flex; align-items: center; gap: 36px; }
 .brand { display: flex; align-items: center; gap: 11px; flex: none; }
 .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; color: white; background: var(--primary); font-size: 21px; font-weight: 800; box-shadow: 0 5px 14px rgb(91 103 241 / 20%); }
+img.brand-mark { display: block; flex: none; object-fit: contain; background: transparent; }
 .brand-mark.small { width: 26px; height: 26px; border-radius: 7px; font-size: 14px; box-shadow: none; }
 .brand-copy { display: flex; flex-direction: column; line-height: 1; }
 .brand-copy b { font-size: 18px; letter-spacing: -.4px; }
@@ -602,8 +603,6 @@ button:disabled { cursor: not-allowed; opacity: .58; transform: none !important;
 .login-symbol { width: 54px; height: 54px; display: grid; place-items: center; margin: 0 auto 15px; border-radius: 14px; background: var(--primary-soft); color: var(--primary); font-size: 25px; }
 .login-dialog h2 { margin: 8px 0 10px; font-size: 21px; }
 .login-dialog p { margin: 0 0 22px; color: #7b8093; font-size: 13px; line-height: 1.8; }
-.login-submit { width: 100%; }
-.login-note { display: block; margin-top: 14px; color: #a4a8b5; font-size: 10px; }
 .site-footer { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; height: 76px; border-top: 1px solid var(--border); background: rgb(255 255 255 / 96%); box-shadow: 0 -4px 18px rgb(30 35 60 / 4%); backdrop-filter: blur(14px); }
 .footer-inner { height: 76px; display: flex; align-items: center; gap: 22px; color: #9297a7; font-size: 11px; }
 .footer-brand { display: flex; align-items: center; gap: 8px; color: #5a6073; }

@@ -16,7 +16,7 @@ import ProfileEditView from '@/views/ProfileEditView.vue'
 import BadgesView from '@/views/BadgesView.vue'
 import NotificationsView from '@/views/NotificationsView.vue'
 import AboutView from '@/views/AboutView.vue'
-import { authReady, currentUser, forumAdminOrigin, refreshCurrentUser, requireLogin } from '@/auth'
+import { authReady, clearAuth, currentUser, forumAdminOrigin, redirectToSsoLogin, refreshCurrentUser } from '@/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -30,13 +30,13 @@ const router = createRouter({
     { path: '/boards/:key', name: 'board', component: BoardView },
     { path: '/threads/:id', name: 'thread', component: ThreadView },
     { path: '/new', name: 'new-thread', component: NewThreadView },
-    { path: '/drafts', name: 'drafts', component: DraftsView, meta: { requiresAuth: true, loginAction: '查看草稿' } },
+    { path: '/drafts', name: 'drafts', component: DraftsView, meta: { requiresAuth: true } },
     { path: '/members/:accountId', name: 'member', component: MemberView },
-    { path: '/me', name: 'profile', component: ProfileView, meta: { requiresAuth: true, loginAction: '查看个人中心' } },
-    { path: '/favorites', name: 'favorites', component: FavoritesView, meta: { requiresAuth: true, loginAction: '查看我的收藏' } },
-    { path: '/settings/profile', name: 'profile-edit', component: ProfileEditView, meta: { requiresAuth: true, loginAction: '编辑个人资料' } },
+    { path: '/me', name: 'profile', component: ProfileView, meta: { requiresAuth: true } },
+    { path: '/favorites', name: 'favorites', component: FavoritesView, meta: { requiresAuth: true } },
+    { path: '/settings/profile', name: 'profile-edit', component: ProfileEditView, meta: { requiresAuth: true } },
     { path: '/badges', name: 'badges', component: BadgesView },
-    { path: '/notifications', name: 'notifications', component: NotificationsView, meta: { requiresAuth: true, loginAction: '查看论坛消息' } },
+    { path: '/notifications', name: 'notifications', component: NotificationsView, meta: { requiresAuth: true } },
     {
       path: '/admin',
       name: 'forum-admin',
@@ -59,7 +59,10 @@ router.beforeEach(async to => {
   if (!to.meta.requiresAuth) return true
   if (!authReady.value) await refreshCurrentUser()
   if (!currentUser.value) {
-    requireLogin(String(to.meta.loginAction || '查看个人内容'), to.fullPath)
+    // 需要登录的页面直接走单点，不再弹引导框；本地可能残留失效令牌，先清掉再交给 SSO 判定
+    // 是静默续登还是落到统一登录页
+    clearAuth()
+    redirectToSsoLogin(to.fullPath)
     return false
   }
   return true

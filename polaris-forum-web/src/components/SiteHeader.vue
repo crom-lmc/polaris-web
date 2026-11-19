@@ -2,7 +2,7 @@
   <header class="site-header">
     <div class="container header-inner">
       <RouterLink to="/" class="brand" aria-label="Polaris Forum 首页">
-        <span class="brand-mark">P</span><span class="brand-copy"><b>Polaris</b><small>FORUM</small></span>
+        <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" /><span class="brand-copy"><b>Polaris</b><small>FORUM</small></span>
       </RouterLink>
 
       <nav class="main-nav" aria-label="主导航">

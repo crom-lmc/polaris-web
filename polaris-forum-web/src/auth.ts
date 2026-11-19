@@ -1,8 +1,6 @@
 import { computed, ref } from 'vue'
 import { fetchMe, fetchUnreadCount, logoutSso, type MeInfo } from '@/api/forum'
 
-export const loginDialogOpen = ref(false)
-export const pendingAction = ref('参与社区讨论')
 const pendingLoginRedirect = ref('/')
 export const currentUser = ref<MeInfo | null>(null)
 export const authReady = ref(false)
@@ -40,12 +38,16 @@ export async function refreshUnreadCount() {
   }
 }
 
-/** 返回 true 表示已登录，调用方可以继续执行；false 表示已打开登录引导。 */
-export function requireLogin(action: string, redirect = window.location.pathname + window.location.search + window.location.hash) {
+/**
+ * 未登录时直接跳统一账号中心，不再弹登录引导弹窗。
+ * SSO 侧若也没有登录态，会由它自己的路由守卫落到统一登录页（带 redirect 回跳）。
+ * 返回 true 表示已登录，调用方可以继续执行；false 表示已发起跳转。
+ * 首参保留给调用点表达业务语义（日志/排查用），当前不再展示在弹窗里。
+ */
+export function requireLogin(_action: string, redirect = window.location.pathname + window.location.search + window.location.hash) {
   if (getAccessToken()) return true
-  pendingAction.value = action
   pendingLoginRedirect.value = redirect
-  loginDialogOpen.value = true
+  redirectToSsoLogin()
   return false
 }
 
@@ -98,7 +100,8 @@ function authorizeUrl() {
   return `${ssoOrigin()}/authorize?${params.toString()}`
 }
 
-export function redirectToSsoLogin() {
+export function redirectToSsoLogin(redirect?: string) {
+  if (redirect) pendingLoginRedirect.value = redirect
   window.location.assign(authorizeUrl())
 }
 

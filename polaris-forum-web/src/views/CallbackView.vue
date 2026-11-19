@@ -6,7 +6,7 @@
       <h1>{{ error ? '统一登录失败' : '正在登录社区论坛' }}</h1>
       <p>{{ error || '正在使用一次性授权码换取论坛登录状态，请稍候。' }}</p>
       <div class="callback-actions">
-        <button v-if="error" class="primary-button" @click="redirectToSsoLogin">重新登录</button>
+        <button v-if="error" class="primary-button" @click="redirectToSsoLogin()">重新登录</button>
         <RouterLink to="/" class="secondary-button">返回社区首页</RouterLink>
       </div>
     </section>

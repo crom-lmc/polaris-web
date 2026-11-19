@@ -33,7 +33,7 @@ const linkColumns = [
   { title: '排序', dataIndex: 'sortNo', width: 80 },
   { title: '状态', key: 'status', width: 100 },
   { title: '更新时间', key: 'updatedAt', width: 170 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' }
+  { title: '操作', key: 'action', width: 150 }
 ]
 
 onMounted(() => {
@@ -180,8 +180,8 @@ async function toggleLink(link: FriendLink) {
           <a-button v-if="store.can('forum:site:link:manage')" type="primary" @click="openLinkCreate"><PlusOutlined />新增友链</a-button>
         </a-space>
       </template>
-      <div class="table-scroll">
-        <a-table :columns="linkColumns" :data-source="pagedLinks" :loading="linkLoading" :pagination="linkPagination" :scroll="{ x: 1020 }" row-key="id" size="middle" @change="onLinkTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !linkLoading && !pagedLinks.length }">
+        <a-table :columns="linkColumns" :data-source="pagedLinks" :loading="linkLoading" :pagination="linkPagination" row-key="id" size="middle" @change="onLinkTableChange">
           <template #emptyText>
             <a-empty v-if="!linkLoading" class="table-empty" description="暂无数据" />
           </template>

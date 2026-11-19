@@ -59,7 +59,7 @@ const columns = [
   { title: '状态', key: 'status', width: 100 },
   { title: '获得人数', key: 'awardedCount', width: 100 },
   { title: '发布时间', key: 'publishedAt', width: 170 },
-  { title: '操作', key: 'action', width: 170, fixed: 'right' }
+  { title: '操作', key: 'action', width: 170 }
 ]
 
 onMounted(load)
@@ -193,8 +193,8 @@ function offline(badge: Badge) {
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
-      <div class="table-scroll">
-        <a-table :columns="columns" :data-source="pagedBadges" :loading="loading" :pagination="pagination" :scroll="{ x: 1190 }" row-key="id" size="middle" @change="onTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !loading && !pagedBadges.length }">
+        <a-table :columns="columns" :data-source="pagedBadges" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
           <template #emptyText>
             <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
           </template>
@@ -243,7 +243,7 @@ function offline(badge: Badge) {
 
 <style scoped>
 .badge-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.rule-alert { margin-bottom: 16px; }
+.rule-alert { margin-bottom: 0; }
 .badge-info { display: flex; align-items: center; gap: 12px; min-width: 200px; }
 .badge-icon { display: inline-flex; flex: 0 0 42px; width: 42px; height: 42px; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-size: 18px; overflow: hidden; }
 .badge-description { max-width: 240px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

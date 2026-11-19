@@ -8,13 +8,18 @@ export function useTablePagination<T>(source: Ref<T[]>, defaultSize = 10) {
   const page = ref(1)
   const size = ref(defaultSize)
 
-  const pagination = computed(() => ({
-    current: page.value,
-    pageSize: size.value,
-    total: unref(source).length,
-    showSizeChanger: true,
-    showTotal: (total: number) => `共 ${total} 条`
-  }))
+  // 没有数据时直接隐藏分页条，避免空列表底部留一条空白分页栏
+  const pagination = computed(() => {
+    const total = unref(source).length
+    if (!total) return false
+    return {
+      current: page.value,
+      pageSize: size.value,
+      total,
+      showSizeChanger: true,
+      showTotal: (value: number) => `共 ${value} 条`
+    }
+  })
 
   const pagedSource = computed(() => {
     const list = unref(source)

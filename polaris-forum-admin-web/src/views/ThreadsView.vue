@@ -32,7 +32,7 @@ const columns = [
   { title: '作者', key: 'author', width: 130 },
   { title: '状态', key: 'status', width: 250 },
   { title: '发布时间', dataIndex: 'createdAt', width: 170 },
-  { title: '操作', key: 'action', width: 330, fixed: 'right' }
+  { title: '操作', key: 'action', width: 330 }
 ]
 
 onMounted(() => {
@@ -122,8 +122,8 @@ function recommendThread(thread: Thread) {
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
-      <div class="table-scroll">
-        <a-table :columns="columns" :data-source="pagedThreads" :loading="loading" :pagination="pagination" :scroll="{ x: 1420 }" row-key="id" size="middle" @change="onTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !loading && !pagedThreads.length }">
+        <a-table :columns="columns" :data-source="pagedThreads" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
           <template #emptyText>
             <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
           </template>

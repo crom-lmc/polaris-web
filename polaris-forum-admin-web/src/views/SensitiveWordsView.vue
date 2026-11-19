@@ -24,7 +24,7 @@ const columns = [
   { title: '敏感词', dataIndex: 'word' },
   { title: '状态', key: 'status', width: 120 },
   { title: '创建时间', dataIndex: 'createdAt', width: 180 },
-  { title: '操作', key: 'action', width: 180, fixed: 'right' }
+  { title: '操作', key: 'action', width: 180 }
 ]
 
 onMounted(load)
@@ -110,8 +110,8 @@ function removeWord(word: SensitiveWord) {
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
-      <div class="table-scroll">
-        <a-table :columns="columns" :data-source="pagedWords" :loading="loading" :pagination="pagination" :scroll="{ x: 760 }" row-key="id" size="middle" @change="onTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !loading && !pagedWords.length }">
+        <a-table :columns="columns" :data-source="pagedWords" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
           <template #emptyText>
             <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
           </template>

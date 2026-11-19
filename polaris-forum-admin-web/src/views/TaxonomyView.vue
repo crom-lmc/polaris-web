@@ -61,7 +61,7 @@ const boardColumns = [
   { title: '排序', dataIndex: 'sortNo', width: 80 },
   { title: '状态', key: 'status', width: 100 },
   { title: '更新时间', dataIndex: 'updatedAt', width: 170 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' }
+  { title: '操作', key: 'action', width: 150 }
 ]
 const tagColumns = [
   { title: '标签', dataIndex: 'name', width: 220 },
@@ -69,7 +69,7 @@ const tagColumns = [
   { title: '使用次数', key: 'count', width: 100 },
   { title: '排序', dataIndex: 'sortNo', width: 80 },
   { title: '状态', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' }
+  { title: '操作', key: 'action', width: 150 }
 ]
 
 onMounted(() => {
@@ -263,8 +263,8 @@ async function toggleTag(tag: AdminTag) {
           </div>
         </a-card>
         <a-card class="table-card" :bordered="false">
-          <div class="table-scroll">
-            <a-table :columns="boardColumns" :data-source="pagedBoards" :loading="boardLoading" :pagination="boardPagination" :scroll="{ x: 1010 }" row-key="key" size="middle" @change="onBoardTableChange">
+          <div class="table-scroll" :class="{ 'is-empty': !boardLoading && !pagedBoards.length }">
+            <a-table :columns="boardColumns" :data-source="pagedBoards" :loading="boardLoading" :pagination="boardPagination" row-key="key" size="middle" @change="onBoardTableChange">
               <template #emptyText>
                 <a-empty v-if="!boardLoading" class="table-empty" description="暂无数据" />
               </template>
@@ -306,8 +306,8 @@ async function toggleTag(tag: AdminTag) {
           </div>
         </a-card>
         <a-card class="table-card" :bordered="false">
-          <div class="table-scroll">
-            <a-table :columns="tagColumns" :data-source="pagedTags" :loading="tagLoading" :pagination="tagPagination" :scroll="{ x: 830 }" row-key="id" size="middle" @change="onTagTableChange">
+          <div class="table-scroll" :class="{ 'is-empty': !tagLoading && !pagedTags.length }">
+            <a-table :columns="tagColumns" :data-source="pagedTags" :loading="tagLoading" :pagination="tagPagination" row-key="id" size="middle" @change="onTagTableChange">
               <template #emptyText>
                 <a-empty v-if="!tagLoading" class="table-empty" description="暂无数据" />
               </template>
@@ -374,6 +374,13 @@ async function toggleTag(tag: AdminTag) {
 </template>
 
 <style scoped>
+/* 页签内容撑满剩余高度：否则表格卡片拿不到确定高度，分页条会跟着内容走、不贴底 */
+.admin-page :deep(.ant-tabs) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.admin-page :deep(.ant-tabs-nav) { flex: 0 0 auto; margin-bottom: 10px; }
+.admin-page :deep(.ant-tabs-content-holder) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.admin-page :deep(.ant-tabs-content) { flex: 1; min-height: 0; }
+.admin-page :deep(.ant-tabs-tabpane) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.admin-page :deep(.ant-tabs-tabpane-hidden) { display: none !important; }
 .taxonomy-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .board-info { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
 .board-color { flex: 0 0 10px; width: 10px; height: 10px; margin-top: 7px; border-radius: 50%; }

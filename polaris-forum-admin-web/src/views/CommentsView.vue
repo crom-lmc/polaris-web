@@ -19,7 +19,7 @@ const columns = [
   { title: '作者', key: 'author', width: 140 },
   { title: '状态', key: 'status', width: 100 },
   { title: '时间', key: 'time', width: 170 },
-  { title: '操作', key: 'action', width: 100, fixed: 'right' }
+  { title: '操作', key: 'action', width: 100 }
 ]
 
 onMounted(load)
@@ -76,8 +76,8 @@ async function changeComment(comment: ForumComment) {
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
-      <div class="table-scroll">
-        <a-table :columns="columns" :data-source="pagedComments" :loading="loading" :pagination="pagination" :scroll="{ x: 990 }" row-key="id" size="middle" @change="onTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !loading && !pagedComments.length }">
+        <a-table :columns="columns" :data-source="pagedComments" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
           <template #emptyText>
             <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
           </template>
