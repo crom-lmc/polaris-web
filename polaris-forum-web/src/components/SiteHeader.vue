@@ -1,8 +1,8 @@
 <template>
   <header class="site-header">
     <div class="container header-inner">
-      <RouterLink to="/" class="brand" aria-label="Polaris Forum 首页">
-        <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" /><span class="brand-copy"><b>Polaris</b><small>FORUM</small></span>
+      <RouterLink to="/" class="brand" aria-label="Polaris 社区首页">
+        <img class="brand-mark" src="/favicon.svg" alt="" aria-hidden="true" /><span class="brand-copy"><b>Polaris</b></span>
       </RouterLink>
 
       <nav class="main-nav" aria-label="主导航">

@@ -68,9 +68,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; color: white; background: var(--primary); font-size: 21px; font-weight: 800; box-shadow: 0 5px 14px rgb(91 103 241 / 20%); }
 img.brand-mark { display: block; flex: none; object-fit: contain; background: transparent; }
 .brand-mark.small { width: 26px; height: 26px; border-radius: 7px; font-size: 14px; box-shadow: none; }
-.brand-copy { display: flex; flex-direction: column; line-height: 1; }
+.brand-copy { display: flex; align-items: center; line-height: 1; }
 .brand-copy b { font-size: 18px; letter-spacing: -.4px; }
-.brand-copy small { margin-top: 5px; color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: 2.4px; }
 .main-nav { display: flex; align-self: stretch; gap: 26px; }
 .main-nav a { position: relative; display: flex; align-items: center; color: #676d80; font-size: 14px; font-weight: 550; }
 .main-nav a:hover, .main-nav a.active, .main-nav a.router-link-exact-active { color: var(--primary); }
