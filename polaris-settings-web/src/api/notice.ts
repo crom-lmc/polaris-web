@@ -4,6 +4,8 @@ import request from './request'
 export interface NoticeRule {
   id: string
   code: string
+  /** 归属应用编码，空=通用 */
+  appCode: string
   module: string
   name: string
   titleTpl: string
@@ -20,6 +22,7 @@ export interface NoticeRule {
 
 export interface NoticeRulePayload {
   code?: string
+  appCode?: string
   module?: string
   name?: string
   titleTpl?: string

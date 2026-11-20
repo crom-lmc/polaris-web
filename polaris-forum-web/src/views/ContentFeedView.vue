@@ -37,7 +37,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { FileTextOutlined, CommentOutlined, MessageOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons-vue'
 import CommunitySidebar from '@/components/CommunitySidebar.vue'
 import ThreadCard from '@/components/ThreadCard.vue'
-import { fetchThreads } from '@/api/forum'
+import { fetchThreadsPage } from '@/api/forum'
 import { authReady, currentUser, requireLogin } from '@/auth'
 import type { Thread } from '@/types'
 
@@ -59,8 +59,10 @@ const loading = ref(false)
 const error = ref('')
 const pageSize = 20
 const currentPage = ref(1)
-const totalPages = computed(() => Math.max(1, Math.ceil(threads.value.length / pageSize)))
-const pagedThreads = computed(() => threads.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize))
+const totalCount = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize)))
+// 服务端已按页返回，前端不再切片
+const pagedThreads = computed(() => threads.value)
 // 页码多时只展示首尾与当前页附近，避免整排平铺后换行
 const visiblePages = computed<(number | '…')[]>(() => {
   const total = totalPages.value
@@ -87,11 +89,16 @@ async function load() {
   if (sort.value === 'following' && !authReady.value) return
   if (sort.value === 'following' && !currentUser.value) {
     threads.value = []
+    totalCount.value = 0
     if (!requireLogin('查看关注内容', `${route.path}?sort=following`)) return
   }
   loading.value = true
   error.value = ''
-  try { threads.value = await fetchThreads({ kind: contentType.value, sort: sort.value, board: board.value, q: keyword.value }) }
+  try {
+    const page = await fetchThreadsPage({ kind: contentType.value, sort: sort.value, board: board.value, q: keyword.value, page: currentPage.value, size: pageSize })
+    threads.value = page.records
+    totalCount.value = page.total
+  }
   catch (e) { error.value = e instanceof Error ? e.message : '请稍后重试' }
   finally { loading.value = false }
 }
@@ -104,6 +111,7 @@ function goPage(value: number) {
   if (value < 1 || value > totalPages.value) return
   currentPage.value = value
   window.scrollTo({ top: 0, behavior: 'smooth' })
+  void load()
 }
 watch([contentType, sort, keyword, board, authReady, currentUser], () => {
   currentPage.value = 1

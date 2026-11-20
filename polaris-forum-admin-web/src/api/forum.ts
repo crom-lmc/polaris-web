@@ -529,8 +529,20 @@ export function uploadBannerImage(file: File) {
   return request.post<never, UploadedImage>('/api/forum/admin/banner-images', form)
 }
 
+export interface AdminCommentPage {
+  records: ForumComment[]
+  total: number
+  page: number
+  size: number
+}
+
 export function fetchAdminComments(params: { keyword?: string; deleted?: string } = {}) {
   return request.get<never, ForumComment[]>('/api/forum/admin/comments', { params })
+}
+
+/** 评论分页查询，size 上限 50；管理端列表用此接口替代全量 comments。 */
+export function fetchAdminCommentsPage(params: { keyword?: string; deleted?: string; page?: number; size?: number } = {}) {
+  return request.get<never, AdminCommentPage>('/api/forum/admin/comments/page', { params })
 }
 
 export function updateAdminComment(id: string, deleted: boolean) {

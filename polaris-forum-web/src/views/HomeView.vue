@@ -37,7 +37,7 @@ import { SearchOutlined } from '@ant-design/icons-vue'
 import CarouselBanner from '@/components/CarouselBanner.vue'
 import CommunitySidebar from '@/components/CommunitySidebar.vue'
 import ThreadCard from '@/components/ThreadCard.vue'
-import { fetchBanners, fetchBoards, fetchThreads } from '@/api/forum'
+import { fetchBanners, fetchBoards, fetchThreadsPage } from '@/api/forum'
 import type { Banner, Board, Thread } from '@/types'
 
 const route = useRoute()
@@ -53,8 +53,10 @@ const loading = ref(false)
 const error = ref('')
 const pageSize = 20
 const currentPage = ref(1)
-const totalPages = computed(() => Math.max(1, Math.ceil(threads.value.length / pageSize)))
-const pagedThreads = computed(() => threads.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize))
+const totalCount = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize)))
+// 服务端已按页返回，前端不再切片
+const pagedThreads = computed(() => threads.value)
 // 页码多时只展示首尾与当前页附近，避免整排平铺后换行
 const visiblePages = computed<(number | '…')[]>(() => {
   const total = totalPages.value
@@ -84,7 +86,11 @@ const listTitle = computed(() => {
 async function load() {
   loading.value = true
   error.value = ''
-  try { threads.value = await fetchThreads({ board: board.value, q: keyword.value, sort: sort.value }) }
+  try {
+    const page = await fetchThreadsPage({ board: board.value, q: keyword.value, sort: sort.value, page: currentPage.value, size: pageSize })
+    threads.value = page.records
+    totalCount.value = page.total
+  }
   catch (e) { error.value = e instanceof Error ? e.message : '请稍后重试' }
   finally { loading.value = false }
 }
@@ -95,6 +101,7 @@ function goPage(value: number) {
   if (value < 1 || value > totalPages.value) return
   currentPage.value = value
   window.scrollTo({ top: 0, behavior: 'smooth' })
+  void load()
 }
 // 切换分类/搜索/排序后回到第一页，避免停在新筛选下不存在的页码
 watch([keyword, board, sort], () => {

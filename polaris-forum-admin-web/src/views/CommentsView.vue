@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import { fetchAdminComments, publicThreadUrl, updateAdminComment, type ForumComment } from '@/api/forum'
-import { useTablePagination } from '@/composables/useTablePagination'
+import { fetchAdminCommentsPage, publicThreadUrl, updateAdminComment, type ForumComment } from '@/api/forum'
 import { useUserStore } from '@/stores/user'
 
 const store = useUserStore()
 const comments = ref<ForumComment[]>([])
+const totalCount = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(20)
 const deleted = ref('')
 const keyword = ref('')
 const loading = ref(false)
 const savingId = ref('')
-const { pagination, pagedSource: pagedComments, reset: resetPage, onChange: onTableChange } = useTablePagination(comments)
+// 服务端分页：分页条按后端 total 渲染，翻页/改每页条数都重新请求
+const pagination = computed(() => {
+  if (!totalCount.value) return false
+  return {
+    current: currentPage.value,
+    pageSize: pageSize.value,
+    total: totalCount.value,
+    showSizeChanger: true,
+    showTotal: (value: number) => `共 ${value} 条`
+  }
+})
 const columns = [
   { title: '评论内容', key: 'content', width: 380 },
   { title: '帖子', key: 'thread', width: 100 },
@@ -27,10 +39,14 @@ onMounted(load)
 async function load() {
   loading.value = true
   try {
-    comments.value = await fetchAdminComments({
+    const page = await fetchAdminCommentsPage({
       deleted: deleted.value || undefined,
-      keyword: keyword.value.trim() || undefined
+      keyword: keyword.value.trim() || undefined,
+      page: currentPage.value,
+      size: pageSize.value
     })
+    comments.value = page.records
+    totalCount.value = page.total
   } catch (cause) {
     message.error(cause instanceof Error ? cause.message : '评论加载失败')
   } finally {
@@ -39,7 +55,13 @@ async function load() {
 }
 
 function reload() {
-  resetPage()
+  currentPage.value = 1
+  void load()
+}
+
+function onTableChange(pag: { current?: number; pageSize?: number }) {
+  currentPage.value = pag?.current || 1
+  pageSize.value = pag?.pageSize || pageSize.value
   void load()
 }
 
@@ -76,8 +98,8 @@ async function changeComment(comment: ForumComment) {
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
-      <div class="table-scroll" :class="{ 'is-empty': !loading && !pagedComments.length }">
-        <a-table :columns="columns" :data-source="pagedComments" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !loading && !comments.length }">
+        <a-table :columns="columns" :data-source="comments" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
           <template #emptyText>
             <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
           </template>

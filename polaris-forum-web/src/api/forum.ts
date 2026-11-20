@@ -87,6 +87,20 @@ export function fetchThreads(params: { kind?: string; board?: string; q?: string
   return get<Thread[]>(`/api/forum/public/threads${query.size ? `?${query}` : ''}`)
 }
 
+export interface ThreadPage {
+  records: Thread[]
+  total: number
+  page: number
+  size: number
+}
+
+/** 服务端分页列表：每页只取当前页摘要（不含正文），避免全量请求拖慢渲染。 */
+export function fetchThreadsPage(params: { kind?: string; board?: string; q?: string; sort?: string; page?: number; size?: number } = {}) {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== null && value !== '') query.set(key, String(value)) })
+  return get<ThreadPage>(`/api/forum/public/threads/page${query.size ? `?${query}` : ''}`)
+}
+
 export function fetchThread(id: string) {
   return get<Thread>(`/api/forum/public/threads/${id}`)
 }

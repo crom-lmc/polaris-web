@@ -30,7 +30,7 @@ import { MessageOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import CommunitySidebar from '@/components/CommunitySidebar.vue'
 import ThreadCard from '@/components/ThreadCard.vue'
 import { boards } from '@/data/forum'
-import { fetchThreads } from '@/api/forum'
+import { fetchThreadsPage } from '@/api/forum'
 import type { Thread } from '@/types'
 
 const route = useRoute()
@@ -43,7 +43,8 @@ const keyword = computed(() => String(route.query.q || ''))
 async function load() {
   loading.value = true
   error.value = ''
-  try { threads.value = await fetchThreads({ board: boardKey.value, q: keyword.value }) }
+  // 板块内容先取前 50 条摘要，避免大板块一次拉全量正文
+  try { threads.value = (await fetchThreadsPage({ board: boardKey.value, q: keyword.value, size: 50 })).records }
   catch (e) { error.value = e instanceof Error ? e.message : '请稍后重试' }
   finally { loading.value = false }
 }

@@ -115,7 +115,7 @@ import { CheckCircleOutlined, CloseOutlined, DownloadOutlined, EyeOutlined, Flag
 import ForumCommentItem from '@/components/ForumCommentItem.vue'
 import RichTextView from '@/components/RichTextView.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { createComment, createReport, favoriteThread, fetchComments, fetchThread, fetchThreads, toggleLike, unfavoriteThread, vote } from '@/api/forum'
+import { createComment, createReport, favoriteThread, fetchComments, fetchThread, fetchThreadsPage, toggleLike, unfavoriteThread, vote } from '@/api/forum'
 import { boards, formatTime } from '@/data/forum'
 import { currentUser, isLoggedIn, refreshCurrentUser, refreshUnreadCount, requireLogin } from '@/auth'
 import { cleanLiteralEscapes } from '@/utils/html'
@@ -181,8 +181,9 @@ async function load() {
     }
     selectedOptionIds.value = [...(detail.poll?.selectedOptionIds || [])]
     comments.value = commentList
-    const list = await fetchThreads({ board: detail.board })
-    related.value = list.filter(item => item.id !== id).slice(0, 3)
+    // 相关推荐取前 6 条摘要即可（过滤掉当前文章后取 3 条），不再拉全量正文
+    const page = await fetchThreadsPage({ board: detail.board, size: 6 })
+    related.value = page.records.filter(item => item.id !== id).slice(0, 3)
     await nextTick(scrollToComment)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '内容加载失败'
