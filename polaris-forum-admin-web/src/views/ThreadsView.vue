@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import {
-  fetchAdminThreads,
+  fetchAdminThreadsPage,
   fetchBoards,
   publicThreadUrl,
   updateAdminThread,
@@ -12,19 +12,30 @@ import {
   type Thread
 } from '@/api/forum'
 import { confirmAction } from '@/utils/confirm'
-import { useTablePagination } from '@/composables/useTablePagination'
 import { useUserStore } from '@/stores/user'
 
 const store = useUserStore()
 const threads = ref<Thread[]>([])
+const totalCount = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(20)
 const boards = ref<Board[]>([])
-const kind = ref('')
 const board = ref('')
 const deleted = ref('')
 const keyword = ref('')
 const loading = ref(false)
 const savingId = ref('')
-const { pagination, pagedSource: pagedThreads, reset: resetPage, onChange: onTableChange } = useTablePagination(threads)
+// 服务端分页：分页条按后端 total 渲染，翻页/改每页条数都重新请求
+const pagination = computed(() => {
+  if (!totalCount.value) return false
+  return {
+    current: currentPage.value,
+    pageSize: pageSize.value,
+    total: totalCount.value,
+    showSizeChanger: true,
+    showTotal: (value: number) => `共 ${value} 条`
+  }
+})
 const kindNames: Record<ContentKind, string> = { feed: '动态', topic: '话题', question: '问答', article: '文章' }
 const columns = [
   { title: '内容', key: 'content', width: 300 },
@@ -54,12 +65,15 @@ async function loadBoards() {
 async function load() {
   loading.value = true
   try {
-    threads.value = await fetchAdminThreads({
-      kind: kind.value || undefined,
+    const page = await fetchAdminThreadsPage({
       board: board.value || undefined,
       deleted: deleted.value || undefined,
-      keyword: keyword.value.trim() || undefined
+      keyword: keyword.value.trim() || undefined,
+      page: currentPage.value,
+      size: pageSize.value
     })
+    threads.value = page.records
+    totalCount.value = page.total
   } catch (cause) {
     message.error(cause instanceof Error ? cause.message : '内容加载失败')
   } finally {
@@ -68,7 +82,13 @@ async function load() {
 }
 
 function reload() {
-  resetPage()
+  currentPage.value = 1
+  void load()
+}
+
+function onTableChange(pag: { current?: number; pageSize?: number }) {
+  currentPage.value = pag?.current || 1
+  pageSize.value = pag?.pageSize || pageSize.value
   void load()
 }
 
@@ -103,13 +123,6 @@ function recommendThread(thread: Thread) {
     </header>
     <a-card class="filter-card" :bordered="false">
       <div class="filters">
-        <a-select v-model:value="kind" class="filter-select" @change="reload">
-          <a-select-option value="">全部类型</a-select-option>
-          <a-select-option value="feed">动态</a-select-option>
-          <a-select-option value="topic">话题</a-select-option>
-          <a-select-option value="question">问答</a-select-option>
-          <a-select-option value="article">文章</a-select-option>
-        </a-select>
         <a-select v-model:value="board" class="filter-select" @change="reload">
           <a-select-option value="">全部板块</a-select-option>
           <a-select-option v-for="item in boards" :key="item.key" :value="item.key">{{ item.name }}</a-select-option>
@@ -125,8 +138,8 @@ function recommendThread(thread: Thread) {
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
-      <div class="table-scroll" :class="{ 'is-empty': !loading && !pagedThreads.length }">
-        <a-table :columns="columns" :data-source="pagedThreads" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !loading && !threads.length }">
+        <a-table :columns="columns" :data-source="threads" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
           <template #emptyText>
             <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
           </template>

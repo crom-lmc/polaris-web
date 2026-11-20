@@ -234,6 +234,13 @@ export interface SensitiveWord {
   updatedAt?: string
 }
 
+export interface SensitiveWordPage {
+  records: SensitiveWord[]
+  total: number
+  page: number
+  size: number
+}
+
 export interface ExchangeRecord {
   id: string
   accountId: string
@@ -445,8 +452,20 @@ export function publicThreadUrl(id: string) {
   return `${FORUM_ORIGIN}/threads/${id}`
 }
 
+export interface AdminThreadPage {
+  records: Thread[]
+  total: number
+  page: number
+  size: number
+}
+
 export function fetchAdminThreads(params: { kind?: string; board?: string; keyword?: string; deleted?: string } = {}) {
   return request.get<never, Thread[]>('/api/forum/admin/threads', { params })
+}
+
+/** 内容分页查询，size 上限 50；管理端列表用此接口替代全量 threads。 */
+export function fetchAdminThreadsPage(params: { kind?: string; board?: string; keyword?: string; deleted?: string; page?: number; size?: number } = {}) {
+  return request.get<never, AdminThreadPage>('/api/forum/admin/threads/page', { params })
 }
 
 export function updateAdminThread(id: string, data: { deleted?: boolean; pinned?: boolean; solved?: boolean; recommended?: boolean }) {
@@ -551,6 +570,11 @@ export function updateAdminComment(id: string, deleted: boolean) {
 
 export function fetchSensitiveWords() {
   return request.get<never, SensitiveWord[]>('/api/forum/admin/sensitive-words')
+}
+
+/** 敏感词分页查询，size 上限 50；管理端列表用此接口替代全量 sensitive-words。 */
+export function fetchSensitiveWordsPage(params: { page?: number; size?: number } = {}) {
+  return request.get<never, SensitiveWordPage>('/api/forum/admin/sensitive-words/page', { params })
 }
 
 export function createSensitiveWord(word: string) {

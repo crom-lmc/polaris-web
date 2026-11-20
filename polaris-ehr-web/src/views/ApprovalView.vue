@@ -9,8 +9,8 @@
             <span class="tab">
               {{ t.label }}
               <a-badge
-                v-if="t.key === 'todo' && approvalRows.length"
-                :count="approvalRows.length"
+                v-if="t.key === 'todo' && todoCount > 0"
+                :count="todoCount"
                 :overflow-count="99"
                 class="badge"
               />
@@ -400,6 +400,8 @@ watch([visibleTabs, () => route.query.tab], ([, requested]) => {
 /* ---------------- 审批中心实例（五视图） ---------------- */
 const approvalRows = ref<ApprovalInstance[]>([])
 const approvalLoading = ref(false)
+/** 「待我审批」角标单独维护：五个页签共用 approvalRows，切页签时不能把它替换成别的列表条数 */
+const todoCount = ref(0)
 
 const isApprovalTab = computed(() => APPROVAL_TABS.includes(tab.value))
 
@@ -449,15 +451,19 @@ function fmtTime(s?: string) {
 async function loadApprovals() {
   const scope = SCOPE_BY_TAB[tab.value]
   if (!scope) return
+  const isTodo = tab.value === 'todo'
   approvalLoading.value = true
   // 切换页签时先清空：五视图共用 approvalRows，不清空会在异步返回前短暂残留上一页签
-  // （如「我发起的」）的数据，导致「待我审批」角标闪一下旧数字、列表先显示旧内容。
+  // （如「我发起的」）的数据，导致列表先显示旧内容。
   approvalRows.value = []
   try {
     approvalRows.value = (await fetchApprovals(scope)) || []
+    // 待办角标只在「待我审批」加载时更新，其它页签的条数不覆盖它
+    if (isTodo) todoCount.value = approvalRows.value.length
   } catch (e: any) {
     message.error(e?.message || '加载审批单失败')
     approvalRows.value = []
+    if (isTodo) todoCount.value = 0
   } finally {
     approvalLoading.value = false
   }
@@ -721,6 +727,13 @@ async function doCancel(row: ResignApplyItem) {
 onMounted(() => {
   mounted = true
   reload()
+  // 默认不在「待我审批」页签时，角标也需要一个准确的待办数；
+  // 只取条数，不写入 approvalRows，避免用其它页签的数据覆盖当前列表。
+  if (tab.value !== 'todo') {
+    void fetchApprovals('pending')
+      .then((rows) => { todoCount.value = (rows || []).length })
+      .catch(() => { /* 角标取不到不影响主流程 */ })
+  }
 })
 </script>
 

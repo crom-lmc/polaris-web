@@ -8,6 +8,8 @@ const props = defineProps<{ banners: Banner[] }>()
 const items = computed(() => props.banners.filter(banner => !!banner.imageUrl))
 const active = ref(0)
 const paused = ref(false)
+// 图片按ID记录加载状态：缓存命中时立即淡入，未命中时用底色占位平滑过渡，避免大片空白突然闪出
+const loaded = ref<Record<string, boolean>>({})
 let timer: ReturnType<typeof setInterval> | null = null
 
 function go(index: number) {
@@ -43,8 +45,10 @@ onUnmounted(stop)
 <template>
   <div v-if="items.length" class="banner-carousel" @mouseenter="paused = true" @mouseleave="paused = false">
     <div class="banner-track" :style="{ transform: `translateX(-${active * 100}%)` }">
-      <div v-for="banner in items" :key="banner.id" class="banner-slide" @click="open(banner)">
-        <img :src="banner.imageUrl!" :alt="banner.title || '轮播图'" />
+      <div v-for="(banner, index) in items" :key="banner.id" class="banner-slide" @click="open(banner)">
+        <img :src="banner.imageUrl!" :alt="banner.title || '轮播图'"
+             :loading="index === 0 ? 'eager' : 'lazy'" :class="{ loaded: loaded[banner.id] }"
+             @load="loaded[banner.id] = true" />
       </div>
     </div>
     <template v-if="items.length > 1">
@@ -69,7 +73,8 @@ onUnmounted(stop)
 }
 .banner-track { display: flex; height: 100%; transition: transform .5s ease; }
 .banner-slide { flex: 0 0 100%; height: 100%; cursor: pointer; line-height: 0; }
-.banner-slide img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.banner-slide img { width: 100%; height: 100%; display: block; object-fit: cover; opacity: 0; transition: opacity .35s ease; }
+.banner-slide img.loaded { opacity: 1; }
 .banner-arrow {
   position: absolute;
   top: 50%;

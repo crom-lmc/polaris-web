@@ -1,16 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   createSensitiveWord,
   deleteSensitiveWord,
-  fetchSensitiveWords,
+  fetchSensitiveWordsPage,
   updateSensitiveWord,
   type SensitiveWord
 } from '@/api/forum'
 import { confirmAction } from '@/utils/confirm'
-import { useTablePagination } from '@/composables/useTablePagination'
 
 import { useUserStore } from '@/stores/user'
 const words = ref<SensitiveWord[]>([])
@@ -19,7 +18,20 @@ const newWord = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const savingId = ref('')
-const { pagination, pagedSource: pagedWords, reset: resetPage, onChange: onTableChange } = useTablePagination(words)
+const totalCount = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(20)
+// 服务端分页：分页条按后端 total 渲染，翻页/改每页条数都重新请求
+const pagination = computed(() => {
+  if (!totalCount.value) return false
+  return {
+    current: currentPage.value,
+    pageSize: pageSize.value,
+    total: totalCount.value,
+    showSizeChanger: true,
+    showTotal: (value: number) => `共 ${value} 条`
+  }
+})
 const columns = [
   { title: '敏感词', dataIndex: 'word' },
   { title: '状态', key: 'status', width: 120 },
@@ -32,7 +44,9 @@ onMounted(load)
 async function load() {
   loading.value = true
   try {
-    words.value = await fetchSensitiveWords()
+    const page = await fetchSensitiveWordsPage({ page: currentPage.value, size: pageSize.value })
+    words.value = page.records
+    totalCount.value = page.total
   } catch (cause) {
     message.error(cause instanceof Error ? cause.message : '敏感词加载失败')
   } finally {
@@ -41,7 +55,13 @@ async function load() {
 }
 
 function reload() {
-  resetPage()
+  currentPage.value = 1
+  void load()
+}
+
+function onTableChange(pag: { current?: number; pageSize?: number }) {
+  currentPage.value = pag?.current || 1
+  pageSize.value = pag?.pageSize || pageSize.value
   void load()
 }
 
@@ -89,6 +109,9 @@ function removeWord(word: SensitiveWord) {
         await deleteSensitiveWord(word.id)
         words.value = words.value.filter((item) => item.id !== word.id)
         message.success('敏感词已删除')
+        // 删光当前页时回退一页，再按后端总数刷新
+        if (!words.value.length && currentPage.value > 1) currentPage.value -= 1
+        void load()
       } catch (cause) {
         message.error(cause instanceof Error ? cause.message : '删除失败')
       }
@@ -111,8 +134,8 @@ function removeWord(word: SensitiveWord) {
       </div>
     </a-card>
     <a-card class="table-card" :bordered="false">
-      <div class="table-scroll" :class="{ 'is-empty': !loading && !pagedWords.length }">
-        <a-table :columns="columns" :data-source="pagedWords" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
+      <div class="table-scroll" :class="{ 'is-empty': !loading && !words.length }">
+        <a-table :columns="columns" :data-source="words" :loading="loading" :pagination="pagination" row-key="id" size="middle" @change="onTableChange">
           <template #emptyText>
             <a-empty v-if="!loading" class="table-empty" description="暂无数据" />
           </template>
