@@ -432,6 +432,10 @@ const HR_ORG_NAME_KEY = 'ehr.notice.hr-org-name'
 const CITY_POLICY_KEY = 'ehr.leave.city-policy'
 /** 社区等级数量上限：数字输入，值为 {"maxLevel": 20} */
 const MAX_LEVELS_KEY = 'forum.level.max-levels'
+/** 论坛积分抽奖开关：布尔，值为 {"enabled": true/false} */
+const FORUM_LOTTERY_KEY = 'forum.lottery.enabled'
+/** 论坛礼品兑换开关：布尔，值为 {"enabled": true/false} */
+const FORUM_EXCHANGE_KEY = 'forum.exchange.enabled'
 const COMMON_APP = '__common__'
 
 const store = useUserStore()
@@ -618,7 +622,9 @@ const EDITOR_BY_CODE: Record<string, EmbedEditor> = {
   [PROBATION_OFFSETS_KEY]: 'offsets',
   [CONTRACT_OFFSETS_KEY]: 'offsets',
   [HR_ORG_NAME_KEY]: 'orgs',
-  [MAX_LEVELS_KEY]: 'number'
+  [MAX_LEVELS_KEY]: 'number',
+  [FORUM_LOTTERY_KEY]: 'switch',
+  [FORUM_EXCHANGE_KEY]: 'switch'
 }
 const editor = computed<EmbedEditor>(() => EDITOR_BY_CODE[currentCode.value] || 'unknown')
 
@@ -734,7 +740,7 @@ function applyStructured(code: string, raw: string) {
     roleCodes.value = Array.isArray(obj.roleCodes) ? obj.roleCodes.map(String) : []
   } else if (code === DEFAULT_APPS_KEY) {
     defaultApps.value = Array.isArray(obj.apps) ? obj.apps.map(String) : []
-  } else if (code === MOCK_ENABLED_KEY) {
+  } else if (code === MOCK_ENABLED_KEY || code === FORUM_LOTTERY_KEY || code === FORUM_EXCHANGE_KEY) {
     mockEnabled.value = obj.enabled === true
   } else if (code === MAX_LEVELS_KEY) {
     const n = Number(obj.maxLevel)
