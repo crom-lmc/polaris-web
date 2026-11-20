@@ -9,11 +9,13 @@ export interface ForumTag {
 
 export interface Board {
   key: string
+  parentKey?: string
   name: string
   description: string
   count: number
   color: string
   tags?: ForumTag[]
+  children?: Board[]
 }
 
 export interface Author {
@@ -106,6 +108,8 @@ export interface ExchangeRecord {
   username?: string
   giftName: string
   points: number
+  /** EXCHANGE 积分兑换、LOTTERY 抽奖中奖 */
+  source?: 'EXCHANGE' | 'LOTTERY'
   status: 'PENDING_ISSUE' | 'SHIPPING' | 'ISSUED'
   trackingNo?: string
   createdAt: string
@@ -140,7 +144,13 @@ export interface Member {
   website?: string
   points: number
   totalPoints?: number
+  experience?: number
   level?: number
+  levelName?: string
+  levelColor?: string
+  nextLevel?: number
+  experienceToNext?: number
+  levelProgress?: number
   threadsCount: number
   commentsCount?: number
   likesReceived: number
@@ -186,7 +196,7 @@ export interface Badge {
   awardedAt?: string
 }
 
-export type NotificationType = 'THREAD_COMMENT' | 'COMMENT_REPLY' | 'BADGE_AWARDED' | 'REPORT_RESULT'
+export type NotificationType = 'THREAD_COMMENT' | 'COMMENT_REPLY' | 'THREAD_LIKE' | 'BADGE_AWARDED' | 'REPORT_RESULT'
 
 export interface ForumNotification {
   id: string
@@ -212,6 +222,15 @@ export interface PointLog {
   createdAt: string
 }
 
+export interface Banner {
+  id: string
+  title: string
+  imageUrl: string | null
+  linkUrl: string
+  sortNo?: number
+  enabled?: boolean
+}
+
 export interface FriendLink {
   id: string
   name: string
@@ -224,6 +243,12 @@ export interface SiteConfig {
   aboutContent: string
   footerText: string
   friendLinks: FriendLink[]
+}
+
+/** 功能开关（抽奖/兑换），来自配置中心埋点 */
+export interface FeatureFlags {
+  lotteryEnabled: boolean
+  exchangeEnabled: boolean
 }
 
 export type ReportTargetType = 'thread' | 'comment'
@@ -240,6 +265,12 @@ export interface Prize {
   name: string
   points: number
   color: string
+  /** POINTS 积分、GIFT 礼品 */
+  prizeType?: 'POINTS' | 'GIFT'
+  giftId?: string
+  giftName?: string
+  giftImageUrl?: string
+  giftPoints?: number
 }
 
 export interface Gift {
@@ -250,4 +281,44 @@ export interface Gift {
   points: number
   stock: number
   icon: string
+  imageUrl?: string
+  /** 兑换所需最低社区等级，默认 1 */
+  minLevel?: number
+}
+
+/** 社区等级定义 */
+export interface ForumLevel {
+  id: string
+  levelNo: number
+  name: string
+  minExperience: number
+  color: string
+  icon: string
+  description: string
+  privileges: string
+  sortNo: number
+  enabled: boolean
+}
+
+/** 经验获取规则 */
+export interface ExperienceRule {
+  id: string
+  ruleKey: string
+  name: string
+  experience: number
+  sortNo: number
+  enabled: boolean
+}
+
+/** 社区等级晋升路线 */
+export interface LevelRoute {
+  levels: ForumLevel[]
+  currentLevel: number
+  currentLevelName: string
+  currentLevelColor: string
+  nextLevel: number | null
+  nextLevelName: string
+  experienceToNext: number
+  progress: number
+  totalExperience: number
 }

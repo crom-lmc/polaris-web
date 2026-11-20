@@ -5,11 +5,18 @@ import { useUserStore } from '@/stores/user'
 const store = useUserStore()
 const target = computed(() => {
   const pages = [
+    { path: '/', perm: 'forum:overview' },
     { path: '/threads', perm: 'forum:content' },
     { path: '/comments', perm: 'forum:comment' },
+    { path: '/reports', perm: 'forum:report' },
+    { path: '/taxonomy', perm: 'forum:taxonomy' },
+    { path: '/site', perm: 'forum:site' },
     { path: '/sensitive-words', perm: 'forum:sensitive' },
     { path: '/exchanges', perm: 'forum:exchange' },
-    { path: '/badges', perm: 'forum:badge' }
+    { path: '/gifts', perm: 'forum:gift' },
+    { path: '/badges', perm: 'forum:badge' },
+    { path: '/levels', perm: 'forum:level' },
+    { path: '/lottery', perm: 'forum:lottery' }
   ]
   return pages.find((page) => store.can(page.perm))?.path || ''
 })

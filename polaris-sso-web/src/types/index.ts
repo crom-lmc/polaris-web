@@ -275,3 +275,19 @@ export interface ApprovalContext {
   actions?: string[]
   myTaskId?: string | null
 }
+
+/** 账号中心概览统计（GET /api/accounts/overview） */
+export interface OverviewVO {
+  accountCount: number
+  appCount: number
+  roleCount: number
+  permissionCount: number
+  todayLoginCount: number
+  monthNewAccountCount: number
+  /** 近 14 天登录趋势，日期升序 */
+  loginTrend: Array<{ date: string; success: number; fail: number }>
+  /** 账号状态分布 */
+  accountStatus: Array<{ name: string; value: number }>
+  /** 登录方式分布 */
+  loginTypes: Array<{ name: string; value: number }>
+}

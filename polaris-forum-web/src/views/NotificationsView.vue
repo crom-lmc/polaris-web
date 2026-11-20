@@ -3,7 +3,7 @@
     <section class="profile-heading"><div><span class="eyebrow">FORUM MESSAGES</span><h1>论坛消息</h1><p>评论、回复、勋章获得记录和举报处理结果只保存在论坛消息中心。</p></div><button class="secondary-button" :disabled="!unreadCount || readingAll" @click="readAll"><check-outlined />{{ readingAll ? '处理中…' : '全部已读' }}</button></section>
     <section class="panel notification-card">
       <div class="notification-filters">
-        <div class="notification-type-tabs"><button :class="{ active: type === '' }" @click="type = ''">全部消息</button><button :class="{ active: type === 'THREAD_COMMENT' }" @click="type = 'THREAD_COMMENT'">帖子评论</button><button :class="{ active: type === 'COMMENT_REPLY' }" @click="type = 'COMMENT_REPLY'">评论回复</button><button :class="{ active: type === 'BADGE_AWARDED' }" @click="type = 'BADGE_AWARDED'">勋章通知</button><button :class="{ active: type === 'REPORT_RESULT' }" @click="type = 'REPORT_RESULT'">举报结果</button></div>
+        <div class="notification-type-tabs"><button v-for="tab in tabs" :key="tab.key" :class="{ active: type === tab.key }" @click="type = tab.key">{{ tab.label }}<span v-if="badgeOf(tab.key)" class="tab-unread-badge">{{ badgeOf(tab.key) > 99 ? '99+' : badgeOf(tab.key) }}</span></button></div>
         <label class="unread-filter"><input v-model="unreadOnly" type="checkbox" />仅看未读</label>
       </div>
       <p v-if="actionError" class="form-message error" role="alert">{{ actionError }}</p>
@@ -24,8 +24,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { BellOutlined, CheckOutlined, CommentOutlined, FlagOutlined, MessageOutlined, RightOutlined, TrophyOutlined } from '@ant-design/icons-vue'
-import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '@/api/forum'
+import { BellOutlined, CheckOutlined, CommentOutlined, FlagOutlined, HeartOutlined, MessageOutlined, RightOutlined, TrophyOutlined } from '@ant-design/icons-vue'
+import { fetchNotifications, fetchUnreadCounts, markAllNotificationsRead, markNotificationRead } from '@/api/forum'
 import { refreshUnreadCount, unreadCount } from '@/auth'
 import { formatTime } from '@/data/forum'
 import type { ForumNotification, NotificationType } from '@/types'
@@ -39,9 +39,27 @@ const readingId = ref('')
 const readingAll = ref(false)
 const error = ref('')
 const actionError = ref('')
-const typeNames: Record<NotificationType, string> = { THREAD_COMMENT: '帖子评论', COMMENT_REPLY: '评论回复', BADGE_AWARDED: '勋章通知', REPORT_RESULT: '举报处理结果' }
-const typeIcons = { THREAD_COMMENT: CommentOutlined, COMMENT_REPLY: MessageOutlined, BADGE_AWARDED: TrophyOutlined, REPORT_RESULT: FlagOutlined }
+const typeNames: Record<NotificationType, string> = { THREAD_COMMENT: '帖子评论', COMMENT_REPLY: '评论回复', THREAD_LIKE: '点赞消息', BADGE_AWARDED: '勋章通知', REPORT_RESULT: '举报处理结果' }
+const typeIcons = { THREAD_COMMENT: CommentOutlined, COMMENT_REPLY: MessageOutlined, THREAD_LIKE: HeartOutlined, BADGE_AWARDED: TrophyOutlined, REPORT_RESULT: FlagOutlined }
+// 分类 tab：key 为空表示全部；角标取对应类型的未读数
+const tabs: { key: NotificationType | ''; label: string }[] = [
+  { key: '', label: '全部消息' },
+  { key: 'THREAD_COMMENT', label: '帖子评论' },
+  { key: 'COMMENT_REPLY', label: '评论回复' },
+  { key: 'THREAD_LIKE', label: '点赞消息' },
+  { key: 'BADGE_AWARDED', label: '勋章通知' },
+  { key: 'REPORT_RESULT', label: '举报结果' }
+]
+const unreadCounts = ref<Record<string, number>>({})
+function badgeOf(key: NotificationType | ''): number {
+  return unreadCounts.value[key || 'ALL'] || 0
+}
+async function loadUnreadCounts() {
+  try { unreadCounts.value = await fetchUnreadCounts() }
+  catch { unreadCounts.value = {} }
+}
 watch([type, unreadOnly], load, { immediate: true })
+loadUnreadCounts()
 
 async function load() {
   loading.value = true
@@ -59,6 +77,7 @@ async function markRead(item: ForumNotification) {
     await markNotificationRead(item.id)
     item.readAt = new Date().toISOString()
     await refreshUnreadCount()
+    await loadUnreadCounts()
     if (unreadOnly.value) notifications.value = notifications.value.filter(notification => notification.id !== item.id)
   } catch (cause) {
     actionError.value = cause instanceof Error ? cause.message : '标记已读失败'
@@ -75,6 +94,7 @@ async function readAll() {
     const now = new Date().toISOString()
     notifications.value.forEach(item => { item.readAt = item.readAt || now })
     unreadCount.value = 0
+    unreadCounts.value = {}
     if (unreadOnly.value) notifications.value = []
   } catch (cause) {
     actionError.value = cause instanceof Error ? cause.message : '全部已读失败'
@@ -87,7 +107,7 @@ async function open(item: ForumNotification) {
   if (!item.readAt) await markRead(item)
   if (item.type === 'BADGE_AWARDED') {
     router.push('/badges')
-  } else if (item.type === 'REPORT_RESULT' && item.threadId) {
+  } else if ((item.type === 'REPORT_RESULT' || item.type === 'THREAD_LIKE') && item.threadId) {
     router.push(`/threads/${item.threadId}`)
   } else if (item.threadId) {
     router.push({ path: `/threads/${item.threadId}`, hash: `#comment-${item.bizId}` })

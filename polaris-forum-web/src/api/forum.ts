@@ -1,5 +1,5 @@
 import { del, get, patch, post, put, upload } from './request'
-import type { Badge, Board, ContentKind, ExchangeRecord, ForumAttachment, ForumComment, ForumDraft, ForumNotification, ForumTag, Gift, Member, MemberRelation, NotificationType, PointLog, PollInput, Prize, ReportInput, SiteConfig, Thread } from '@/types'
+import type { Badge, Banner, Board, ContentKind, ExchangeRecord, ExperienceRule, FeatureFlags, ForumAttachment, ForumComment, ForumDraft, ForumLevel, ForumNotification, ForumTag, Gift, LevelRoute, Member, MemberRelation, NotificationType, PointLog, PollInput, Prize, ReportInput, SiteConfig, Thread } from '@/types'
 
 export interface TokenResult {
   accessToken: string
@@ -18,6 +18,7 @@ export interface MeInfo {
 }
 
 export interface RewardConfig {
+  mode: 'SQUARE' | 'WHEEL'
   prizes: Prize[]
   gifts: Gift[]
   lotteryCost: number
@@ -47,6 +48,18 @@ export function fetchMe() {
   return get<MeInfo>('/api/forum/me')
 }
 
+/** 按应用编码查询 SSO 登记的应用名（公开只读，供浏览器标签标题用；取不到返回空串） */
+export async function fetchAppName(appCode: string): Promise<string> {
+  try {
+    const info = await get<{ code: string; name: string }>(
+      `/api/applications/public/${encodeURIComponent(appCode)}`
+    )
+    return info?.name || ''
+  } catch {
+    return ''
+  }
+}
+
 export function fetchBoards() {
   return get<Board[]>('/api/forum/public/boards')
 }
@@ -57,6 +70,15 @@ export function fetchTags(board: string) {
 
 export function fetchSite() {
   return get<SiteConfig>('/api/forum/public/site')
+}
+
+/** 功能开关（抽奖/兑换），来自配置中心埋点 */
+export function fetchFeatureFlags() {
+  return get<FeatureFlags>('/api/forum/public/features')
+}
+
+export function fetchBanners() {
+  return get<Banner[]>('/api/forum/public/banners')
 }
 
 export function fetchThreads(params: { kind?: string; board?: string; q?: string; sort?: string } = {}) {
@@ -181,8 +203,28 @@ export function fetchPointsRanking(limit = 10) {
   return get<Member[]>(`/api/forum/public/ranking/points?limit=${limit}`)
 }
 
+/** 等级排行：按累计经验降序（经验决定等级） */
+export function fetchLevelRanking(limit = 10) {
+  return get<Member[]>(`/api/forum/public/ranking/level?limit=${limit}`)
+}
+
 export function fetchPublicBadges() {
   return get<Badge[]>('/api/forum/public/badges')
+}
+
+/** 社区等级晋升路线（含登录用户当前进度） */
+export function fetchLevelRoute() {
+  return get<LevelRoute>('/api/forum/public/levels')
+}
+
+/** 社区等级定义列表 */
+export function fetchLevels() {
+  return get<ForumLevel[]>('/api/forum/public/levels/definitions')
+}
+
+/** 经验获取规则（发帖/回复各加多少经验） */
+export function fetchExperienceRules() {
+  return get<ExperienceRule[]>('/api/forum/public/experience-rules')
 }
 
 export function fetchProfile() {
@@ -227,6 +269,11 @@ export function fetchNotifications(params: { type?: NotificationType | ''; unrea
 
 export function fetchUnreadCount() {
   return get<{ count: number }>('/api/forum/notifications/unread-count')
+}
+
+/** 按类型分组的未读消息数（key 为通知类型，ALL 为合计），供分类角标展示。 */
+export function fetchUnreadCounts() {
+  return get<Record<string, number>>('/api/forum/notifications/unread-counts')
 }
 
 export function markNotificationRead(id: string) {

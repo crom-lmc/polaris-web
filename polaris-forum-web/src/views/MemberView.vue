@@ -8,7 +8,7 @@
         <div class="member-hero-content">
           <UserAvatar class="member-page-avatar" :name="displayName" :avatar-url="member.avatarUrl" :size="104" />
           <div class="member-identity">
-            <div><h1>{{ displayName }}</h1><span class="level-badge">Lv.{{ member.level || 1 }}</span></div>
+            <div><h1>{{ displayName }}</h1><span class="level-badge" :style="member.levelColor ? { color: '#fff', background: member.levelColor } : {}">Lv.{{ member.level || 1 }} {{ member.levelName || '社区成员' }}</span></div>
             <p>@{{ member.username }}<span v-if="member.location"> · {{ member.location }}</span></p>
             <p class="member-bio">{{ member.bio || '这位成员还没有填写个人简介。' }}</p>
             <a v-if="safeWebsite" :href="safeWebsite" target="_blank" rel="noopener noreferrer" class="member-website"><link-outlined />{{ member.website }}</a>
@@ -37,9 +37,6 @@
             <button :class="{ active: section === 'followers' }" @click="selectSection('followers')">粉丝 {{ followerTotal }}</button>
           </div>
           <template v-if="section === 'threads'">
-            <div class="member-thread-tabs member-kind-tabs">
-              <button v-for="tab in tabs" :key="tab.value" :class="{ active: kind === tab.value }" @click="kind = tab.value">{{ tab.label }}</button>
-            </div>
             <div v-if="threadsLoading" class="compact-state">正在加载发布内容…</div>
             <div v-else-if="threadsError" class="compact-state error-state"><p>{{ threadsError }}</p><button class="secondary-button" @click="loadThreads">重新加载</button></div>
             <div v-else-if="threads.length"><ThreadCard v-for="thread in threads" :key="thread.id" :thread="thread" /></div>
@@ -61,18 +58,22 @@
 
         <aside class="member-side">
           <section class="panel sidebar-section member-badges-card">
-            <div class="member-section-heading"><h2>已获得勋章</h2><RouterLink to="/badges">勋章墙</RouterLink></div>
+            <div class="member-section-heading"><h2><trophy-outlined class="section-title-icon" />已获得勋章</h2><RouterLink to="/badges">勋章墙<right-outlined class="section-more-arrow" /></RouterLink></div>
             <div v-if="member.badges?.length" class="member-badge-list">
               <div v-for="badge in member.badges" :key="badge.id" class="member-badge-summary">
-                <span class="badge-icon" :style="{ color: badge.color, background: `${badge.color}18` }"><span v-if="badge.icon">{{ badge.icon }}</span><trophy-outlined v-else /></span>
-                <div><b>{{ badge.name }}</b><small>{{ badge.description }}</small></div>
+                <span class="badge-icon" :style="{ color: badge.color, background: `${badge.color}1f` }"><span v-if="badge.icon" class="badge-glyph">{{ badge.icon }}</span><trophy-outlined v-else /></span>
+                <div class="member-badge-copy"><b>{{ badge.name }}</b><small>{{ badge.description }}</small></div>
               </div>
             </div>
             <p v-else class="compact-state">还没有获得勋章</p>
           </section>
           <section class="panel sidebar-section member-about-card">
-            <div class="member-section-heading"><h2>个人资料</h2></div>
-            <dl><div><dt>论坛账号</dt><dd>{{ member.username }}</dd></div><div><dt>社区等级</dt><dd>Lv.{{ member.level || 1 }}</dd></div><div v-if="member.location"><dt>所在地</dt><dd>{{ member.location }}</dd></div></dl>
+            <div class="member-section-heading"><h2><idcard-outlined class="section-title-icon" />个人资料</h2></div>
+            <dl class="member-about-list">
+              <div><dt><user-outlined />论坛账号</dt><dd class="about-username">{{ member.username }}</dd></div>
+              <div><dt><trophy-outlined />社区等级</dt><dd><span class="level-badge" :style="member.levelColor ? { color: '#fff', background: member.levelColor } : {}">Lv.{{ member.level || 1 }} {{ member.levelName || '社区成员' }}</span><small class="about-level-exp">累计 {{ member.experience ?? 0 }} 经验</small></dd></div>
+              <div v-if="member.location"><dt><environment-outlined />所在地</dt><dd>{{ member.location }}</dd></div>
+            </dl>
           </section>
         </aside>
       </div>
@@ -83,17 +84,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { CheckOutlined, EditOutlined, FileTextOutlined, LinkOutlined, RightOutlined, TrophyOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons-vue'
+import { CheckOutlined, EditOutlined, EnvironmentOutlined, FileTextOutlined, IdcardOutlined, LinkOutlined, RightOutlined, TrophyOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons-vue'
 import ThreadCard from '@/components/ThreadCard.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { fetchMember, fetchMemberRelations, fetchMemberThreads, followMember, unfollowMember } from '@/api/forum'
 import { currentUser, requireLogin } from '@/auth'
-import type { ContentKind, Member, MemberRelation, Thread } from '@/types'
+import type { Member, MemberRelation, Thread } from '@/types'
 
 const route = useRoute()
 const member = ref<Member | null>(null)
 const threads = ref<Thread[]>([])
-const kind = ref<ContentKind | ''>('')
 const loading = ref(true)
 const threadsLoading = ref(false)
 const error = ref('')
@@ -104,9 +104,6 @@ const relationsLoading = ref(false)
 const relationsError = ref('')
 const followPending = ref(false)
 const followError = ref('')
-const tabs: { label: string; value: ContentKind | '' }[] = [
-  { label: '全部', value: '' }, { label: '动态', value: 'feed' }, { label: '话题', value: 'topic' }, { label: '问答', value: 'question' }, { label: '文章', value: 'article' }
-]
 const displayName = computed(() => member.value?.displayName || member.value?.nickname || member.value?.username || '')
 const isOwn = computed(() => Boolean(currentUser.value?.accountId) && currentUser.value?.accountId === routeAccountId())
 const followerTotal = computed(() => member.value?.followersCount ?? 0)
@@ -119,7 +116,6 @@ const safeWebsite = computed(() => {
 })
 
 watch(() => route.params.accountId, load, { immediate: true })
-watch(kind, loadThreads)
 watch(() => currentUser.value?.accountId, (accountId, previousAccountId) => {
   if (member.value && accountId !== previousAccountId) load()
 })
@@ -139,7 +135,6 @@ async function load() {
   loading.value = true
   error.value = ''
   member.value = null
-  kind.value = ''
   section.value = 'threads'
   relations.value = []
   followError.value = ''
@@ -159,7 +154,7 @@ async function loadThreads() {
   if (!member.value || !/^[1-9]\d*$/.test(accountId)) return
   threadsLoading.value = true
   threadsError.value = ''
-  try { threads.value = await fetchMemberThreads(accountId, kind.value) }
+  try { threads.value = await fetchMemberThreads(accountId) }
   catch (cause) { threadsError.value = cause instanceof Error ? cause.message : '发布内容加载失败' }
   finally { threadsLoading.value = false }
 }

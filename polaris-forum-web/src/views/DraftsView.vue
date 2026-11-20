@@ -2,7 +2,7 @@
   <div class="container drafts-page">
     <section class="editor-heading">
       <div><span class="eyebrow">MY DRAFTS</span><h1>我的草稿</h1><p>草稿保存在服务端，可在不同设备继续编辑和发布。</p></div>
-      <RouterLink to="/new?type=topic" class="primary-button"><plus-outlined />新建内容</RouterLink>
+      <RouterLink to="/new" class="primary-button"><plus-outlined />新建内容</RouterLink>
     </section>
     <p v-if="error" class="form-message error" role="alert">{{ error }}</p>
     <p v-if="message" class="form-message success">{{ message }}</p>
@@ -11,13 +11,13 @@
     <section v-else class="panel draft-list">
       <article v-for="draft in drafts" :key="draft.id" class="draft-row">
         <div class="draft-copy">
-          <div><span class="content-kind-tag" :class="draft.kind">{{ kindNames[draft.kind] }}</span><span class="draft-board">{{ draft.board }}</span></div>
+          <div><span class="draft-board">{{ draft.board }}</span></div>
           <h2>{{ draft.title || plainText(draft.content).slice(0, 60) || '未命名草稿' }}</h2>
           <p>{{ plainText(draft.content) || '尚未填写正文' }}</p>
           <small>更新于 {{ draft.updatedAt || draft.createdAt }} · {{ draft.attachments?.length || 0 }} 个附件<template v-if="draft.pollConfig"> · 含投票</template></small>
         </div>
         <div class="draft-actions">
-          <RouterLink :to="`/new?type=${draft.kind}&draftId=${draft.id}`" class="secondary-button"><edit-outlined />继续编辑</RouterLink>
+          <RouterLink :to="`/new?draftId=${draft.id}`" class="secondary-button"><edit-outlined />继续编辑</RouterLink>
           <button class="secondary-button danger-text" :disabled="deletingId === draft.id" @click="remove(draft)"><delete-outlined />删除</button>
           <button class="primary-button" :disabled="publishingId === draft.id" @click="publish(draft)"><send-outlined />{{ publishingId === draft.id ? '发布中…' : '发布' }}</button>
         </div>
@@ -33,7 +33,7 @@ import { DeleteOutlined, EditOutlined, FileTextOutlined, PlusOutlined, SendOutli
 import { deleteDraft, fetchDrafts, publishDraft } from '@/api/forum'
 import { refreshCurrentUser } from '@/auth'
 import { richTextToPlainText as plainText } from '@/utils/html'
-import type { ContentKind, ForumDraft } from '@/types'
+import type { ForumDraft } from '@/types'
 
 const router = useRouter()
 const drafts = ref<ForumDraft[]>([])
@@ -42,7 +42,6 @@ const deletingId = ref('')
 const publishingId = ref('')
 const error = ref('')
 const message = ref('')
-const kindNames: Record<ContentKind, string> = { feed: '动态', topic: '话题', question: '问答', article: '文章' }
 
 onMounted(load)
 async function load() {

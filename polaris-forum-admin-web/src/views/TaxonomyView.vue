@@ -18,7 +18,7 @@ import {
 } from '@/api/forum'
 
 const store = useUserStore()
-const activeKey = ref('boards')
+const activeKey = ref('primary')
 const boards = ref<AdminBoard[]>([])
 const tags = ref<AdminTag[]>([])
 const boardFilter = ref('')
@@ -34,6 +34,7 @@ const editingBoardKey = ref<string | null>(null)
 const editingTag = ref<AdminTag | null>(null)
 const boardForm = reactive<AdminBoardInput & { key: string }>({
   key: '',
+  parentKey: '',
   name: '',
   description: '',
   color: '#5b67f1',
@@ -41,12 +42,21 @@ const boardForm = reactive<AdminBoardInput & { key: string }>({
   enabled: true
 })
 const tagForm = reactive<AdminTagInput>({ board: '', name: '', sortNo: 0, enabled: true })
+// 一级板块（parentKey 为空）与二级板块（parentKey 非空），由全量列表派生
+const primaryBoards = computed(() => boards.value.filter((board) => !board.parentKey))
+const childBoards = computed(() => boards.value.filter((board) => !!board.parentKey))
 const {
   pagination: boardPagination,
-  pagedSource: pagedBoards,
+  pagedSource: pagedPrimaryBoards,
   reset: resetBoardPage,
   onChange: onBoardTableChange
-} = useTablePagination(boards)
+} = useTablePagination(primaryBoards)
+const {
+  pagination: childPagination,
+  pagedSource: pagedChildBoards,
+  reset: resetChildPage,
+  onChange: onChildTableChange
+} = useTablePagination(childBoards)
 const {
   pagination: tagPagination,
   pagedSource: pagedTags,
@@ -54,13 +64,21 @@ const {
   onChange: onTagTableChange
 } = useTablePagination(tags)
 const boardNames = computed(() => Object.fromEntries(boards.value.map((board) => [board.key, board.name])))
-const boardColumns = [
+const primaryColumns = [
   { title: '板块', key: 'board', width: 280 },
   { title: '标识', dataIndex: 'key', width: 140 },
   { title: '内容数', key: 'count', width: 90 },
   { title: '排序', dataIndex: 'sortNo', width: 80 },
   { title: '状态', key: 'status', width: 100 },
   { title: '更新时间', dataIndex: 'updatedAt', width: 170 },
+  { title: '操作', key: 'action', width: 150 }
+]
+const childColumns = [
+  { title: '二级板块', key: 'board', width: 240 },
+  { title: '所属一级板块', key: 'parent', width: 180 },
+  { title: '标识', dataIndex: 'key', width: 160 },
+  { title: '排序', dataIndex: 'sortNo', width: 80 },
+  { title: '状态', key: 'status', width: 100 },
   { title: '操作', key: 'action', width: 150 }
 ]
 const tagColumns = [
@@ -101,6 +119,7 @@ async function loadTags() {
 
 function reloadBoards() {
   resetBoardPage()
+  resetChildPage()
   void loadBoards()
 }
 
@@ -109,9 +128,22 @@ function reloadTags() {
   void loadTags()
 }
 
-function openBoardCreate() {
+/** level: primary 新增一级板块；child 新增二级板块 */
+function openBoardCreate(level: 'primary' | 'child' = 'primary') {
+  if (level === 'child' && !primaryBoards.value.length) {
+    message.warning('请先新增一级板块')
+    return
+  }
   editingBoardKey.value = null
-  Object.assign(boardForm, { key: '', name: '', description: '', color: '#5b67f1', sortNo: 0, enabled: true })
+  Object.assign(boardForm, {
+    key: '',
+    parentKey: level === 'child' ? primaryBoards.value[0].key : '',
+    name: '',
+    description: '',
+    color: '#5b67f1',
+    sortNo: 0,
+    enabled: true
+  })
   boardModalOpen.value = true
 }
 
@@ -119,6 +151,7 @@ function openBoardEdit(board: AdminBoard) {
   editingBoardKey.value = board.key
   Object.assign(boardForm, {
     key: board.key,
+    parentKey: board.parentKey || '',
     name: board.name,
     description: board.description || '',
     color: board.color || '#5b67f1',
@@ -141,6 +174,7 @@ async function submitBoard() {
   }
   boardSaving.value = true
   const data: AdminBoardInput = {
+    parentKey: boardForm.parentKey,
     name,
     description: boardForm.description.trim(),
     color: boardForm.color,
@@ -249,22 +283,24 @@ async function toggleTag(tag: AdminTag) {
     <header class="page-heading taxonomy-heading">
       <div>
         <h1>板块与标签</h1>
-        <p>维护板块和标签的展示顺序与启停状态；标签创建后不可改名，均不提供删除操作。</p>
+        <p>一级板块下可维护二级板块；标签为全站内容标签。均可维护展示顺序与启停状态，创建后不可改名、不提供删除。</p>
       </div>
-      <a-button v-if="activeKey === 'boards' && store.can('forum:taxonomy:board:manage')" type="primary" @click="openBoardCreate"><PlusOutlined />新增板块</a-button>
+      <a-button v-if="activeKey === 'primary' && store.can('forum:taxonomy:board:manage')" type="primary" @click="openBoardCreate('primary')"><PlusOutlined />新增一级板块</a-button>
+      <a-button v-else-if="activeKey === 'child' && store.can('forum:taxonomy:board:manage')" type="primary" @click="openBoardCreate('child')"><PlusOutlined />新增二级板块</a-button>
       <a-button v-else-if="store.can('forum:taxonomy:tag:manage')" type="primary" @click="openTagCreate"><PlusOutlined />新增标签</a-button>
     </header>
 
     <a-tabs v-model:active-key="activeKey">
-      <a-tab-pane key="boards" tab="板块管理">
+      <a-tab-pane key="primary" tab="一级板块">
         <a-card class="filter-card" :bordered="false">
           <div class="filters">
             <a-button v-if="store.can('forum:taxonomy:view')" @click="reloadBoards"><ReloadOutlined />刷新</a-button>
           </div>
         </a-card>
         <a-card class="table-card" :bordered="false">
-          <div class="table-scroll" :class="{ 'is-empty': !boardLoading && !pagedBoards.length }">
-            <a-table :columns="boardColumns" :data-source="pagedBoards" :loading="boardLoading" :pagination="boardPagination" row-key="key" size="middle" @change="onBoardTableChange">
+          <div class="table-scroll" :class="{ 'is-empty': !boardLoading && !pagedPrimaryBoards.length }">
+            <!-- children-column-name 指向不存在的字段：后台扁平展示不用树形，避免表格因 BoardVO.children 自动渲染展开"+"图标 -->
+            <a-table :columns="primaryColumns" :data-source="pagedPrimaryBoards" :loading="boardLoading" :pagination="boardPagination" row-key="key" size="middle" children-column-name="__no_tree__" @change="onBoardTableChange">
               <template #emptyText>
                 <a-empty v-if="!boardLoading" class="table-empty" description="暂无数据" />
               </template>
@@ -283,6 +319,36 @@ async function toggleTag(tag: AdminTag) {
                   <a-tag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用中' : '已停用' }}</a-tag>
                 </template>
                 <template v-else-if="column.key === 'updatedAt'">{{ record.updatedAt || '-' }}</template>
+                <template v-else-if="column.key === 'action'">
+                  <a-space class="action-group" :size="0">
+                    <a-button v-if="store.can('forum:taxonomy:board:manage')" type="link" size="small" @click="openBoardEdit(record)">编辑</a-button>
+                    <a-button v-if="store.can('forum:taxonomy:board:manage')" type="link" size="small" :loading="savingBoardKey === record.key" @click="toggleBoard(record)">{{ record.enabled ? '停用' : '启用' }}</a-button>
+                  </a-space>
+                </template>
+              </template>
+            </a-table>
+          </div>
+        </a-card>
+      </a-tab-pane>
+
+      <a-tab-pane key="child" tab="二级板块">
+        <a-card class="filter-card" :bordered="false">
+          <div class="filters">
+            <a-button v-if="store.can('forum:taxonomy:view')" @click="reloadBoards"><ReloadOutlined />刷新</a-button>
+          </div>
+        </a-card>
+        <a-card class="table-card" :bordered="false">
+          <div class="table-scroll" :class="{ 'is-empty': !boardLoading && !pagedChildBoards.length }">
+            <a-table :columns="childColumns" :data-source="pagedChildBoards" :loading="boardLoading" :pagination="childPagination" row-key="key" size="middle" children-column-name="__no_tree__" @change="onChildTableChange">
+              <template #emptyText>
+                <a-empty v-if="!boardLoading" class="table-empty" description="暂无数据，请先新增二级板块" />
+              </template>
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'board'"><strong>{{ record.name }}</strong></template>
+                <template v-else-if="column.key === 'parent'">{{ boardNames[record.parentKey] || record.parentKey || '-' }}</template>
+                <template v-else-if="column.key === 'status'">
+                  <a-tag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用中' : '已停用' }}</a-tag>
+                </template>
                 <template v-else-if="column.key === 'action'">
                   <a-space class="action-group" :size="0">
                     <a-button v-if="store.can('forum:taxonomy:board:manage')" type="link" size="small" @click="openBoardEdit(record)">编辑</a-button>
@@ -330,8 +396,13 @@ async function toggleTag(tag: AdminTag) {
       </a-tab-pane>
     </a-tabs>
 
-    <a-modal v-model:open="boardModalOpen" centered :title="editingBoardKey !== null ? '编辑板块' : '新增板块'" ok-text="保存" cancel-text="取消" :confirm-loading="boardSaving" @ok="submitBoard">
+    <a-modal v-model:open="boardModalOpen" centered :title="editingBoardKey !== null ? (boardForm.parentKey ? '编辑二级板块' : '编辑一级板块') : (activeKey === 'child' ? '新增二级板块' : '新增一级板块')" ok-text="保存" cancel-text="取消" :confirm-loading="boardSaving" @ok="submitBoard">
       <a-form layout="vertical">
+        <a-form-item v-if="activeKey === 'child' && editingBoardKey === null" label="所属一级板块" required>
+          <a-select v-model:value="boardForm.parentKey" placeholder="请选择一级板块">
+            <a-select-option v-for="board in primaryBoards" :key="board.key" :value="board.key">{{ board.name }}</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-row :gutter="12">
           <a-col :xs="24" :sm="12">
             <a-form-item label="板块标识" required>
@@ -342,7 +413,7 @@ async function toggleTag(tag: AdminTag) {
             <a-form-item label="板块名称" required><a-input v-model:value="boardForm.name" :maxlength="80" placeholder="请输入板块名称" /></a-form-item>
           </a-col>
         </a-row>
-        <a-form-item label="板块描述"><a-textarea v-model:value="boardForm.description" :maxlength="300" :rows="3" placeholder="请输入板块描述" /></a-form-item>
+        <a-form-item v-if="!boardForm.parentKey" label="板块描述"><a-textarea v-model:value="boardForm.description" :maxlength="300" :rows="3" placeholder="请输入板块描述" /></a-form-item>
         <a-row :gutter="12">
           <a-col :xs="24" :sm="12">
             <a-form-item label="板块颜色"><input v-model="boardForm.color" class="color-input" type="color" aria-label="板块颜色" /></a-form-item>

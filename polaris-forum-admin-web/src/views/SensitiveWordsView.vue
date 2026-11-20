@@ -46,6 +46,7 @@ function reload() {
 }
 
 async function addWord() {
+  if (!store.can('forum:sensitive:add')) return
   const value = newWord.value.trim()
   if (!value) {
     message.warning('请输入敏感词')

@@ -1,5 +1,5 @@
 <template>
-  <div class="container">
+  <div class="container home-container">
     <section v-if="board" class="board-hero" :style="{ '--board-color': board.color }">
       <div class="board-hero-icon"><message-outlined /></div>
       <div><span class="eyebrow">COMMUNITY BOARD</span><h1>{{ board.name }}</h1><p>{{ board.description }}</p></div>
@@ -11,7 +11,6 @@
           <div><h2>{{ board?.name || '板块讨论' }}</h2><span>{{ threads.length }} 条内容</span></div>
           <RouterLink to="/new" class="small-primary"><plus-outlined />新帖子</RouterLink>
         </div>
-        <CategoryTabs />
         <div v-if="loading" class="empty-state"><h3>正在加载板块内容…</h3></div>
         <div v-else-if="error" class="empty-state"><h3>内容加载失败</h3><p>{{ error }}</p></div>
         <template v-else>
@@ -28,7 +27,6 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { MessageOutlined, PlusOutlined } from '@ant-design/icons-vue'
-import CategoryTabs from '@/components/CategoryTabs.vue'
 import CommunitySidebar from '@/components/CommunitySidebar.vue'
 import ThreadCard from '@/components/ThreadCard.vue'
 import { boards } from '@/data/forum'
@@ -39,7 +37,7 @@ const route = useRoute()
 const threads = ref<Thread[]>([])
 const loading = ref(false)
 const error = ref('')
-const boardKey = computed(() => String(route.params.key || 'general'))
+const boardKey = computed(() => String(route.query.board || route.params.key || 'general'))
 const board = computed(() => boards.find(item => item.key === boardKey.value))
 const keyword = computed(() => String(route.query.q || ''))
 async function load() {

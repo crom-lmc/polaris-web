@@ -16,13 +16,19 @@ export function sanitizeRichText(value: string) {
   }).trim()
 }
 
+/** 把历史数据里字面的 \n \r \t 转义串还原为真实字符，避免当成文字显示 */
+export function cleanLiteralEscapes(value: string): string {
+  if (!value) return ''
+  return value.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n').replace(/\\t/g, ' ')
+}
+
 function escapeHtml(value: string) {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
 export function legacyTextToHtml(value: string) {
-  return escapeHtml(value.replace(/\r\n?/g, '\n')).replace(/\n/g, '<br>')
+  return escapeHtml(cleanLiteralEscapes(value).replace(/\r\n?/g, '\n')).replace(/\n/g, '<br>')
 }
 
 export function toEditorHtml(value: string) {

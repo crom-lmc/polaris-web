@@ -27,12 +27,15 @@ const savingId = ref('')
 const { pagination, pagedSource: pagedThreads, reset: resetPage, onChange: onTableChange } = useTablePagination(threads)
 const kindNames: Record<ContentKind, string> = { feed: '动态', topic: '话题', question: '问答', article: '文章' }
 const columns = [
-  { title: '内容', key: 'content', width: 330 },
-  { title: '类型', key: 'kind', width: 90 },
-  { title: '作者', key: 'author', width: 130 },
-  { title: '状态', key: 'status', width: 250 },
-  { title: '发布时间', dataIndex: 'createdAt', width: 170 },
-  { title: '操作', key: 'action', width: 330 }
+  { title: '内容', key: 'content', width: 300 },
+  { title: '类型', key: 'kind', width: 80 },
+  { title: '作者', key: 'author', width: 110 },
+  { title: '点赞', key: 'likes', width: 70 },
+  { title: '查看', key: 'views', width: 70 },
+  { title: '评论', key: 'replies', width: 70 },
+  { title: '状态', key: 'status', width: 220 },
+  { title: '发布时间', dataIndex: 'createdAt', width: 150 },
+  { title: '操作', key: 'action', width: 300 }
 ]
 
 onMounted(() => {
@@ -137,6 +140,9 @@ function recommendThread(thread: Thread) {
             </template>
             <template v-else-if="column.key === 'kind'">{{ kindNames[record.kind as ContentKind] }}</template>
             <template v-else-if="column.key === 'author'">{{ record.author?.name || '-' }}</template>
+            <template v-else-if="column.key === 'likes'">{{ record.likes ?? 0 }}</template>
+            <template v-else-if="column.key === 'views'">{{ record.views ?? 0 }}</template>
+            <template v-else-if="column.key === 'replies'">{{ record.replies ?? 0 }}</template>
             <template v-else-if="column.key === 'status'">
               <a-space :size="4" wrap>
                 <a-tag :color="record.deleted ? 'red' : 'green'">{{ record.deleted ? '已删除' : '公开' }}</a-tag>

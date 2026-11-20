@@ -5,10 +5,12 @@ import { ReloadOutlined } from '@ant-design/icons-vue'
 import { fetchAdminExchanges, issueExchange, shipExchange, type ExchangeRecord } from '@/api/forum'
 import { confirmAction } from '@/utils/confirm'
 import { useTablePagination } from '@/composables/useTablePagination'
+import { useFeatureSwitch } from '@/composables/useFeatureSwitch'
 
 import { useUserStore } from '@/stores/user'
 const records = ref<ExchangeRecord[]>([])
 const store = useUserStore()
+const { exchangeEnabled } = useFeatureSwitch()
 const status = ref('')
 const trackingNumbers = ref<Record<string, string>>({})
 const issueRemarks = ref<Record<string, string>>({})
@@ -28,6 +30,7 @@ const statusColors: Record<ExchangeRecord['status'], string> = {
 const columns = [
   { title: '兑换用户', key: 'user', width: 150 },
   { title: '礼品', dataIndex: 'giftName', width: 180 },
+  { title: '来源', key: 'source', width: 90 },
   { title: '积分', dataIndex: 'points', width: 100 },
   { title: '状态', key: 'status', width: 120 },
   { title: '兑换时间', dataIndex: 'createdAt', width: 170 },
@@ -53,6 +56,7 @@ function reload() {
 }
 
 function ship(record: ExchangeRecord) {
+  if (!store.can('forum:exchange:ship')) return
   const trackingNo = trackingNumbers.value[record.id]?.trim() || ''
   if (!trackingNo) {
     message.warning('请输入快递单号')
@@ -102,6 +106,7 @@ function issue(record: ExchangeRecord) {
       <h1>礼品发放</h1>
       <p>登记快递单号，并在核实线下签收后确认发放；不关联快递公司或物流查询。</p>
     </header>
+    <a-alert v-if="!exchangeEnabled" class="feature-off-alert" type="warning" show-icon message="礼品兑换功能当前已关闭" description="论坛前台不再展示兑换入口，本页面发放按钮已全部置灰。如需开启，请到「配置中心 - 埋点管理」修改 forum.exchange.enabled。" />
     <a-card class="filter-card" :bordered="false">
       <div class="filters">
         <a-select v-model:value="status" class="filter-select" @change="reload">
@@ -121,20 +126,23 @@ function issue(record: ExchangeRecord) {
           </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'user'">{{ record.username || record.accountId }}</template>
+            <template v-else-if="column.key === 'source'">
+              <a-tag :color="record.source === 'LOTTERY' ? 'purple' : 'blue'">{{ record.source === 'LOTTERY' ? '抽奖' : '兑换' }}</a-tag>
+            </template>
             <template v-else-if="column.key === 'status'"><a-tag :color="statusColors[record.status as ExchangeRecord['status']]">{{ statusNames[record.status as ExchangeRecord['status']] }}</a-tag></template>
             <template v-else-if="column.key === 'issue'">
               <div v-if="record.status === 'PENDING_ISSUE'" class="issue-detail">
                 <div class="issue-controls">
-                  <a-input v-model:value="trackingNumbers[record.id]" :maxlength="100" placeholder="输入快递单号" @press-enter="ship(record)" />
-                  <a-button v-if="store.can('forum:exchange:ship')" type="primary" :loading="processingId === record.id" @click="ship(record)">登记物流</a-button>
+                  <a-input v-model:value="trackingNumbers[record.id]" :maxlength="100" placeholder="输入快递单号" :disabled="!exchangeEnabled" @press-enter="ship(record)" />
+                  <a-button v-if="store.can('forum:exchange:ship')" type="primary" :disabled="!exchangeEnabled" :loading="processingId === record.id" @click="ship(record)">登记物流</a-button>
                 </div>
-                <a-input v-model:value="issueRemarks[record.id]" :maxlength="500" placeholder="发放备注（选填）" />
+                <a-input v-model:value="issueRemarks[record.id]" :maxlength="500" placeholder="发放备注（选填）" :disabled="!exchangeEnabled" />
               </div>
               <div v-else-if="record.status === 'SHIPPING'" class="issue-detail">
                 <span>快递单号：{{ record.trackingNo }}</span>
                 <div class="issue-controls">
-                  <a-input v-model:value="issueRemarks[record.id]" :maxlength="500" placeholder="签收备注（选填）" />
-                  <a-button v-if="store.can('forum:exchange:issue')" type="primary" :loading="processingId === record.id" @click="issue(record)">确认签收</a-button>
+                  <a-input v-model:value="issueRemarks[record.id]" :maxlength="500" placeholder="签收备注（选填）" :disabled="!exchangeEnabled" />
+                  <a-button v-if="store.can('forum:exchange:issue')" type="primary" :disabled="!exchangeEnabled" :loading="processingId === record.id" @click="issue(record)">确认签收</a-button>
                 </div>
                 <span class="secondary-text">请线下核实签收后再操作</span>
               </div>
@@ -150,3 +158,7 @@ function issue(record: ExchangeRecord) {
     </a-card>
   </div>
 </template>
+
+<style scoped>
+.feature-off-alert { margin-bottom: 16px; }
+</style>

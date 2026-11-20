@@ -91,6 +91,108 @@
       </a-col>
     </a-row>
 
+    <!-- 平台运营概览：账号/应用/角色/权限/登录等规模数字，色块图标风格与上方一致 -->
+    <a-row :gutter="16" align="stretch" class="stat-row">
+      <a-col v-for="item in overviewCards" :key="item.label" :span="4">
+        <a-card size="small" hoverable :loading="overviewLoading" class="stat-card mini-stat-card">
+          <div class="stat-main">
+            <div class="stat-icon" :style="{ color: item.color, background: item.bg }">
+              <component :is="item.icon" />
+            </div>
+            <div class="stat-text">
+              <div class="stat-value small">{{ item.value }}</div>
+              <div class="stat-sub">
+                <span class="stat-label">{{ item.label }}</span>
+              </div>
+            </div>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <!-- 统计图：近 14 天登录趋势（折线）+ 账号状态/登录方式分布（环形），纯 SVG 无图表库 -->
+    <a-row :gutter="16" align="stretch" class="stat-row chart-row">
+      <a-col :span="14">
+        <a-card title="近 14 天登录趋势" size="small" :loading="overviewLoading" class="chart-card">
+          <template #extra>
+            <span class="chart-legend"><i class="dot success" />成功 <i class="dot fail" />失败</span>
+          </template>
+          <div class="line-chart">
+            <svg viewBox="0 0 560 180" preserveAspectRatio="none" role="img" aria-label="登录趋势折线图">
+              <defs>
+                <linearGradient id="loginSuccessFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#2f54eb" stop-opacity="0.28" />
+                  <stop offset="100%" stop-color="#2f54eb" stop-opacity="0.02" />
+                </linearGradient>
+              </defs>
+              <!-- 横向网格线与刻度 -->
+              <g v-for="i in 5" :key="'g' + i">
+                <line x1="34" :y1="20 + (i - 1) * 34" x2="552" :y2="20 + (i - 1) * 34"
+                      stroke="var(--border-subtle, #eee)" stroke-width="1" />
+                <text x="30" :y="24 + (i - 1) * 34" text-anchor="end" class="chart-axis-text">
+                  {{ trendMax - Math.round((i - 1) * trendMax / 4) }}
+                </text>
+              </g>
+              <!-- 成功面积 + 折线，失败折线 -->
+              <path :d="trendAreaPath" fill="url(#loginSuccessFill)" />
+              <path :d="trendLinePath.success" fill="none" stroke="#2f54eb" stroke-width="2.5"
+                    stroke-linejoin="round" stroke-linecap="round" />
+              <path :d="trendLinePath.fail" fill="none" stroke="#fa541c" stroke-width="2"
+                    stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="5 4" />
+              <!-- x 轴日期（隔点显示避免拥挤） -->
+              <g v-for="(p, idx) in trendPoints" :key="'x' + idx">
+                <text v-if="idx % 2 === 0 || idx === trendPoints.length - 1" :x="p.x" y="172"
+                      text-anchor="middle" class="chart-axis-text">{{ p.label }}</text>
+              </g>
+            </svg>
+            <a-empty v-if="!trendHasData" class="chart-empty" description="暂无登录记录" />
+          </div>
+        </a-card>
+      </a-col>
+
+      <a-col :span="5">
+        <a-card title="账号状态" size="small" :loading="overviewLoading" class="chart-card donut-card">
+          <div class="donut-wrap">
+            <svg viewBox="0 0 120 120" class="donut" role="img" aria-label="账号状态分布环形图">
+              <circle v-for="(seg, i) in statusSegments" :key="i" cx="60" cy="60" r="46" fill="none"
+                      :stroke="seg.color" stroke-width="16" :stroke-dasharray="seg.dash"
+                      :stroke-dashoffset="seg.offset" transform="rotate(-90 60 60)" />
+              <circle cx="60" cy="60" r="46" fill="none" stroke="var(--border-subtle, #eee)" stroke-width="16"
+                      v-if="!statusSegments.length" />
+            </svg>
+            <div class="donut-center">
+              <b>{{ overview.accountCount }}</b>
+              <span>账号总数</span>
+            </div>
+          </div>
+          <div class="donut-legend">
+            <div v-for="(seg, i) in statusSegments" :key="i" class="legend-row">
+              <i class="dot" :style="{ background: seg.color }" />
+              <span class="legend-name">{{ seg.name }}</span>
+              <b>{{ seg.value }}</b>
+            </div>
+            <a-empty v-if="!statusSegments.length" :image-style="{ height: '30px' }" description="暂无数据" />
+          </div>
+        </a-card>
+      </a-col>
+
+      <a-col :span="5">
+        <a-card title="登录方式" size="small" :loading="overviewLoading" class="chart-card">
+          <div class="bar-list">
+            <div v-for="(row, i) in loginTypeBars" :key="i" class="bar-item">
+              <div class="bar-head">
+                <span>{{ row.name }}</span><b>{{ row.value }}</b>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill" :style="{ width: row.percent + '%', background: row.color }" />
+              </div>
+            </div>
+            <a-empty v-if="!loginTypeBars.length" :image-style="{ height: '40px' }" description="暂无数据" />
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+
     <!-- 员工快捷查询：按姓名/工号找人，结果只展示非隐私信息；宽度与「当前账号」同列（span=8） -->
     <a-row :gutter="16" align="stretch" class="lookup-row">
       <a-col :span="8">
@@ -218,8 +320,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { AuditOutlined, BellOutlined, CarryOutOutlined } from '@ant-design/icons-vue'
+import { AuditOutlined, BellOutlined, CarryOutOutlined, DatabaseOutlined, RiseOutlined, TeamOutlined, AppstoreOutlined, SafetyCertificateOutlined } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { fetchOverview } from '@/api/accounts'
 import { oauthAuthorize } from '@/api/oauth'
 import { fetchApprovals } from '@/api/approvals'
 import { fetchUnreadNoticeCount } from '@/api/notice'
@@ -296,8 +399,110 @@ async function loadStats() {
   }
 }
 
+/* ---------- 平台运营概览：规模数字卡 + 登录趋势/分布统计图 ---------- */
+const overviewLoading = ref(false)
+const overview = ref<import('@/types').OverviewVO>({
+  accountCount: 0, appCount: 0, roleCount: 0, permissionCount: 0,
+  todayLoginCount: 0, monthNewAccountCount: 0,
+  loginTrend: [], accountStatus: [], loginTypes: []
+})
+
+/** 6 个规模数字卡：图标/配色沿用既有色块风格 */
+const overviewCards = computed(() => [
+  { label: '账号总数', value: overview.value.accountCount, icon: TeamOutlined, color: '#2f54eb', bg: '#eef2ff' },
+  { label: '接入应用', value: overview.value.appCount, icon: AppstoreOutlined, color: '#13a8a8', bg: '#e6fffb' },
+  { label: '角色', value: overview.value.roleCount, icon: SafetyCertificateOutlined, color: '#722ed1', bg: '#f9f0ff' },
+  { label: '权限码', value: overview.value.permissionCount, icon: SafetyCertificateOutlined, color: '#597ef7', bg: '#eef2ff' },
+  { label: '今日登录', value: overview.value.todayLoginCount, icon: RiseOutlined, color: '#fa8c16', bg: '#fff7e6' },
+  { label: '本月新增', value: overview.value.monthNewAccountCount, icon: DatabaseOutlined, color: '#52c41a', bg: '#f6ffed' }
+])
+
+async function loadOverview() {
+  overviewLoading.value = true
+  try {
+    const res = await fetchOverview()
+    overview.value = res.data
+  } catch {
+    // 概览统计失败不阻塞页面其它模块，保留全 0 默认态
+  } finally {
+    overviewLoading.value = false
+  }
+}
+
+/* 折线图坐标计算：viewBox 560x180，绘图区 x∈[34,552]，y∈[20,156] */
+const trendMax = computed(() => {
+  const max = Math.max(1, ...overview.value.loginTrend.flatMap(p => [p.success, p.fail]))
+  // 向上取整到便于阅读的刻度
+  return Math.ceil(max / 4) * 4 || 4
+})
+const trendHasData = computed(() =>
+  overview.value.loginTrend.some(p => p.success > 0 || p.fail > 0))
+
+const trendPoints = computed(() => {
+  const rows = overview.value.loginTrend
+  const n = rows.length
+  const max = trendMax.value
+  return rows.map((p, i) => ({
+    x: n <= 1 ? 34 : 34 + i * (518 / (n - 1)),
+    sy: 156 - (p.success / max) * 136,
+    fy: 156 - (p.fail / max) * 136,
+    label: p.date.slice(5)
+  }))
+})
+
+const trendLinePath = computed(() => {
+  const pts = trendPoints.value
+  const line = (key: 'sy' | 'fy') =>
+    pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p[key].toFixed(1)}`).join(' ')
+  return { success: line('sy'), fail: line('fy') }
+})
+
+const trendAreaPath = computed(() => {
+  const pts = trendPoints.value
+  if (!pts.length) return ''
+  const top = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.sy.toFixed(1)}`).join(' ')
+  return `${top} L${pts[pts.length - 1].x.toFixed(1)},156 L${pts[0].x.toFixed(1)},156 Z`
+})
+
+/** 账号状态环形图：按占比分配 stroke-dasharray，周长 = 2πr = 289.03 */
+const STATUS_COLORS = ['#52c41a', '#faad14', '#ff4d4f', '#bfbfbf']
+const statusSegments = computed(() => {
+  const rows = overview.value.accountStatus
+  const total = rows.reduce((s, r) => s + r.value, 0)
+  if (!total) return []
+  const circumference = 2 * Math.PI * 46
+  let acc = 0
+  return rows.map((r, i) => {
+    const fraction = r.value / total
+    const len = fraction * circumference
+    const seg = {
+      name: r.name,
+      value: r.value,
+      color: STATUS_COLORS[i % STATUS_COLORS.length],
+      dash: `${len.toFixed(2)} ${(circumference - len).toFixed(2)}`,
+      offset: `${(-acc).toFixed(2)}`
+    }
+    acc += len
+    return seg
+  })
+})
+
+/** 登录方式条形图：按最大值归一百分比 */
+const loginTypeBars = computed(() => {
+  const rows = overview.value.loginTypes
+  const max = Math.max(1, ...rows.map(r => r.value))
+  const colors = ['#2f54eb', '#13a8a8', '#fa8c16', '#722ed1']
+  return rows.map((r, i) => ({
+    name: r.name,
+    value: r.value,
+    percent: Math.round((r.value / max) * 100),
+    color: colors[i % colors.length]
+  }))
+})
+
 onMounted(() => {
   loadStats()
+  loadOverview()
   loadNotices()
 })
 
@@ -688,18 +893,178 @@ async function enter(app: ApplicationVO) {
   font-weight: 600;
 }
 
-/* 概览页纵向撑满：查询卡片吃掉下方剩余高度 */
+/* 概览页内容较多（卡片 + 统计图 + 查询 + 通知），交给父级 .content 滚动，
+   这里不再强制 100% + flex 撑满，否则新增的统计图会被压缩 */
 .dash-page {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  width: 100%;
 }
 
-/* 员工快捷查询：与「当前账号」同列宽（span=8），高度铺满剩余空间 */
+/* 员工快捷查询：与「当前账号」同列宽（span=8），给定最小高度即可，不再吃满剩余空间 */
 .lookup-row {
-  flex: 1;
-  min-height: 240px;
+  min-height: 300px;
   margin-top: 16px;
+}
+
+/* 统计图区：卡片内固定高度，折线自适应宽度 */
+.chart-row {
+  margin-top: 16px;
+}
+
+.chart-card {
+  height: 100%;
+}
+
+.chart-card :deep(.ant-card-body) {
+  min-height: 220px;
+}
+
+.line-chart {
+  position: relative;
+  width: 100%;
+  height: 200px;
+}
+
+.line-chart svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.chart-axis-text {
+  fill: var(--muted, #8c8c8c);
+  font-size: 11px;
+}
+
+.chart-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot.success { background: #2f54eb; }
+.dot.fail { background: #fa541c; }
+
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 环形图 + 中心数字 */
+.donut-card :deep(.ant-card-body) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 220px;
+}
+
+.donut-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  flex: 0 0 auto;
+}
+
+.donut {
+  width: 120px;
+  height: 120px;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.donut-center b {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.donut-center span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.donut-legend {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.legend-name {
+  flex: 1;
+  color: var(--muted);
+}
+
+/* 登录方式条形图 */
+.bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.bar-head span { color: var(--muted); }
+
+.bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border-subtle, #f0f0f0);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* 6 张规模卡比上面的卡略紧凑 */
+.mini-stat-card :deep(.ant-card-body) {
+  min-height: 92px;
+  padding: 14px;
+}
+
+.mini-stat-card .stat-icon {
+  width: 40px;
+  height: 40px;
+  font-size: 19px;
+}
+
+.stat-value.small {
+  font-size: 24px;
 }
 
 .lookup-row :deep(.ant-col),

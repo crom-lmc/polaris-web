@@ -22,6 +22,9 @@
     <a-layout class="body">
       <a-layout-sider class="sider" :theme="theme.mode" :width="208" collapsible :collapsed="collapsed" :trigger="null">
         <a-menu mode="inline" :inline-collapsed="collapsed" :selected-keys="selectedKeys" @click="handleMenuClick">
+          <a-menu-item v-if="store.can('forum:overview')" key="/">
+            <template #icon><dashboard-outlined /></template>概览
+          </a-menu-item>
           <a-menu-item v-if="store.can('forum:content')" key="/threads">
             <template #icon><file-text-outlined /></template>内容管理
           </a-menu-item>
@@ -43,8 +46,17 @@
           <a-menu-item v-if="store.can('forum:exchange')" key="/exchanges">
             <template #icon><gift-outlined /></template>礼品发放
           </a-menu-item>
+          <a-menu-item v-if="store.can('forum:gift')" key="/gifts">
+            <template #icon><shopping-outlined /></template>礼品管理
+          </a-menu-item>
           <a-menu-item v-if="store.can('forum:badge')" key="/badges">
             <template #icon><trophy-outlined /></template>勋章管理
+          </a-menu-item>
+          <a-menu-item v-if="store.can('forum:level')" key="/levels">
+            <template #icon><rise-outlined /></template>等级晋升
+          </a-menu-item>
+          <a-menu-item v-if="store.can('forum:lottery')" key="/lottery">
+            <template #icon><aim-outlined /></template>抽奖配置
           </a-menu-item>
         </a-menu>
       </a-layout-sider>
@@ -58,23 +70,28 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal } from 'ant-design-vue'
 import {
+  AimOutlined,
   AppstoreOutlined,
   CommentOutlined,
+  DashboardOutlined,
   DownOutlined,
   FileTextOutlined,
   FlagOutlined,
   GiftOutlined,
   LogoutOutlined,
   MenuOutlined,
+  RiseOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
+  ShoppingOutlined,
   TrophyOutlined
 } from '@ant-design/icons-vue'
-import { fetchAppName, gotoAuthorize, logoutSso } from '@/api/forum'
+import { gotoAuthorize, logoutSso } from '@/api/forum'
 import ThemeToggleIcon from '@/components/ThemeToggleIcon.vue'
 import { useSessionGuard } from '@/composables/useSessionGuard'
 import { useThemeStore } from '@/stores/theme'
 import { useUserStore } from '@/stores/user'
+import { appName, resolveAppName } from '@/utils/appTitle'
 import { getRefreshToken } from '@/utils/token'
 
 const router = useRouter()
@@ -83,15 +100,12 @@ const store = useUserStore()
 const theme = useThemeStore()
 const collapsed = ref(false)
 const selectedKeys = computed(() => [route.path])
-const appName = ref('论坛管理端')
 
 useSessionGuard()
 
 onMounted(async () => {
   const code = store.me?.appCode
-  if (!code) return
-  const name = await fetchAppName(code)
-  if (name) appName.value = name
+  if (code) await resolveAppName(code)
 })
 
 function toggleCollapse() {

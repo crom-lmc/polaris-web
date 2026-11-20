@@ -1,22 +1,17 @@
 <template>
-  <div class="container callback-page">
-    <section class="panel callback-card">
-      <div class="login-symbol"><safety-certificate-outlined /></div>
-      <span class="eyebrow">SSO CALLBACK</span>
-      <h1>{{ error ? '统一登录失败' : '正在登录社区论坛' }}</h1>
-      <p>{{ error || '正在使用一次性授权码换取论坛登录状态，请稍候。' }}</p>
-      <div class="callback-actions">
-        <button v-if="error" class="primary-button" @click="redirectToSsoLogin()">重新登录</button>
-        <RouterLink to="/" class="secondary-button">返回社区首页</RouterLink>
-      </div>
-    </section>
+  <div class="callback-standalone">
+    <div v-if="error" class="callback-error-card">
+      <h1>登录失败</h1>
+      <p>{{ error }}</p>
+      <button class="retry-button" @click="redirectToSsoLogin()">重新登录</button>
+    </div>
+    <div v-else class="callback-loading">正在登录社区论坛…</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { SafetyCertificateOutlined } from '@ant-design/icons-vue'
 import { exchangeCode } from '@/api/forum'
 import { callbackUrl, consumeOauthState, redirectToSsoLogin, refreshCurrentUser, setTokens, takePostLoginRedirect } from '@/auth'
 
@@ -42,9 +37,19 @@ onMounted(async () => {
     setTokens(tokens.accessToken, tokens.refreshToken)
     const user = await refreshCurrentUser()
     if (!user) throw new Error('论坛登录状态加载失败，请重新登录')
-    router.replace(takePostLoginRedirect())
+    await router.replace(takePostLoginRedirect())
   } catch (e) {
     error.value = e instanceof Error ? e.message : '换取令牌失败'
   }
 })
 </script>
+
+<style scoped>
+.callback-standalone { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--soft); padding: 16px; }
+.callback-error-card { width: min(420px, 100%); padding: 22px 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+.callback-error-card h1 { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--text); }
+.callback-error-card p { margin: 0 0 16px; font-size: 12px; line-height: 1.7; color: var(--muted); }
+.retry-button { padding: 7px 14px; border: 1px solid var(--primary); border-radius: 8px; background: var(--primary); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+.retry-button:hover { border-color: var(--primary-dark); background: var(--primary-dark); }
+.callback-loading { font-size: 14px; color: var(--muted); }
+</style>

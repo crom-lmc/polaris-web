@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f3edff"/><stop offset="1" stop-color="#e6d9ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#bg)"/>
+  <ellipse cx="160" cy="158" rx="66" ry="9" fill="#c8cef0" opacity=".6"/>
+  <rect x="112" y="70" width="96" height="84" rx="14" fill="#7c3aed"/>
+  <rect x="126" y="84" width="68" height="56" rx="8" fill="#a78bfa"/>
+  <text x="160" y="120" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#fff">AI</text>
+  <g stroke="#7c3aed" stroke-width="5" stroke-linecap="round">
+    <path d="M132 70V54M148 70V54M172 70V54M188 70V54"/>
+    <path d="M132 154v16M148 154v16M172 154v16M188 154v16"/>
+    <path d="M112 92H96M112 116H96M112 140H96"/>
+    <path d="M208 92h16M208 116h16M208 140h16"/>
+  </g>
+  <text x="160" y="182" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" font-weight="700" fill="#8a92c9" opacity=".9">POLARIS</text>
+</svg>

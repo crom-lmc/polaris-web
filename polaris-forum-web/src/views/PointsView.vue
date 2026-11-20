@@ -14,7 +14,7 @@
               <div class="mission-progress"><div><span>累计签到 {{ summary?.checkinDays || 0 }} 天</span><b>{{ summary?.checkedIn ? '100%' : '待完成' }}</b></div><div class="mission-progress-track"><i :style="{ width: summary?.checkedIn ? '100%' : '0%' }"></i></div><button v-if="!summary?.checkedIn" :disabled="checkingIn" @click="handleCheckin">{{ checkingIn ? '签到中…' : '立即签到' }}<right-outlined /></button><span v-else class="mission-complete"><check-circle-outlined />今日已签到</span></div>
             </div>
             <div class="mission-row">
-              <div class="mission-copy"><div><b>发布社区内容</b><span>可参与</span></div><p>发布动态、话题、问答或文章，成功保存后获得奖励。</p><small><thunderbolt-outlined />+20 积分<span>·</span>每次成功发布</small></div>
+              <div class="mission-copy"><div><b>发布社区内容</b><span>可参与</span></div><p>发布帖子，成功保存后获得奖励。</p><small><thunderbolt-outlined />+20 积分<span>·</span>每次成功发布</small></div>
               <div class="mission-progress"><button @click="goCreate">去发布<right-outlined /></button></div>
             </div>
             <div class="mission-row">
@@ -94,6 +94,6 @@ async function handleCheckin() {
 }
 
 function goCreate() {
-  if (requireLogin('发布社区内容')) router.push('/new?type=topic')
+  if (requireLogin('发布社区内容')) router.push('/new')
 }
 </script>

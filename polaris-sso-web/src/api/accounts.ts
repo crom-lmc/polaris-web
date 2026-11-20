@@ -103,3 +103,8 @@ export function grantAccountApps(id: string, appIds: string[]) {
 export function setAccountDataScope(id: string, dataScopeOrgCode: string | null) {
   return request.put<never, { data: void }>(`/api/accounts/${id}/data-scope`, { dataScopeOrgCode })
 }
+
+/** 账号中心概览聚合统计（数字卡 + 登录趋势 + 分布） */
+export function fetchOverview() {
+  return request.get<never, { data: import('@/types').OverviewVO }>('/api/accounts/overview')
+}

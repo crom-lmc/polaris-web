@@ -4,7 +4,7 @@ import { computed, ref, unref, watch, type Ref } from 'vue'
  * 后台列表统一前端分页：接口返回全量数组，分页只负责当前展示页。
  * 分页条贴在表格滚动容器底部，必须与 .table-scroll + .ant-table-pagination 样式配套使用。
  */
-export function useTablePagination<T>(source: Ref<T[]>, defaultSize = 10) {
+export function useTablePagination<T>(source: Ref<T[]>, defaultSize = 20) {
   const page = ref(1)
   const size = ref(defaultSize)
 

@@ -6,7 +6,7 @@
     <template v-else-if="profile">
       <section class="panel profile-summary-card">
         <UserAvatar :name="displayName" :avatar-url="profile.avatarUrl" :size="76" />
-        <div class="profile-summary-copy"><div><h2>{{ displayName }}</h2><span class="level-badge">Lv.{{ profile.level || 1 }}</span></div><p>{{ profile.bio || '完善个人简介，让社区成员更了解你。' }}</p><RouterLink :to="`/members/${profile.accountId}`">查看公开个人主页 <arrow-right-outlined /></RouterLink></div>
+        <div class="profile-summary-copy"><div><h2>{{ displayName }}</h2><span class="level-badge" :style="levelBadgeStyle">Lv.{{ profile.level || 1 }} · {{ profile.levelName || '社区成员' }}</span></div><p>{{ profile.bio || '完善个人简介，让社区成员更了解你。' }}</p><RouterLink :to="`/members/${profile.accountId}`">查看公开个人主页 <arrow-right-outlined /></RouterLink></div>
         <div class="profile-points"><span>当前积分</span><b>{{ profile.points }}</b><small>累计 {{ profile.totalPoints ?? profile.points }}</small></div>
       </section>
 
@@ -23,13 +23,17 @@
           <div class="profile-quick-links">
             <RouterLink to="/settings/profile"><idcard-outlined /><span><b>个人资料</b><small>修改显示名、头像、封面和联系方式</small></span><right-outlined /></RouterLink>
             <RouterLink to="/drafts"><save-outlined /><span><b>我的草稿</b><small>继续编辑尚未发布的内容</small></span><right-outlined /></RouterLink>
-            <RouterLink to="/gifts"><gift-outlined /><span><b>积分兑换</b><small>查看礼品与兑换记录</small></span><right-outlined /></RouterLink>
+            <RouterLink v-if="featureFlags.exchangeEnabled" to="/gifts"><gift-outlined /><span><b>积分兑换</b><small>查看礼品与兑换记录</small></span><right-outlined /></RouterLink>
           </div>
         </section>
         <section class="panel profile-quick-card">
           <div class="member-section-heading"><h2>社区数据</h2></div>
           <div class="profile-activity-stats"><div><b>{{ profile.commentsCount ?? 0 }}</b><span>评论与回复</span></div><div><b>{{ profile.likesReceived }}</b><span>累计获赞</span></div><div><b>{{ profile.totalPoints ?? profile.points }}</b><span>累计积分</span></div></div>
-          <p>等级按累计积分每 500 分提升一级，从 Lv.1 开始。</p>
+          <div class="profile-level-progress">
+            <div class="profile-level-line"><span>{{ profile.levelName || '社区成员' }} · 累计 {{ profile.experience ?? 0 }} 经验</span><b v-if="profile.nextLevel">距 Lv.{{ profile.nextLevel }} 还差 {{ profile.experienceToNext }} 经验</b><b v-else>已达最高等级</b></div>
+            <div class="profile-level-track"><i :style="{ width: `${profile.levelProgress ?? 100}%` }"></i></div>
+            <RouterLink to="/levels">查看等级晋升路线 <arrow-right-outlined /></RouterLink>
+          </div>
         </section>
       </div>
     </template>
@@ -42,12 +46,14 @@ import { ArrowRightOutlined, BellOutlined, EditOutlined, GiftOutlined, HeartOutl
 import UserAvatar from '@/components/UserAvatar.vue'
 import { fetchProfile } from '@/api/forum'
 import { refreshUnreadCount, unreadCount } from '@/auth'
+import { featureFlags } from '@/composables/useFeatureSwitch'
 import type { Member } from '@/types'
 
 const profile = ref<Member | null>(null)
 const loading = ref(true)
 const error = ref('')
 const displayName = computed(() => profile.value?.displayName || profile.value?.nickname || profile.value?.username || '')
+const levelBadgeStyle = computed(() => profile.value?.levelColor ? { color: '#fff', background: profile.value.levelColor } : {})
 const favoriteCount = computed(() => profile.value?.favoriteCount ?? 0)
 const earnedBadgeCount = computed(() => profile.value?.badgeCount ?? 0)
 onMounted(load)

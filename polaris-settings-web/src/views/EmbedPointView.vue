@@ -187,6 +187,25 @@
           </a-form>
         </template>
 
+        <!-- 社区等级数量上限：数字输入 -->
+        <template v-if="editor === 'number'">
+          <a-divider orientation="left">数值配置</a-divider>
+          <a-form layout="vertical">
+            <a-form-item :label="current?.name || '数值'">
+              <a-input-number
+                v-model:value="numberValue"
+                :min="1"
+                :max="100"
+                :disabled="isReadonly"
+                placeholder="请输入数值"
+                style="width: 220px"
+                @change="syncNumberJson"
+              />
+              <span class="muted switch-tip">保存后最多 60 秒生效（配置中心缓存）；后端有内置兜底值</span>
+            </a-form-item>
+          </a-form>
+        </template>
+
         <!-- 到期提醒节点：到期前 N 天提醒，可配置多个 -->
         <template v-if="editor === 'offsets'">
           <a-divider orientation="left">提醒节点</a-divider>
@@ -411,6 +430,8 @@ const CONTRACT_OFFSETS_KEY = 'ehr.reminder.contract-offsets'
 const HR_ORG_NAME_KEY = 'ehr.notice.hr-org-name'
 /** 城市假期政策（婚假 / 产假 / 陪产假按城市配置天数与计算方式）：结构化维护 */
 const CITY_POLICY_KEY = 'ehr.leave.city-policy'
+/** 社区等级数量上限：数字输入，值为 {"maxLevel": 20} */
+const MAX_LEVELS_KEY = 'forum.level.max-levels'
 const COMMON_APP = '__common__'
 
 const store = useUserStore()
@@ -586,6 +607,7 @@ type EmbedEditor =
   | 'switch'
   | 'offsets'
   | 'orgs'
+  | 'number'
   | 'unknown'
 const EDITOR_BY_CODE: Record<string, EmbedEditor> = {
   [RECEIVER_KEY]: 'receiver',
@@ -595,7 +617,8 @@ const EDITOR_BY_CODE: Record<string, EmbedEditor> = {
   [MOCK_ENABLED_KEY]: 'switch',
   [PROBATION_OFFSETS_KEY]: 'offsets',
   [CONTRACT_OFFSETS_KEY]: 'offsets',
-  [HR_ORG_NAME_KEY]: 'orgs'
+  [HR_ORG_NAME_KEY]: 'orgs',
+  [MAX_LEVELS_KEY]: 'number'
 }
 const editor = computed<EmbedEditor>(() => EDITOR_BY_CODE[currentCode.value] || 'unknown')
 
@@ -610,6 +633,8 @@ const defaultApps = ref<string[]>([])
 const mockEnabled = ref(false)
 /** 到期提醒节点（天） */
 const offsetTags = ref<string[]>([])
+/** 数值埋点（如等级上限）：通用数字输入 */
+const numberValue = ref<number>(1)
 /** HR 部门组织节点（含全部下级） */
 const hrOrgIds = ref<string[]>([])
 /** 城市假期政策：每行一个城市 */
@@ -711,6 +736,9 @@ function applyStructured(code: string, raw: string) {
     defaultApps.value = Array.isArray(obj.apps) ? obj.apps.map(String) : []
   } else if (code === MOCK_ENABLED_KEY) {
     mockEnabled.value = obj.enabled === true
+  } else if (code === MAX_LEVELS_KEY) {
+    const n = Number(obj.maxLevel)
+    numberValue.value = Number.isFinite(n) && n > 0 ? n : 20
   } else if (code === PROBATION_OFFSETS_KEY || code === CONTRACT_OFFSETS_KEY) {
     offsetTags.value = Array.isArray(obj.offsets) ? obj.offsets.map(String) : []
   } else if (code === HR_ORG_NAME_KEY) {
@@ -752,6 +780,15 @@ function syncAppsJson() {
 
 function syncSwitchJson() {
   form.value = JSON.stringify({ enabled: mockEnabled.value }, null, 2)
+}
+
+/** 数值埋点：当前埋点用 maxLevel 字段，字段 code 区分不同数值配置 */
+function syncNumberJson() {
+  const n = Number(numberValue.value)
+  if (!Number.isFinite(n) || n < 1) {
+    numberValue.value = 1
+  }
+  form.value = JSON.stringify({ maxLevel: Number(numberValue.value) }, null, 2)
 }
 
 /** 提醒节点：去重、降序、只保留正整数 */
@@ -962,6 +999,10 @@ async function load() {
 .tree-body {
   overflow-y: auto;
   overflow-x: hidden;
+  /* a-tree 虚拟滚动把树节点渲染成 position:absolute，默认以 body 为包含块，
+     节点宽度会被算成整个视口宽并从左侧偏移，撑出 document 级横向滚动条。
+     这里建立定位上下文，把 absolute 节点约束回左树面板内。 */
+  position: relative;
 }
 
 .embed-main {

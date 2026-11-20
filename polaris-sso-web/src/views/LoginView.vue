@@ -105,10 +105,6 @@
             </a-form>
           </a-tab-pane>
         </a-tabs>
-
-        <p class="hint">
-          {{ appName ? '登录后自动返回应用，无需再次输入密码' : '登录后可在「概览」看到你有权访问的应用' }}
-        </p>
       </template>
     </div>
   </div>
@@ -327,12 +323,5 @@ async function handleSendCode() {
 .code-row {
   display: flex;
   gap: 8px;
-}
-
-.hint {
-  margin-top: 16px;
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
 }
 </style>

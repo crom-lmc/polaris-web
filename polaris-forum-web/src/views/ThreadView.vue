@@ -6,7 +6,7 @@
       <div class="breadcrumbs"><RouterLink to="/">首页</RouterLink><span>/</span><RouterLink :to="`/boards/${thread.board}`">{{ boardName }}</RouterLink><span>/</span><span>正文</span></div>
       <div class="thread-detail-layout">
         <article class="panel detail-card">
-          <div class="detail-labels"><span class="board-name">{{ boardName }}</span><span v-if="thread.solved" class="status-tag solved"><check-circle-outlined />已解决</span><span v-if="thread.reward" class="status-tag reward-tag">悬赏 {{ thread.reward }} 积分</span></div>
+          <div v-if="thread.solved || thread.reward" class="detail-labels"><span v-if="thread.solved" class="status-tag solved"><check-circle-outlined />已解决</span><span v-if="thread.reward" class="status-tag reward-tag">悬赏 {{ thread.reward }} 积分</span></div>
           <h1 v-if="thread.title">{{ thread.title }}</h1>
           <div class="detail-author-row">
             <RouterLink v-if="authorAccountId" :to="`/members/${authorAccountId}`" class="avatar-link"><UserAvatar :name="thread.author.name" :avatar-url="thread.author.avatarUrl" :initials="thread.author.initials" :color="thread.author.color" /></RouterLink>
@@ -47,7 +47,7 @@
           </section>
           <section v-if="related.length" class="panel sidebar-section">
             <div class="panel-heading">同板块讨论</div>
-            <RouterLink v-for="item in related" :key="item.id" :to="`/threads/${item.id}`" class="related-link">{{ item.title || item.excerpt }}<span>{{ item.replies }} 回复</span></RouterLink>
+            <RouterLink v-for="item in related" :key="item.id" :to="`/threads/${item.id}`" class="related-link">{{ cleanLiteralEscapes(item.title || item.excerpt) }}<span>{{ item.replies }} 回复</span></RouterLink>
           </section>
         </aside>
       </div>
@@ -110,7 +110,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { CheckCircleOutlined, CloseOutlined, DownloadOutlined, EyeOutlined, FlagOutlined, LikeOutlined, MessageOutlined, PaperClipOutlined, ShareAltOutlined, StarOutlined } from '@ant-design/icons-vue'
 import ForumCommentItem from '@/components/ForumCommentItem.vue'
 import RichTextView from '@/components/RichTextView.vue'
@@ -118,9 +118,11 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import { createComment, createReport, favoriteThread, fetchComments, fetchThread, fetchThreads, toggleLike, unfavoriteThread, vote } from '@/api/forum'
 import { boards, formatTime } from '@/data/forum'
 import { currentUser, isLoggedIn, refreshCurrentUser, refreshUnreadCount, requireLogin } from '@/auth'
+import { cleanLiteralEscapes } from '@/utils/html'
 import type { ForumComment, ReportTargetType, Thread } from '@/types'
 
 const route = useRoute()
+const router = useRouter()
 const thread = ref<Thread | null>(null)
 const comments = ref<ForumComment[]>([])
 const related = ref<Thread[]>([])
@@ -173,6 +175,10 @@ async function load() {
   try {
     const [detail, commentList] = await Promise.all([fetchThread(id), fetchComments(id)])
     thread.value = detail
+    // 顶部栏目导航按 query.board 高亮；进入详情后同步帖子所属栏目，使其定位到对应一级栏目
+    if (detail.board && String(route.query.board || '') !== detail.board) {
+      await router.replace({ query: { ...route.query, board: detail.board } })
+    }
     selectedOptionIds.value = [...(detail.poll?.selectedOptionIds || [])]
     comments.value = commentList
     const list = await fetchThreads({ board: detail.board })

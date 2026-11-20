@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffeef4"/><stop offset="1" stop-color="#ffd9e8"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="200" fill="url(#bg)"/>
+  <ellipse cx="160" cy="158" rx="60" ry="9" fill="#c8cef0" opacity=".6"/>
+  <circle cx="140" cy="128" r="24" fill="#eb4b8d"/>
+  <circle cx="196" cy="118" r="20" fill="#eb4b8d"/>
+  <path d="M164 128V64l52-12v66" fill="none" stroke="#eb4b8d" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="140" cy="128" r="8" fill="#fff"/>
+  <circle cx="196" cy="118" r="7" fill="#fff"/>
+  <path d="M164 78l52-12" stroke="#fff" stroke-width="3" opacity=".5"/>
+  <text x="160" y="182" text-anchor="middle" font-family="Arial,sans-serif" font-size="10" font-weight="700" fill="#8a92c9" opacity=".9">POLARIS</text>
+</svg>
