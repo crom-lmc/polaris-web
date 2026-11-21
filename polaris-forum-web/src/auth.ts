@@ -77,11 +77,14 @@ export async function logout() {
 }
 
 function ssoOrigin() {
-  return (import.meta.env.VITE_SSO_ORIGIN as string) || 'http://localhost:5173'
+  return (import.meta.env.VITE_SSO_ORIGIN as string) ||
+    (import.meta.env.DEV ? 'http://localhost:5173' : 'https://polaris-sso.laimengchao.site')
 }
 
+/** 管理端地址：本地开发跨端口回退 5183，线上与前台同域的 /admin/，不回退 localhost */
 export function forumAdminOrigin() {
-  return ((import.meta.env.VITE_FORUM_ADMIN_ORIGIN as string) || 'http://localhost:5183').replace(/\/$/, '')
+  return ((import.meta.env.VITE_FORUM_ADMIN_ORIGIN as string) ||
+    (import.meta.env.DEV ? 'http://localhost:5183' : 'https://polaris-forum.laimengchao.site/admin')).replace(/\/$/, '')
 }
 
 export function callbackUrl() {

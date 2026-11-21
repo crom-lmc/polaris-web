@@ -136,7 +136,7 @@ onMounted(load)
 
     <a-spin :spinning="loading">
       <!-- 6 张主规模卡 -->
-      <a-row :gutter="16" class="stat-row">
+      <a-row :gutter="16" class="stat-row main-stat-row">
         <a-col v-for="item in statCards" :key="item.label" :span="8">
           <a-card size="small" class="stat-card">
             <div class="stat-main">
@@ -263,6 +263,8 @@ onMounted(load)
 
 .stat-row { margin-top: 16px; }
 .stat-row:first-of-type { margin-top: 0; }
+/* 6 张主规模卡同一 a-row 内按 span=8 折成两行，gutter 只有水平间距，补行间距避免上下卡片紧贴 */
+.main-stat-row { row-gap: 16px; }
 
 .stat-card :deep(.ant-card-body) {
   min-height: 96px;

@@ -4,7 +4,7 @@
     <div class="forum-layout forum-layout--tags">
       <section class="thread-section panel">
         <div class="thread-list-header">
-          <div><h2>{{ listTitle }}</h2><span>{{ threads.length }} 条内容</span></div>
+          <div><h2>{{ listTitle }}</h2><span>{{ totalCount }} 条内容</span></div>
           <div class="sort-tabs">
             <button :class="{ active: sort !== 'hot' }" @click="setSort('latest')">最新</button>
             <button :class="{ active: sort === 'hot' }" @click="setSort('hot')">热门</button>
@@ -53,6 +53,7 @@ const loading = ref(false)
 const error = ref('')
 const pageSize = 20
 const currentPage = ref(1)
+// 「N 条内容」用后端全量 total；threads 在服务端分页后只装当前页，不能再拿它的 length 当总数
 const totalCount = ref(0)
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize)))
 // 服务端已按页返回，前端不再切片

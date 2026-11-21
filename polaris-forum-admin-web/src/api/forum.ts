@@ -1,7 +1,11 @@
 import request from './request'
 
-export const SSO_AUTHORIZE_URL = import.meta.env.VITE_SSO_ORIGIN || 'http://localhost:5173'
-export const FORUM_ORIGIN = import.meta.env.VITE_FORUM_ORIGIN || 'http://localhost:5182'
+/** 统一账号中心 /authorize 入口：本地各应用分端口需回退本地 sso-web，线上用正式域名，不回退 localhost */
+export const SSO_AUTHORIZE_URL = import.meta.env.VITE_SSO_ORIGIN ||
+  (import.meta.env.DEV ? 'http://localhost:5173' : 'https://polaris-sso.laimengchao.site')
+/** 论坛前台地址：与管理端同站不同路径（前台挂在独立域根路径 /），线上不回退 localhost */
+export const FORUM_ORIGIN = import.meta.env.VITE_FORUM_ORIGIN ||
+  (import.meta.env.DEV ? 'http://localhost:5182' : 'https://polaris-forum.laimengchao.site')
 
 export function callbackUrl(): string {
   return `${window.location.origin}/admin/callback`

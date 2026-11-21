@@ -8,7 +8,7 @@
     <div class="forum-layout forum-layout--tags">
       <section class="thread-section panel">
         <div class="thread-list-header">
-          <div><h2>{{ board?.name || '板块讨论' }}</h2><span>{{ threads.length }} 条内容</span></div>
+          <div><h2>{{ board?.name || '板块讨论' }}</h2><span>{{ totalCount }} 条内容</span></div>
           <RouterLink to="/new" class="small-primary"><plus-outlined />新帖子</RouterLink>
         </div>
         <div v-if="loading" class="empty-state"><h3>正在加载板块内容…</h3></div>
@@ -35,6 +35,8 @@ import type { Thread } from '@/types'
 
 const route = useRoute()
 const threads = ref<Thread[]>([])
+// 「N 条内容」用后端全量 total；服务端分页后 threads 只装当前页，不能用它的 length 当总数
+const totalCount = ref(0)
 const loading = ref(false)
 const error = ref('')
 const boardKey = computed(() => String(route.query.board || route.params.key || 'general'))
@@ -44,7 +46,11 @@ async function load() {
   loading.value = true
   error.value = ''
   // 板块内容先取前 50 条摘要，避免大板块一次拉全量正文
-  try { threads.value = (await fetchThreadsPage({ board: boardKey.value, q: keyword.value, size: 50 })).records }
+  try {
+    const page = await fetchThreadsPage({ board: boardKey.value, q: keyword.value, size: 50 })
+    threads.value = page.records
+    totalCount.value = page.total
+  }
   catch (e) { error.value = e instanceof Error ? e.message : '请稍后重试' }
   finally { loading.value = false }
 }
