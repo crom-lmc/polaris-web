@@ -1,6 +1,8 @@
 # 依赖与构建产物
 node_modules/
 dist/
+# 构建前改名保留的旧 dist 备份（不入库，避免刷屏源代码管理面板）
+dist_bak_*/
 
 # 本地环境文件（.env.example 保留入库）
 .env.local

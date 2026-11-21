@@ -129,7 +129,7 @@ const KIND_OPTIONS = [
 ]
 
 const props = defineProps<{
-  /** 所属应用（ehr / cms / blog / sso-center / settings 等）：决定去哪个业务库拉表 */
+  /** 所属应用（ehr / cms / sso-center / settings 等）：决定去哪个业务库拉表 */
   appCode: string
   /** 当前已保存的绑定（编辑场景时回填） */
   modelValue?: TableBinding | null
@@ -147,7 +147,6 @@ const emit = defineEmits<{ 'update:modelValue': [TableBinding] }>()
 const DEFAULT_SUBJECT_KEY: Record<string, string> = {
   ehr: 'employeeId',
   cms: 'articleId',
-  blog: 'articleId',
   'sso-center': 'id',
   settings: 'id'
 }

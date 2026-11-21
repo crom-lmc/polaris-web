@@ -1,27 +1,25 @@
 # Polaris Web
 
-Polaris 一体化企业平台前端，包含统一账号中心、EHR、配置与审批中心、CMS、门户、调度中心和博客。各应用独立开发、独立构建、独立部署，通过统一 SSO 登录，并经 Gateway 访问后端。
+Polaris 一体化企业平台前端，包含统一账号中心、EHR、配置与审批中心、CMS、门户和调度中心。各应用独立开发、独立构建、独立部署，通过统一 SSO 登录，并经 Gateway 访问后端。
 
-普通应用使用 Vue 3 + TypeScript + Vite + Pinia + Ant Design Vue；Blog 使用 npm workspaces，同时包含读者端和管理端。
+各应用使用 Vue 3 + TypeScript + Vite + Pinia + Ant Design Vue。
 
 > 后端仓库：[polaris-server](https://github.com/crom-lmc/polaris-server)。启动前端前，请先按后端 README 准备 MySQL、Redis、JWT 密钥和所需后端服务。
 
 ## 一、应用与端口总览
 
-仓库包含 **7 个应用目录、8 个可运行前端入口**。
+仓库包含 **6 个应用目录、6 个可运行前端入口**。
 
 | 应用目录 | 可运行入口 | 默认开发端口 | 主要使用者 | 默认开发地址 |
 |---|---|---:|---|---|
 | `polaris-sso-web` | 统一账号中心 | 5173 | 全员、系统管理员 | `http://localhost:5173` |
-| `polaris-blog-web/packages/web` | 博客读者端 | 5175 | 访客 | `http://localhost:5175` |
-| `polaris-blog-web/packages/admin` | 博客管理端 | 5176 | 博客管理员 | `http://localhost:5176` |
 | `polaris-cms-web` | 内容中心 | 5177 | 内容运营 | `http://localhost:5177` |
 | `polaris-portal-web` | 内容门户 | 5178 | 员工、访客 | `http://localhost:5178` |
 | `polaris-ehr-web` | 人力中心 | 5179 | 全员、HR、负责人 | `http://localhost:5179` |
 | `polaris-settings-web` | 配置与审批中心 | 5180 | 管理员、审批人 | `http://localhost:5180` |
 | `polaris-job-web` | 调度中心 | 5181 | 运维、系统管理员 | `http://localhost:5181` |
 
-普通应用的 Vite 开发服务器会把 `/api`、`/actuator` 代理到 `VITE_SSO_TARGET`，默认是 `http://127.0.0.1:9080`。Blog 使用自己的环境变量，见后文。
+普通应用的 Vite 开发服务器会把 `/api`、`/actuator` 代理到 `VITE_SSO_TARGET`，默认是 `http://127.0.0.1:9080`。
 
 ## 二、功能模块
 
@@ -88,20 +86,6 @@ Polaris 一体化企业平台前端，包含统一账号中心、EHR、配置与
 - 执行日志、执行结果和失败原因排查。
 - 报警规则及通知配置入口。
 
-### 2.7 polaris-blog-web：博客读者端与管理端
-
-**读者端 `packages/web`**
-
-- 公开博客首页、文章列表、分类/标签和文章详情。
-- 默认可免登录浏览，开发时可选择 Mock 或真实后端数据。
-
-**管理端 `packages/admin`**
-
-- 博客文章、分类、标签等后台管理。
-- 接入统一 SSO，需要管理员应用授权和相应权限。
-
-Blog 不是普通单目录 Vite 应用，安装和启动命令必须在 `polaris-blog-web` 根目录执行，见第五节。
-
 ## 三、技术栈与通用结构
 
 | 分类 | 技术 |
@@ -111,7 +95,7 @@ Blog 不是普通单目录 Vite 应用，安装和启动命令必须在 `polaris
 | UI | Ant Design Vue 4.2.6 |
 | 状态与路由 | Pinia、vue-router |
 | 时间与编辑器 | dayjs、md-editor-v3（CMS 等按需使用） |
-| 包管理 | npm；Blog 使用 npm workspaces |
+| 包管理 | npm |
 
 普通应用目录结构基本一致：
 
@@ -172,8 +156,7 @@ npm -v
 - 只启动账号中心：Gateway、Auth、Account，以及 MySQL、Redis。
 - 启动 EHR：在上述基础上增加 Settings、EHR。
 - 启动 CMS 内容审批：增加 CMS、Settings；门户展示再增加 Portal。
-- 启动博客管理：增加 Blog；只使用 Blog Mock 数据时可暂不启动 Blog 后端。
-- 启动调度中心：增加 Job；报警消息依赖 Settings。
+- 启动调度中心：增加 Job；调度中心默认不需要单独博客服务。
 
 ### 4.2 获取代码
 
@@ -215,55 +198,11 @@ npm ci
 npm run dev
 ```
 
-每个应用需要独立终端。无需为了开发 EHR 一次启动全部 8 个前端入口。
+每个应用需要独立终端。无需为了开发 EHR 一次启动全部 6 个前端入口。
 
-## 五、Blog 安装与启动
+## 五、环境变量与 SSO 联调
 
-进入 Blog workspace 根目录，一次安装两个包的依赖：
-
-```bash
-cd polaris-blog-web
-npm ci
-```
-
-使用真实后端时，可在当前 PowerShell 设置：
-
-```powershell
-$env:VITE_USE_MOCK = "false"
-$env:VITE_API_TARGET = "http://127.0.0.1:9080"
-$env:VITE_WEB_PORT = "5175"
-$env:VITE_ADMIN_PORT = "5176"
-$env:VITE_WEB_ORIGIN = "http://localhost:5175"
-$env:VITE_SSO_ORIGIN = "http://localhost:5173"
-```
-
-启动读者端：
-
-```bash
-npm run dev:web
-```
-
-另开终端启动管理端：
-
-```bash
-cd polaris-blog-web
-npm run dev:admin
-```
-
-如果只在当前终端设置过环境变量，另一个终端需要重新设置。也可按 `packages/web/.env.example`、`packages/admin/.env.example` 的变量名创建本地配置，但其中旧地址示例不要直接照抄，以本 README 的当前端口和后端地址为准。
-
-Blog 常用命令：
-
-```bash
-npm run dev:web       # 读者端开发
-npm run dev:admin     # 管理端开发
-npm run typecheck     # 两端类型检查
-npm run build         # 依次构建读者端和管理端
-```
-
-## 六、环境变量与 SSO 联调
-
-### 6.1 普通应用变量
+### 5.1 普通应用变量
 
 | 变量 | 默认值/示例 | 用途 |
 |---|---|---|
@@ -280,7 +219,7 @@ npm run dev
 
 `VITE_SSO_TARGET` 在 Vite 配置阶段读取，因此最稳妥的方式是在启动命令前设置终端环境变量。修改变量后需要重启 Vite。前端环境变量会进入浏览器产物，**不要放入数据库密码、appSecret、JWT 私钥或内部 token**。
 
-### 6.2 应用登记与回调地址
+### 5.2 应用登记与回调地址
 
 跨应用登录不仅要求前端地址正确，还要求账号中心中的应用登记正确。每个需要登录的应用应检查：
 
@@ -298,22 +237,21 @@ Settings：http://localhost:5180
 CMS：     http://localhost:5177
 Portal：  http://localhost:5178
 Job：     http://localhost:5181
-Blog 管理端：http://localhost:5176
 Gateway： http://127.0.0.1:9080
 ```
 
 `localhost` 与 `127.0.0.1` 是不同 origin；如果 EHR 登记为 `http://localhost:5179`，浏览器就使用这个地址，不要改成 `http://127.0.0.1:5179`。修改端口或部署域名后，要同步修改账号中心应用登记。
 
-### 6.3 推荐联调顺序
+### 5.3 推荐联调顺序
 
 1. 启动 Account、Auth、Gateway，启动 `polaris-sso-web`，确认管理员可以登录。
 2. 启动 Settings、EHR，启动 `polaris-ehr-web`，确认可以从账号中心返回并获取当前用户。
 3. 给测试账号授予较小范围的角色和数据权限，检查菜单、页签、按钮和人员数据是否一致。
-4. 再按需要启动 CMS、Portal、Blog、Job，避免把多个应用的问题混在一起排查。
+4. 再按需要启动 CMS、Portal、Job，避免把多个应用的问题混在一起排查。
 
-## 七、类型检查、构建与预览
+## 六、类型检查、构建与预览
 
-### 7.1 普通应用
+### 6.1 普通应用
 
 在任一普通应用目录执行：
 
@@ -330,7 +268,7 @@ npm run preview
 npx vue-tsc --noEmit
 ```
 
-### 7.2 全部普通应用构建
+### 6.2 全部普通应用构建
 
 在 `polaris-web` 根目录，PowerShell 可执行：
 
@@ -351,9 +289,7 @@ foreach ($app in $apps) {
 }
 ```
 
-Blog 单独进入 `polaris-blog-web` 执行 `npm ci`、`npm run build`。
-
-## 八、生产构建与 Nginx 部署
+## 七、生产构建与 Nginx 部署
 
 每个应用独立部署自己的 `dist/`。使用 vue-router history 模式时，Nginx 必须配置 history fallback，否则刷新子路由会出现 404。
 
@@ -391,18 +327,18 @@ server {
 - 不在前端环境变量或源码中写任何服务端密钥。
 - 部署后验证直接打开子路由、刷新页面、SSO 跳转、退出登录、文件上传下载和跨应用主题。
 
-## 九、开发规范
+## 八、开发规范
 
-### 9.1 代码与接口
+### 8.1 代码与接口
 
 - 统一使用 Vue 3 组合式 API 和 `<script setup lang="ts">`。
 - 接口放在 `src/api/*.ts`，组件不直接散落编写请求；TypeScript 类型与后端 DTO 对齐。
 - 登录态和权限通过用户 Store 获取，按钮/入口使用 `store.can('资源:动作')`，不要只判断角色名称。
 - 新增菜单时同时评估路由、页签、按钮、后端 `@Permit` 和数据范围。
-- 普通应用提交前执行 `npm run build`；Blog 执行 `npm run typecheck` 和 `npm run build`。
+- 应用提交前执行 `npm run build`。
 - `.env.local`、`dist/`、`node_modules/` 不提交；环境示例只放非敏感配置。
 
-### 9.2 样式与主题
+### 8.2 样式与主题
 
 - 颜色使用 CSS 变量（如 `--card-bg`、`--text-base`、`--border-subtle`），新增颜色同时适配浅色和深色。
 - 表格布局沿用 `ft-page / ft-head / ft-scroll / ft-bottom`，保持分页、滚动和空态行为一致。
@@ -411,44 +347,40 @@ server {
 - 主题读写通过 `src/stores/theme.ts`，页面不要各自直接操作 cookie、localStorage 或 `data-theme`。
 - 修改 request、主题、布局 class 等跨应用共同模式时，应评估所有相关应用，不只检查当前页面。
 
-## 十、常见问题
+## 九、常见问题
 
-### 10.1 `npm run dev` 后接口连接失败
+### 9.1 `npm run dev` 后接口连接失败
 
 确认 Gateway 已在 `9080` 启动，`VITE_SSO_TARGET` 指向 Gateway，并且后端所需业务服务已启动。Vite 只代理请求，不会代替启动后端。
 
-### 10.2 登录后又跳回登录页，或 ticket 换取失败
+### 9.2 登录后又跳回登录页，或 ticket 换取失败
 
 依次检查应用 `base_url`、浏览器 origin、账号应用授权和后端 `*_APP_SECRET`。修改 Vite 端口后必须同步应用登记；不要混用 `localhost` 和 `127.0.0.1`。
 
-### 10.3 请求返回 401
+### 9.3 请求返回 401
 
 检查登录是否过期、后端 auth/Gateway RSA 密钥是否匹配、Redis 是否正常，以及请求是否经过 Gateway。必要时退出后重新登录，不要通过前端关闭鉴权绕过。
 
-### 10.4 页面能看到菜单但按钮消失
+### 9.4 页面能看到菜单但按钮消失
 
 按钮可能使用独立权限码。检查账号中心角色是否同时授予页面、页签和按钮权限；前端权限缓存可在重新登录后刷新。非 HR 对组织、人员只读是预期权限行为。
 
-### 10.5 有页面权限但没有人员数据，或只能看到本团队
+### 9.5 有页面权限但没有人员数据，或只能看到本团队
 
 这是组织数据范围在服务端生效。检查账号的数据权限和组织负责人关系，不应通过请求全部接口或修改前端来绕过。
 
-### 10.6 出现跨域错误
+### 9.6 出现跨域错误
 
 本地开发优先使用 Vite `/api` 代理，让浏览器请求同源前端地址。生产环境通过 Nginx 把 `/api` 转发到 Gateway。不要在不了解影响的情况下同时放开多个跨域来源和凭据。
 
-### 10.7 修改环境变量没有生效
+### 9.7 修改环境变量没有生效
 
 `VITE_SSO_TARGET` 等变量在 Vite 启动时读取，修改后重启开发服务器。另一个终端不会继承已打开终端的变量；还要确认变量设置在真正执行 `npm run dev` 的终端中。
 
-### 10.8 生产首页正常，刷新子路由 404
+### 9.8 生产首页正常，刷新子路由 404
 
 Nginx 缺少 `try_files $uri $uri/ /index.html;`。同时检查 `root` 是否指向当前应用的 `dist`，不要指到仓库根目录。
 
-### 10.9 Blog 一直显示模拟数据
-
-确认 `VITE_USE_MOCK=false`、`VITE_API_TARGET` 指向 Gateway，并重启 Blog 开发服务器。管理端还需要 Blog 后端、SSO 应用登记和账号授权。
-
-### 10.10 构建报 TypeScript 错误
+### 9.9 构建报 TypeScript 错误
 
 普通应用的 `npm run build` 会先执行 `vue-tsc --noEmit`，应先修复类型错误再部署。不要通过删除类型检查脚本生成可能不可用的产物。

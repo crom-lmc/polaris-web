@@ -209,9 +209,9 @@
             :rows="12"
             class="mono"
             placeholder='[
-  { "code": "blog", "name": "博客", "type": 1, "sort": 1 },
-  { "code": "article:list", "name": "查看文章", "type": 2, "parentCode": "blog", "sort": 1 },
-  { "code": "article:publish", "name": "发布文章", "type": 2, "parentCode": "blog", "sort": 2 }
+  { "code": "cms", "name": "内容中心", "type": 1, "sort": 1 },
+  { "code": "article:list", "name": "查看文章", "type": 2, "parentCode": "cms", "sort": 1 },
+  { "code": "article:publish", "name": "发布文章", "type": 2, "parentCode": "cms", "sort": 2 }
 ]'
           />
           <div class="field-tip">

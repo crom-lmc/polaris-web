@@ -370,7 +370,6 @@ const appLabels: Record<string, string> = {
   sso: '统一账号中心',
   cms: '内容中心',
   ehr: '人力中心',
-  blog: '博客后台',
   settings: '配置中心',
   job: '调度中心'
 }
@@ -398,7 +397,7 @@ async function openAssign(record: RoleVO) {
     }
 
     const leafIds: string[] = []
-    const appOrder = ['sso', 'cms', 'ehr', 'blog', 'settings', 'job']
+    const appOrder = ['sso', 'cms', 'ehr', 'settings', 'job']
     const sortedApps = [...groups.keys()].sort((a, b) => {
       const ia = appOrder.indexOf(a)
       const ib = appOrder.indexOf(b)

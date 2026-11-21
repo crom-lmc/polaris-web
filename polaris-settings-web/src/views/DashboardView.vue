@@ -24,7 +24,6 @@ const apps = [
   { name: '统一账号中心', code: 'account', dict: 6, approval: '—', notice: 3, status: '已接入' },
   { name: '人力中心', code: 'ehr', dict: 12, approval: 5, notice: 4, status: '已接入' },
   { name: '内容中心', code: 'cms', dict: 4, approval: 1, notice: 2, status: '已接入' },
-  { name: '博客系统', code: 'blog', dict: 3, approval: '—', notice: 1, status: '已接入' },
   { name: '调度中心', code: 'job', dict: 5, approval: 2, notice: 2, status: '已接入' }
 ]
 

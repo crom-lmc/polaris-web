@@ -3,11 +3,10 @@ const APP_LABELS: Record<string, string> = {
   ehr: 'EHR',
   settings: '配置中心',
   gateway: 'SSO 网关',
-  cms: 'CMS',
-  blog: '博客'
+  cms: 'CMS'
 }
 
-export const APP_CODES = ['ehr', 'settings', 'cms', 'blog', 'gateway']
+export const APP_CODES = ['ehr', 'settings', 'cms', 'gateway']
 
 export function appLabel(code?: string | null): string {
   if (!code) return '—'

@@ -546,7 +546,7 @@ export interface EntityColumnMeta {
   primaryKey?: boolean
 }
 
-/** 业务库表清单：按 appCode 路由到对应业务方（ehr / cms / blog / sso-center / settings） */
+/** 业务库表清单：按 appCode 路由到对应业务方（ehr / cms / sso-center / settings） */
 export function fetchEntityTables(appCode: string) {
   // 元数据接口带时间戳破缓存：建表/改表注释后必须立刻看到最新清单，
   // 否则浏览器会复用旧响应（曾出现同一张表渲染两遍的现象）。

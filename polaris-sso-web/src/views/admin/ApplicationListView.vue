@@ -119,7 +119,7 @@
           <a-input
             v-model:value="editForm.code"
             :disabled="!!editing"
-            placeholder="如 blog-admin"
+            placeholder="如 cms-admin"
           />
           <div class="field-tip">编码是 ticket 与用户授权的关联键，创建后不可修改</div>
         </a-form-item>
@@ -144,9 +144,9 @@
         <a-form-item
           label="访问地址"
           name="baseUrl"
-          :rules="[{ type: 'url', message: '需为完整 URL，如 https://blog.example.com' }]"
+          :rules="[{ type: 'url', message: '需为完整 URL，如 https://cms.example.com' }]"
         >
-          <a-input v-model:value="editForm.baseUrl" placeholder="https://blog.example.com" />
+          <a-input v-model:value="editForm.baseUrl" placeholder="https://cms.example.com" />
           <div class="field-tip">单点跳转的目标；也会作为回跳地址的合法 origin 校验依据</div>
         </a-form-item>
 

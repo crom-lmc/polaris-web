@@ -2646,8 +2646,7 @@ const APP_NAMES: Record<string, string> = {
   'sso-center': '统一账号中心',
   portal: '内容门户',
   ehr: '人力中心',
-  cms: '内容中心',
-  blog: '博客后台'
+  cms: '内容中心'
 }
 
 function appName(code: string) {
