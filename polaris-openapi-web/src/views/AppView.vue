@@ -4,7 +4,7 @@
       <a-alert
         type="info"
         show-icon
-        message="应用的创建 / 授权 / 密钥重置请在统一账号中心完成，此处仅展示已对接的应用清单。"
+        message="此处仅展示外部第三方对接应用（应用类型：第三方对接应用 / OPENAPI_CLIENT）。应用的创建、接口授权、密钥重置与启停请在统一登录中心完成；Polaris 内部系统不属于对接应用。点每行左侧箭头可查看该应用被授权调用的接口清单与调用方向。"
       />
     </div>
 
@@ -15,7 +15,17 @@
         :data-source="rows"
         :loading="loading"
         row-key="code"
+        :expanded-row-keys="expandedKeys"
+        @expanded-rows-change="onExpanded"
       >
+        <template #expandIcon="{ expanded, onExpand, record }">
+          <a-button type="link" size="small" @click="onExpand(record, $event)">
+            {{ expanded ? '▾' : '▸' }}
+          </a-button>
+        </template>
+        <template #expandedRowRender="{ record }">
+          <EndpointList :app="record" />
+        </template>
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'code'">
             <span class="mono">{{ record.code }}</span>
@@ -39,6 +49,7 @@
 import { onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { listApps, type AppInfo } from '@/api/openapi'
+import EndpointList from '@/components/AppEndpointList.vue'
 
 const columns = [
   { title: '应用编码', dataIndex: 'code', key: 'code', width: 220 },
@@ -49,6 +60,11 @@ const columns = [
 
 const rows = ref<AppInfo[]>([])
 const loading = ref(false)
+const expandedKeys = ref<string[]>([])
+
+function onExpanded(keys: readonly (string | number)[]) {
+  expandedKeys.value = keys.map(String)
+}
 
 async function load() {
   loading.value = true

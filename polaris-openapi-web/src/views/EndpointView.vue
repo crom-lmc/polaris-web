@@ -7,6 +7,20 @@
         style="width: 240px"
         allow-clear
       />
+      <a-select
+        v-model:value="operationFilter"
+        placeholder="操作类型"
+        style="width: 130px"
+        allow-clear
+        :options="operationFilterOptions"
+      />
+      <a-select
+        v-model:value="purposeFilter"
+        placeholder="业务用途"
+        style="width: 130px"
+        allow-clear
+        :options="purposeFilterOptions"
+      />
       <a-button @click="load">刷新</a-button>
       <a-button v-if="canCreate" type="primary" @click="openCreate">新增 API</a-button>
     </div>
@@ -27,8 +41,14 @@
           </template>
           <template v-else-if="column.key === 'direction'">
             <a-tag :color="record.direction === 1 ? 'green' : 'blue'">
-              {{ record.direction === 1 ? '进' : '出' }}
+              {{ directionLabel(record.direction) }}
             </a-tag>
+          </template>
+          <template v-else-if="column.key === 'operationType'">
+            <a-tag :color="operationColor(operationTypeOf(record))">{{ operationLabel(operationTypeOf(record)) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'purpose'">
+            <span>{{ purposeOf(record.apiCode) }}</span>
           </template>
           <template v-else-if="column.key === 'method'">
             <a-tag>{{ record.method }}</a-tag>
@@ -67,14 +87,13 @@
     />
 
     <!-- 新增 / 编辑 -->
-    <a-modal
-      centered
-      v-model:open="modalOpen"
+    <a-drawer
+      v-model:open="drawerOpen"
       :title="editing ? '编辑 API' : '新增 API'"
-      :confirm-loading="saving"
-      @ok="submit"
+      :width="520"
+      destroy-on-close
     >
-      <a-form layout="vertical" style="margin-top: 12px">
+      <a-form layout="vertical">
         <a-form-item label="API 编码" required extra="全局唯一，保存后不可修改">
           <a-input v-model:value="form.apiCode" :disabled="!!editing" placeholder="如 ehr.leave.list" />
         </a-form-item>
@@ -88,11 +107,14 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="归属应用">
-              <a-input v-model:value="form.appCode" placeholder="如 ehr" />
+            <a-form-item label="操作类型">
+              <a-select v-model:value="form.operationType" :options="operationTypeOptions" />
             </a-form-item>
           </a-col>
         </a-row>
+        <a-form-item label="归属应用">
+          <a-input v-model:value="form.appCode" placeholder="如 ehr" />
+        </a-form-item>
         <a-row :gutter="12">
           <a-col :span="8">
             <a-form-item label="方法">
@@ -150,7 +172,13 @@
           <a-textarea v-model:value="form.remark" :rows="2" />
         </a-form-item>
       </a-form>
-    </a-modal>
+      <template #footer>
+        <div class="drawer-footer">
+          <a-button style="margin-right: 8px" :disabled="saving" @click="drawerOpen = false">取消</a-button>
+          <a-button type="primary" :loading="saving" @click="submit">保存</a-button>
+        </div>
+      </template>
+    </a-drawer>
   </div>
 </template>
 
@@ -176,7 +204,9 @@ const canDelete = computed(() => store.can('openapi:endpoint:delete'))
 const columns = [
   { title: 'API 编码', key: 'apiCode', width: 150 },
   { title: '名称', dataIndex: 'apiName', key: 'apiName', width: 120, ellipsis: true },
-  { title: '方向', key: 'direction', width: 70 },
+  { title: '能力方向', key: 'direction', width: 100 },
+  { title: '操作类型', key: 'operationType', width: 90 },
+  { title: '业务用途', key: 'purpose', width: 90 },
   { title: '应用', dataIndex: 'appCode', key: 'appCode', width: 100 },
   { title: '方法', key: 'method', width: 80 },
   { title: '路径', key: 'path', width: 170, ellipsis: true },
@@ -186,10 +216,63 @@ const columns = [
   { title: '操作', key: 'action', width: 180 }
 ]
 
+// 业务语义方向：底层 1=INBOUND（第三方调我们=对外提供/出），2=OUTBOUND（我们调第三方=进）
 const directionOptions = [
-  { label: '入站（进）', value: 1 },
-  { label: '出站（出）', value: 2 }
+  { label: '对外提供（出）', value: 1 },
+  { label: '调用第三方（进）', value: 2 }
 ]
+function directionLabel(direction: number) {
+  return direction === 1 ? '出·对外提供' : '进·调用第三方'
+}
+
+const operationTypeOptions = [
+  { label: '查询 QUERY', value: 'QUERY' },
+  { label: '新增 CREATE', value: 'CREATE' },
+  { label: '修改 UPDATE', value: 'UPDATE' },
+  { label: '删除 DELETE', value: 'DELETE' },
+  { label: '执行 EXECUTE', value: 'EXECUTE' }
+]
+const operationFilterOptions = operationTypeOptions
+const operationLabelMap: Record<string, string> = {
+  QUERY: '查询', CREATE: '新增', UPDATE: '修改', DELETE: '删除', EXECUTE: '执行'
+}
+const operationColorMap: Record<string, string> = {
+  QUERY: 'blue', CREATE: 'green', UPDATE: 'orange', DELETE: 'red', EXECUTE: 'purple'
+}
+function operationTypeOf(r: ApiEndpoint): string {
+  if (r.operationType) return r.operationType
+  // 老数据兼容：按方法与方向推断
+  if (r.direction === 2) return 'EXECUTE'
+  const m = (r.method || '').toUpperCase()
+  if (m === 'POST') return 'CREATE'
+  if (m === 'PUT' || m === 'PATCH') return 'UPDATE'
+  if (m === 'DELETE') return 'DELETE'
+  return 'QUERY'
+}
+function operationLabel(type: string) {
+  return operationLabelMap[type] || type
+}
+function operationColor(type: string) {
+  return operationColorMap[type] || 'default'
+}
+
+const purposeFilterOptions = [
+  { label: '主数据', value: '主数据' },
+  { label: '字典', value: '字典' },
+  { label: '人员', value: '人员' },
+  { label: '组织', value: '组织' },
+  { label: '通知', value: '通知' }
+]
+/** 业务用途按 api_code 前缀推断 */
+function purposeOf(apiCode: string): string {
+  const c = (apiCode || '').toLowerCase()
+  if (c.includes('master')) return '主数据'
+  if (c.includes('dict')) return '字典'
+  if (c.includes('employ')) return '人员'
+  if (c.includes('org')) return '组织'
+  if (c.includes('email') || c.includes('sms') || c.includes('notify')) return '通知'
+  return '其他'
+}
 const methodOptions = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map((v) => ({ label: v, value: v }))
 const authOptions = [
   { label: 'OAUTH_CLIENT', value: 'OAUTH_CLIENT' },
@@ -209,13 +292,18 @@ const rows = ref<ApiEndpoint[]>([])
 const loading = ref(false)
 const keyword = ref('')
 
-/** 按 apiCode / apiName 前端过滤 */
+const operationFilter = ref<string | undefined>(undefined)
+const purposeFilter = ref<string | undefined>(undefined)
+
+/** 按 apiCode / apiName / 操作类型 / 业务用途前端过滤 */
 const filteredRows = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return rows.value
-  return rows.value.filter(
-    (r) => r.apiCode.toLowerCase().includes(kw) || r.apiName.toLowerCase().includes(kw)
-  )
+  return rows.value.filter((r) => {
+    if (kw && !r.apiCode.toLowerCase().includes(kw) && !r.apiName.toLowerCase().includes(kw)) return false
+    if (operationFilter.value && operationTypeOf(r) !== operationFilter.value) return false
+    if (purposeFilter.value && purposeOf(r.apiCode) !== purposeFilter.value) return false
+    return true
+  })
 })
 
 /** 接口返回全量列表，这里做前端分页；分页条由 ft-bottom 固定到滚动容器底部 */
@@ -250,7 +338,7 @@ async function load() {
 }
 
 /* ---------------- 新增 / 编辑 ---------------- */
-const modalOpen = ref(false)
+const drawerOpen = ref(false)
 const saving = ref(false)
 const editing = ref<ApiEndpoint | null>(null)
 
@@ -259,6 +347,7 @@ function emptyForm() {
     apiCode: '',
     apiName: '',
     direction: 1,
+    operationType: 'QUERY',
     appCode: '',
     method: 'GET',
     path: '',
@@ -279,7 +368,7 @@ const form = reactive(emptyForm())
 function openCreate() {
   editing.value = null
   Object.assign(form, emptyForm())
-  modalOpen.value = true
+  drawerOpen.value = true
 }
 
 function openEdit(r: ApiEndpoint) {
@@ -288,6 +377,7 @@ function openEdit(r: ApiEndpoint) {
     apiCode: r.apiCode,
     apiName: r.apiName,
     direction: r.direction,
+    operationType: operationTypeOf(r),
     appCode: r.appCode || '',
     method: r.method || 'GET',
     path: r.path || '',
@@ -302,7 +392,7 @@ function openEdit(r: ApiEndpoint) {
     remark: r.remark || '',
     status: r.status ?? 1
   })
-  modalOpen.value = true
+  drawerOpen.value = true
 }
 
 async function submit() {
@@ -317,6 +407,7 @@ async function submit() {
       apiCode: form.apiCode.trim(),
       apiName: form.apiName.trim(),
       direction: form.direction,
+      operationType: form.operationType,
       appCode: form.appCode.trim(),
       method: form.method,
       path: form.path.trim(),
@@ -332,7 +423,7 @@ async function submit() {
       status: form.status
     })
     message.success(editing.value ? '已保存' : '已创建')
-    modalOpen.value = false
+    drawerOpen.value = false
     void load()
   } catch (e: any) {
     message.error(e?.message || '保存失败')
@@ -380,7 +471,7 @@ onMounted(() => {
 <style scoped>
 /* 表格最小宽度：横向滚动只发生在 .ft-scroll，操作列由 .ft-table 固定 */
 .endpoint-page {
-  --ft-min-width: 1180px;
+  --ft-min-width: 1400px;
 }
 .toolbar {
   display: flex;
@@ -392,5 +483,9 @@ onMounted(() => {
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
+}
+.drawer-footer {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

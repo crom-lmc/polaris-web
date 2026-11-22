@@ -66,6 +66,7 @@ export interface ApiEndpoint {
   apiCode: string
   apiName: string
   direction: number
+  operationType?: string
   appCode: string
   method: string
   path: string
@@ -90,6 +91,23 @@ export const deleteEndpoint = (apiCode: string) =>
 // ---------------- 对接应用（app） ----------------
 export interface AppInfo { code: string; name: string; status?: number; remark?: string }
 export const listApps = () => request.get<never, AppInfo[]>('/api/open/admin/app/list')
+
+/** 第三方应用被授权调用的接口清单项 */
+export interface AppEndpoint {
+  apiCode: string
+  apiName: string
+  direction: number
+  directionLabel: string
+  directionFlow: string
+  operationType?: string
+  method: string
+  path: string
+  appCode: string
+  requiredPerm: string
+  status: number
+}
+export const listAppEndpoints = (appCode: string) =>
+  request.get<never, AppEndpoint[]>(`/api/open/admin/app/${encodeURIComponent(appCode)}/endpoints`)
 
 // ---------------- 出站渠道（channel） ----------------
 export interface Channel {

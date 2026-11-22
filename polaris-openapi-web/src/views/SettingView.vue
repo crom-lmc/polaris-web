@@ -21,22 +21,30 @@
           <a-collapse-panel v-for="key in keys" :key="key" :header="`${metaOf(key).label}（${key}）`">
             <div class="setting-row">
               <div class="setting-control">
-                <a-textarea
-                  v-if="metaOf(key).kind === 'textarea'"
-                  v-model:value="formValues[key]"
-                  :rows="metaOf(key).rows || 3"
-                  :placeholder="metaOf(key).hint"
+                <IpWhitelistEditor
+                  v-if="key === IP_WHITELIST_KEY"
+                  ref="whitelistRef"
+                  v-model="formValues[key]"
                   :disabled="!canEdit"
                 />
-                <a-input-number
-                  v-else
-                  v-model:value="formValues[key]"
-                  :min="0"
-                  :precision="0"
-                  style="width: 240px"
-                  :disabled="!canEdit"
-                />
-                <div class="hint">{{ metaOf(key).hint }}</div>
+                <template v-else>
+                  <a-textarea
+                    v-if="metaOf(key).kind === 'textarea'"
+                    v-model:value="formValues[key]"
+                    :rows="metaOf(key).rows || 3"
+                    :placeholder="metaOf(key).hint"
+                    :disabled="!canEdit"
+                  />
+                  <a-input-number
+                    v-else
+                    v-model:value="formValues[key]"
+                    :min="0"
+                    :precision="0"
+                    style="width: 240px"
+                    :disabled="!canEdit"
+                  />
+                  <div class="hint">{{ metaOf(key).hint }}</div>
+                </template>
               </div>
               <a-button
                 v-if="canEdit"
@@ -60,9 +68,13 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { listSettings, saveSetting, type Setting } from '@/api/openapi'
 import { useUserStore } from '@/stores/user'
+import IpWhitelistEditor from '@/components/IpWhitelistEditor.vue'
+
+const IP_WHITELIST_KEY = 'ip.whitelist'
 
 const store = useUserStore()
 const canEdit = computed(() => store.can('openapi:setting:edit'))
+const whitelistRef = ref<InstanceType<typeof IpWhitelistEditor> | null>(null)
 
 interface SettingMeta {
   label: string
@@ -75,7 +87,7 @@ interface SettingMeta {
 const META: Record<string, SettingMeta> = {
   'ip.whitelist': {
     label: 'IP 白名单',
-    hint: '每行一个 IP/CIDR，* 表示全部，留空不限制',
+    hint: '每行一条规则：IPv4 或 CIDR 网段，* 表示全部，留空不限制',
     kind: 'textarea',
     rows: 5
   },
@@ -132,6 +144,7 @@ async function load() {
 
 async function save(key: string) {
   if (!canEdit.value) return
+  if (key === IP_WHITELIST_KEY && whitelistRef.value && !whitelistRef.value.validate()) return
   savingKey.value = key
   try {
     await saveSetting(key, formValues[key] ?? '', formRemarks[key] || undefined)

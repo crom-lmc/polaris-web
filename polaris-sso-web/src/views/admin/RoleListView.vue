@@ -152,8 +152,9 @@ import {
   fetchRolePage,
   updateRole
 } from '@/api/rbac'
+import { fetchApplications } from '@/api/apps'
 import { useUserStore } from '@/stores/user'
-import type { PermissionVO, RoleVO } from '@/types'
+import type { ApplicationVO, PermissionVO, RoleVO } from '@/types'
 import { message } from 'ant-design-vue'
 import { confirmAction } from '@/utils/confirm'
 import RoleUserTransferModal from './components/RoleUserTransferModal.vue'
@@ -217,8 +218,27 @@ const expandAll = ref(false)
 const allLeafIds = ref<string[]>([])
 
 onMounted(async () => {
+  await loadApps()
   await load()
 })
+
+const apps = ref<ApplicationVO[]>([])
+
+/** 应用下拉数据：授权树分组标题取应用真实名称，无权限时降级为 app_code */
+async function loadApps() {
+  if (!store.can('app:list')) return
+  try {
+    const res = await fetchApplications()
+    apps.value = res.data || []
+  } catch {
+    // 没有应用查看权限时只显示 app_code，不影响授权
+  }
+}
+
+function appLabel(code: string): string {
+  if (code === 'sso' || code === 'sso-center') return '统一账号中心'
+  return apps.value.find((a) => a.code === code)?.name || code
+}
 
 async function load() {
   loading.value = true
@@ -365,15 +385,6 @@ const checkedLeafCount = computed(
   () => checkedKeys.value.filter((k) => !isVirtual(k)).length
 )
 
-/** 应用编码 → 中文名 */
-const appLabels: Record<string, string> = {
-  sso: '统一账号中心',
-  cms: '内容中心',
-  ehr: '人力中心',
-  settings: '配置中心',
-  job: '调度中心'
-}
-
 async function openAssign(record: RoleVO) {
   assignTarget.value = record
   assignOpen.value = true
@@ -406,7 +417,7 @@ async function openAssign(record: RoleVO) {
 
     treeData.value = sortedApps.map((app) => ({
       key: `app:${app}`,
-      title: `${appLabels[app] || app}（${app}）`,
+      title: `${appLabel(app)}（${app}）`,
       children: groups.get(app)!.map((n) => nodeOf(n, leafIds))
     }))
     allLeafIds.value = leafIds

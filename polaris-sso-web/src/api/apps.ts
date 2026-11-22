@@ -9,7 +9,8 @@ export const APPLICATION_TYPE_FALLBACK = [
   { value: 'MANAGEMENT', label: '管理应用' },
   { value: 'PORTAL', label: '门户应用' },
   { value: 'COMMUNITY', label: '社区应用' },
-  { value: 'OTHER', label: '其他应用' }
+  { value: 'OTHER', label: '其他应用' },
+  { value: 'OPENAPI_CLIENT', label: '第三方对接应用' }
 ]
 
 export interface ApplicationPayload {

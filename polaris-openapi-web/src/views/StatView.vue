@@ -337,8 +337,42 @@ onMounted(() => {
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
-.stat-scroll {
+.ft-scroll.stat-scroll {
   padding-right: 2px;
+  overflow-x: hidden;
+}
+
+/* 内容撑满滚动容器高度；gutter 用 padding 实现，抵消 a-row 负 margin 造成的横向溢出 */
+.stat-scroll :deep(.ant-spin-nested-loading),
+.stat-scroll :deep(.ant-spin-container) {
+  min-height: 100%;
+}
+.stat-scroll :deep(.ant-spin-container) {
+  display: flex;
+  flex-direction: column;
+}
+.stat-scroll :deep(.ant-row) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+.stat-scroll :deep(.ant-col) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.stat-scroll .chart-row:last-child {
+  flex: 1 1 auto;
+}
+.stat-scroll .chart-row:last-child :deep(.ant-col),
+.stat-scroll .chart-row:last-child .chart-card {
+  height: 100%;
+}
+.stat-scroll .chart-row:last-child :deep(.ant-card) {
+  display: flex;
+  flex-direction: column;
+}
+.stat-scroll .chart-row:last-child :deep(.ant-card-body) {
+  flex: 1;
+  min-height: 240px;
 }
 
 /* 指标卡自适应网格：窄屏 2 列，宽屏最多 4 列 */

@@ -244,8 +244,34 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text-base);
 }
-.dash-scroll {
+.ft-scroll.dash-scroll {
   padding-right: 2px;
+  overflow-x: hidden;
+}
+
+/* 内容撑满滚动容器高度；gutter 用 padding 实现，抵消 a-row 负 margin 造成的横向溢出 */
+.dash-scroll :deep(.ant-spin-nested-loading),
+.dash-scroll :deep(.ant-spin-container) {
+  min-height: 100%;
+}
+.dash-scroll :deep(.ant-spin-container) {
+  display: flex;
+  flex-direction: column;
+}
+.dash-scroll :deep(.ant-row) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+.dash-scroll :deep(.ant-col) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.dash-scroll .chart-row:last-child {
+  flex: 1 1 auto;
+}
+.dash-scroll .chart-row:last-child :deep(.ant-col),
+.dash-scroll .chart-row:last-child .chart-card {
+  height: 100%;
 }
 
 /* 指标卡自适应网格：窄屏 2 列，宽屏最多 7 列 */
@@ -289,6 +315,14 @@ onMounted(() => {
 }
 .chart-card {
   height: 100%;
+}
+.dash-scroll .chart-row:last-child :deep(.ant-card) {
+  display: flex;
+  flex-direction: column;
+}
+.dash-scroll .chart-row:last-child :deep(.ant-card-body) {
+  flex: 1;
+  min-height: 240px;
 }
 .chart-card :deep(.ant-card-body) {
   min-height: 240px;
