@@ -1,3 +1,12 @@
+<div align="center">
+  <img src="https://img.shields.io/badge/STATUS-ARCHIVED-red.svg" alt="Archived">
+  <img src="https://img.shields.io/badge/MIGRATED_TO-polaris-blue.svg" alt="Migrated">
+</div>
+
+<h2 align="center">⚠️ 本仓库已停止更新</h2>
+<p align="center">前端/后端代码已合并迁移至新仓库：<b><a href="https://github.com/crom-lmc/polaris">crom-lmc/polaris</a></b></p>
+
+
 # Polaris Web
 
 Polaris 一体化企业平台前端，包含统一账号中心、EHR、配置与审批中心、CMS、门户和调度中心。各应用独立开发、独立构建、独立部署，通过统一 SSO 登录，并经 Gateway 访问后端。
